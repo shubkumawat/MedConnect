@@ -55,8 +55,12 @@ class CustomTextField extends StatelessWidget {
       onTap: onTap,
       style: AppTextStyles.body.copyWith(color: AppColors.primary),
       decoration: InputDecoration(
+        labelText: hint,
+        labelStyle: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+        floatingLabelStyle: AppTextStyles.captionBold.copyWith(color: AppColors.teal),
+        floatingLabelBehavior: FloatingLabelBehavior.auto,
         hintText: hint,
-        hintStyle: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+        hintStyle: AppTextStyles.body.copyWith(color: AppColors.textMuted.withOpacity(0.5)),
         filled: true,
         fillColor: AppColors.bgCardNavy,
         prefixIcon: prefixIcon != null
@@ -85,75 +89,6 @@ class CustomTextField extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.statusRed, width: 1.5),
         ),
-      ),
-    );
-  }
-}
-
-// ─── Dropdown Field ───────────────────────────────────────────────────────────
-class McDropdown<T> extends StatelessWidget {
-  final String hint;
-  final T? value;
-  final List<T> items;
-  final String Function(T)? itemLabel;
-  final ValueChanged<T?> onChanged;
-  final IconData? prefixIcon;
-  final Color? borderColor;
-
-  const McDropdown({
-    super.key,
-    required this.hint,
-    required this.items,
-    required this.onChanged,
-    this.value,
-    this.itemLabel,
-    this.prefixIcon,
-    this.borderColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: AppColors.bgCardNavy,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor ?? AppColors.teal),
-      ),
-      child: Row(
-        children: [
-          if (prefixIcon != null) ...[
-            Icon(prefixIcon, color: AppColors.textMuted, size: 20),
-            const SizedBox(width: 12),
-          ],
-          Expanded(
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<T>(
-                value: value,
-                hint: Text(hint, style: AppTextStyles.body.copyWith(color: AppColors.textMuted)),
-                isExpanded: true,
-                dropdownColor: AppColors.bgCardNavy,
-                style: AppTextStyles.body.copyWith(color: AppColors.textTail),
-                icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textMuted),
-                items: items.map((T item) {
-                  String label = "";
-                  if (itemLabel != null) {
-                    label = itemLabel!(item);
-                  } else if (item is String) {
-                    label = item;
-                  } else {
-                    label = item.toString();
-                  }
-                  return DropdownMenuItem<T>(
-                    value: item,
-                    child: Text(label),
-                  );
-                }).toList(),
-                onChanged: onChanged,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

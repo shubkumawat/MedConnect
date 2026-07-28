@@ -344,6 +344,24 @@ class ApiProvider {
     }
   }
 
+  Future<Map<String, dynamic>?> getMasterDisabilityTypeAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
+    Map<String, dynamic>? result;
+    try {
+      CustomLoading().show(context);
+      final Response? response = await requestGetForApi(context, url, dictParameter, token);
+
+      if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
+        result = Map<String, dynamic>.from(response.data);
+      }
+      CustomLoading().hide(context);
+      return result;
+    } catch (e) {
+      CustomLoading().hide(context);
+      PrintLog.printLog("Exception getMasterDisabilityTypeAPI..........$e.........");
+      return result;
+    }
+  }
+
   Future<Map<String, dynamic>?> deleteFamilyMemberAPI(context, String url, String token) async {
     Map<String, dynamic>? result;
     try {
@@ -752,9 +770,11 @@ class ApiProvider {
     try {
       Map<String, String> headers = {
         "Content-type": "application/json",
-        "Authorization": "Bearer $token",
         "Authkey": authKey
       };
+      if (token.isNotEmpty) {
+        headers["Authorization"] = "Bearer $token";
+      }
 
       PrintLog.printLog("Headers: $headers");
       PrintLog.printLog("Url:  $url");
@@ -796,9 +816,11 @@ class ApiProvider {
     try {
       Map<String, String> headers = {
         "Content-type": "application/json",
-        "Authorization": "Bearer $token",
         "Authkey": authKey
       };
+      if (token.isNotEmpty) {
+        headers["Authorization"] = "Bearer $token";
+      }
 
       PrintLog.printLog("Headers: $headers");
       PrintLog.printLog("Url:  $url");
@@ -836,9 +858,11 @@ class ApiProvider {
     try{
       Map<String, String> headers = {
         "Content-type": "application/json",
-        "Authorization": "Bearer $token",
         "Authkey": authKey
       };
+      if (token.isNotEmpty) {
+        headers["Authorization"] = "Bearer $token";
+      }
       dictParameter["versionNew"] = 1;
       PrintLog.printLog("Headers: $headers");
       PrintLog.printLog("Url:  $url");
@@ -883,9 +907,11 @@ class ApiProvider {
   Future<Response?> requestMultipartApi(context, String url,formData,String token) async{
     try{
       Map<String, String> headers = {
-        "Authorization": "Bearer $token",
         "Authkey": "$authKey"
       };
+      if (token.isNotEmpty) {
+        headers["Authorization"] = "Bearer $token";
+      }
 
       PrintLog.printLog("Headers: $headers");
       PrintLog.printLog("Url:  $url");
@@ -921,9 +947,11 @@ class ApiProvider {
     try {
       Map<String, String> headers = {
         "Content-type": "application/json",
-        "Authorization": "Bearer $token",
         "Authkey": authKey
       };
+      if (token.isNotEmpty) {
+        headers["Authorization"] = "Bearer $token";
+      }
       
       PrintLog.printLog("Headers: $headers");
       PrintLog.printLog("Url:  $url");

@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
+import '../../login/views/login_view.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -49,8 +50,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
     if (!mounted) return;
 
-    if (isLogin) {
-      Get.offAll(() => const DashboardScreen());
+    if (!isLogin) {
+      Get.offAll(() => const LoginScreen());
     } else {
       // Temporarily going to DashboardScreen as per original logic if onboarding is skipped/not ready
       Get.offAll(() => const DashboardScreen());

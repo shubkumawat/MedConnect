@@ -13,23 +13,8 @@ import '../../../../DataProvider/web_api_constant.dart';
 import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
 import 'package:digitalhealth/app/data/models/family_member_model.dart';
 
+import '../../../data/models/GetCountryApiResponseModel.dart';
 
-/// Master country list ka model
-class CountryModel {
-  final int id;
-  final String name;
-  final String flagEmoji;
-
-  CountryModel({required this.id, required this.name, required this.flagEmoji});
-
-  factory CountryModel.fromJson(Map<String, dynamic> json) {
-    return CountryModel(
-      id: json['id'] ?? 0,
-      name: json['name']?.toString() ?? '',
-      flagEmoji: json['flag_emoji']?.toString() ?? '',
-    );
-  }
-}
 
 /// Master relation list ka model
 class RelationModel {
@@ -58,6 +43,29 @@ class OccupationModel {
   factory OccupationModel.fromJson(Map<String, dynamic> json) {
     return OccupationModel(
       id: json['id'] ?? 0,
+      name: json['name']?.toString() ?? '',
+      code: json['code']?.toString() ?? '',
+    );
+  }
+}
+
+class DisabilityTypeModel {
+  final int id;
+  final String disabilityTypeId;
+  final String name;
+  final String code;
+
+  DisabilityTypeModel({
+    required this.id,
+    required this.disabilityTypeId,
+    required this.name,
+    required this.code,
+  });
+
+  factory DisabilityTypeModel.fromJson(Map<String, dynamic> json) {
+    return DisabilityTypeModel(
+      id: json['id'] ?? 0,
+      disabilityTypeId: json['disability_type_id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       code: json['code']?.toString() ?? '',
     );
@@ -159,6 +167,11 @@ class FamilyMemberController extends GetxController {
   RxList<OccupationModel> occupationList = <OccupationModel>[].obs;
   Rx<OccupationModel?> selectedOccupationModel = Rx<OccupationModel?>(null);
 
+  // ---------------- Disability Type ----------------
+  RxBool isDisabilityLoading = false.obs;
+  RxList<DisabilityTypeModel> disabilityTypeList = <DisabilityTypeModel>[].obs;
+  Rx<DisabilityTypeModel?> selectedDisabilityTypeModel = Rx<DisabilityTypeModel?>(null);
+
   // ---------------- Medical ----------------
   RxString bloodGroup = ''.obs;
   final bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-', "Don't Know"];
@@ -217,7 +230,7 @@ class FamilyMemberController extends GetxController {
   final contactNameCtrl = TextEditingController();
   Rx<RelationModel?> selectedContactRelationModel = Rx<RelationModel?>(null);
   RxString contactRelation = ''.obs;
-  final contactRelations = ['Parent', 'Sibling', 'Spouse', 'Friend', 'Other'];
+  final contactRelations = ['Spouse', 'Parent', 'Sibling', 'Friend', 'Other'];
   final contactMobileCtrl = TextEditingController();
 
   final insuranceProviderCtrl = TextEditingController();
@@ -329,6 +342,40 @@ class FamilyMemberController extends GetxController {
     }
   }
 
+  Future<void> getMasterDisabilityTypeAPI(BuildContext context) async {
+    try {
+      userAccessToken = await AppSharedPreferences().getString(AppSharedPreferences.token);
+      isDisabilityLoading.value = true;
+
+      final response = await ApiProvider().getMasterDisabilityTypeAPI(
+        context,
+        WebApiConstant.API_URL_MASTER_DISABILITY_TYPES,
+        {},
+        userAccessToken ?? '',
+      );
+
+      isDisabilityLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null && response is Map) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          final List list = response['data']?['disability_types'] ?? [];
+          disabilityTypeList.value = list.map((e) => DisabilityTypeModel.fromJson(e)).toList();
+
+          if (disabilityTypeCtrl.text.isNotEmpty) {
+            selectedDisabilityTypeModel.value = disabilityTypeList.firstWhereOrNull(
+              (d) => d.code.toLowerCase() == disabilityTypeCtrl.text.toLowerCase() ||
+                     d.name.toLowerCase() == disabilityTypeCtrl.text.toLowerCase(),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      isDisabilityLoading.value = false;
+      PrintLog.printLog("Exception Disability: $e");
+    }
+  }
+
   void clearFields() {
     isUpdateMode.value = false;
     currentPatientId = null;
@@ -353,6 +400,7 @@ class FamilyMemberController extends GetxController {
     hasChronicDisease.value = false;
     isPhysicallyHandicapped.value = false;
     disabilityTypeCtrl.clear();
+    selectedDisabilityTypeModel.value = null;
     isOrganDonor.value = false;
 
     selectedAllergies.clear();
@@ -514,6 +562,12 @@ class FamilyMemberController extends GetxController {
     hasChronicDisease.value = member.medical?.chronicDisease ?? false;
     isPhysicallyHandicapped.value = member.medical?.physicallyHandicapped ?? false;
     disabilityTypeCtrl.text = member.medical?.disabilityType ?? '';
+    if (disabilityTypeList.isNotEmpty && disabilityTypeCtrl.text.isNotEmpty) {
+      selectedDisabilityTypeModel.value = disabilityTypeList.firstWhereOrNull(
+        (d) => d.name.toLowerCase() == disabilityTypeCtrl.text.toLowerCase() ||
+               d.code.toLowerCase() == disabilityTypeCtrl.text.toLowerCase()
+      );
+    }
     isOrganDonor.value = member.medical?.organDonor ?? false;
 
     selectedAllergies.value = member.medical?.allergies?.map((e) => e.allergyName ?? '').toList() ?? [];
@@ -590,7 +644,7 @@ class FamilyMemberController extends GetxController {
         "occupation": selectedOccupationModel.value?.code ?? occupationCtrl.text.trim(),
         "chronic_disease": hasChronicDisease.value,
         "physically_handicapped": isPhysicallyHandicapped.value,
-        "disability_type": isPhysicallyHandicapped.value ? disabilityTypeCtrl.text.trim() : "",
+        "disability_type": isPhysicallyHandicapped.value ? (selectedDisabilityTypeModel.value?.code ?? disabilityTypeCtrl.text.trim()) : "",
         "organ_donor": isOrganDonor.value,
         "home_address": homeAddress,
         "contact_name": contactNameCtrl.text.trim(),
@@ -678,7 +732,7 @@ class FamilyMemberController extends GetxController {
         "occupation": selectedOccupationModel.value?.code ?? occupationCtrl.text.trim(),
         "chronic_disease": hasChronicDisease.value,
         "physically_handicapped": isPhysicallyHandicapped.value,
-        "disability_type": isPhysicallyHandicapped.value ? disabilityTypeCtrl.text.trim() : "",
+        "disability_type": isPhysicallyHandicapped.value ? (selectedDisabilityTypeModel.value?.code ?? disabilityTypeCtrl.text.trim()) : "",
         "organ_donor": isOrganDonor.value,
         "home_address": homeAddress,
         "contact_name": contactNameCtrl.text.trim(),

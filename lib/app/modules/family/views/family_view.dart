@@ -103,7 +103,12 @@ class _FamilyScreenState extends State<FamilyScreen> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: FamilyMemberCard(
                             name: m.fullName ?? '',
-                            relation: '${m.relation?.name ?? ''} · ${m.age ?? ''} yrs',
+                            relation: m.relation?.name ?? '',
+                            age: m.age?.toString(),
+                            gender: m.gender,
+                            bloodGroup: m.bloodGroup,
+                            patientId: m.patientId,
+                            profilePhoto: m.profilePhoto,
                             avatarColor: _getAvatarColor(m.relation?.name),
                             isActive: false,
                             onTap: () async {

@@ -80,7 +80,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                     Text('Vitals & Body', style: AppTextStyles.heading3),
                     const SizedBox(height: 20),
                     Obx(
-                      () => McDropdown(
+                      () => McDropdown<String>(
                         hint: 'Blood Group',
                         value: controller.bloodGroup.value.isEmpty ? null : controller.bloodGroup.value,
                         items: controller.bloodGroups,
@@ -153,7 +153,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                     Text('Life Style', style: AppTextStyles.heading3),
                     const SizedBox(height: 20),
                     Obx(
-                      () => McDropdown(
+                      () => McDropdown<String>(
                         hint: 'Marital Status',
                         value: controller.maritalStatus.value.isEmpty ? null : controller.maritalStatus.value,
                         items: controller.maritalStatusOptions,
@@ -308,10 +308,18 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                       () => controller.isPhysicallyHandicapped.value
                           ? Padding(
                               padding: const EdgeInsets.only(top: 12),
-                              child: CustomTextField(
+                              child: McDropdown<DisabilityTypeModel>(
                                 hint: 'Disability Type',
-                                controller: controller.disabilityTypeCtrl,
+                                value: controller.selectedDisabilityTypeModel.value,
+                                items: controller.disabilityTypeList,
+                                itemLabel: (d) => d.name,
                                 prefixIcon: Icons.accessible_rounded,
+                                onChanged: (v) {
+                                  controller.selectedDisabilityTypeModel.value = v;
+                                  if (v != null) {
+                                    controller.disabilityTypeCtrl.text = v.name;
+                                  }
+                                },
                               ),
                             )
                           : const SizedBox.shrink(),
@@ -356,8 +364,10 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                       Fluttertoast.showToast(msg: "Please select occupation");
                       return;
                     }
-                    if (controller.isPhysicallyHandicapped.value && controller.disabilityTypeCtrl.text.trim().isEmpty) {
-                      Fluttertoast.showToast(msg: "Please enter disability type");
+                    if (controller.isPhysicallyHandicapped.value &&
+                        controller.selectedDisabilityTypeModel.value == null &&
+                        controller.disabilityTypeCtrl.text.trim().isEmpty) {
+                      Fluttertoast.showToast(msg: "Please select disability type");
                       return;
                     }
                     controller.updateMedicalAPI(context, () {

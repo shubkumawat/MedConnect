@@ -1,9 +1,301 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../theme/app_colors.dart';
 import '../Colors/colors.dart';
 import '../Font/font_family.dart';
 
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
+/// Ek hi text field jisme left side mein tappable country code (flag)
+/// hota hai aur usi field ke andar right side mein phone number type hota hai.
+/// Do alag boxes ki jagah — ek unified look.
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:digitalhealth/app/core/theme/app_colors.dart';
+
+/// Ek hi text field jisme left side mein tappable country code (flag)
+/// hota hai aur usi field ke andar right side mein phone number type hota hai.
+/// Do alag boxes ki jagah — ek unified look.
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:digitalhealth/app/core/theme/app_colors.dart';
+
+/// Ek hi text field jisme left side mein tappable country code (flag)
+/// hota hai aur usi field ke andar right side mein phone number type hota hai.
+/// Do alag boxes ki jagah — ek unified look.
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:digitalhealth/app/core/theme/app_colors.dart';
+
+/// Ek hi text field jisme left side mein tappable country code (flag)
+/// hota hai aur usi field ke andar right side mein phone number type hota hai.
+/// Do alag boxes ki jagah — ek unified look.
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:digitalhealth/app/core/theme/app_colors.dart';
+
+/// Ek hi text field jisme left side mein tappable country code (flag)
+/// hota hai aur usi field ke andar right side mein phone number type hota hai.
+/// Do alag boxes ki jagah — ek unified look.
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:digitalhealth/app/core/theme/app_colors.dart';
+
+/// Ek hi text field jisme left side mein tappable country code (flag)
+/// hota hai aur usi field ke andar right side mein phone number type hota hai.
+/// Do alag boxes ki jagah — ek unified look.
+class PhoneInputWithCountry<T> extends StatelessWidget {
+  final List<T> items;
+  final T? value;
+  final String Function(T)? itemLabel;
+  final Widget Function(T)? selectedItemBuilder;
+  final String Function(T)? countryName; // 🔑 bottom sheet me naam dikhane ke liye
+  final ValueChanged<T?> onCountryChanged;
+  final TextEditingController controller;
+  final TextInputType keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final int? maxLength;
+  final String hint;
+  final bool isCountryLoading;
+
+  const PhoneInputWithCountry({
+    super.key,
+    required this.items,
+    required this.onCountryChanged,
+    required this.controller,
+    this.value,
+    this.itemLabel,
+    this.selectedItemBuilder,
+    this.countryName,
+    this.keyboardType = TextInputType.phone,
+    this.inputFormatters,
+    this.maxLength,
+    this.hint = 'Mobile number',
+    this.isCountryLoading = false,
+  });
+
+  Future<void> _openCountryPicker(BuildContext context) async {
+    final result = await showModalBottomSheet<T>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _CountryPickerSheet<T>(
+        items: items,
+        itemLabel: itemLabel,
+        countryName: countryName,
+        selectedValue: value,
+      ),
+    );
+    if (result != null) {
+      onCountryChanged(result);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bgCardNavy,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.teal, width: 1.0),
+      ),
+      child: Row(
+        children: [
+          // ── Left side: tappable country code ──────────────────────────
+          InkWell(
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+            onTap: isCountryLoading ? null : () => _openCountryPicker(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: isCountryLoading && items.isEmpty
+                  ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CupertinoActivityIndicator(radius: 8),
+              )
+                  : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  value != null && selectedItemBuilder != null
+                      ? selectedItemBuilder!(value!)
+                      : Text(
+                    value != null
+                        ? (itemLabel != null ? itemLabel!(value!) : value.toString())
+                        : "🌐",
+                    style: const TextStyle(fontSize: 18, color: Colors.black87),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Colors.black87),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Divider between country code aur number ────────────────────
+          Container(
+            width: 1,
+            height: 28,
+            color: AppColors.teal.withOpacity(0.4),
+          ),
+
+          // ── Right side: phone number input, same field ki tarah ────────
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: keyboardType,
+              inputFormatters: inputFormatters,
+              maxLength: maxLength,
+              style: const TextStyle(fontSize: 15, color: Colors.black87),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(color: Colors.black.withOpacity(0.4)),
+                border: InputBorder.none,
+                counterText: '', // maxLength ka counter chhupa diya
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CountryPickerSheet<T> extends StatelessWidget {
+  final List<T> items;
+  final String Function(T)? itemLabel;
+  final String Function(T)? countryName;
+  final T? selectedValue;
+
+  const _CountryPickerSheet({
+    required this.items,
+    this.itemLabel,
+    this.countryName,
+    this.selectedValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "Select Country",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final label = itemLabel != null ? itemLabel!(item) : item.toString();
+                  final name = countryName != null ? countryName!(item) : null;
+                  final isSelected = item == selectedValue;
+                  return ListTile(
+                    title: name != null
+                        ? Text(name, style: const TextStyle(fontSize: 15))
+                        : Text(label),
+                    subtitle: name != null
+                        ? Text(label, style: const TextStyle(fontSize: 13, color: Colors.grey))
+                        : null,
+                    trailing: isSelected ? const Icon(Icons.check, color: Colors.teal) : null,
+                    onTap: () => Navigator.pop(context, item),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+// class _CountryPickerSheet<T> extends StatelessWidget {
+//   final List<T> items;
+//   final String Function(T)? itemLabel;
+//   final T? selectedValue;
+//
+//   const _CountryPickerSheet({
+//     required this.items,
+//     this.itemLabel,
+//     this.selectedValue,
+//   });
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return SafeArea(
+//       child: Container(
+//         decoration: const BoxDecoration(
+//           color: Colors.white,
+//           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+//         ),
+//         constraints: BoxConstraints(
+//           maxHeight: MediaQuery.of(context).size.height * 0.6,
+//         ),
+//         child: Column(
+//           mainAxisSize: MainAxisSize.min,
+//           children: [
+//             const SizedBox(height: 12),
+//             Container(
+//               width: 40,
+//               height: 4,
+//               decoration: BoxDecoration(
+//                 color: Colors.grey.shade300,
+//                 borderRadius: BorderRadius.circular(2),
+//               ),
+//             ),
+//             const SizedBox(height: 16),
+//             const Text(
+//               "Select Country",
+//               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+//             ),
+//             const SizedBox(height: 8),
+//             Flexible(
+//               child: ListView.builder(
+//                 shrinkWrap: true,
+//                 itemCount: items.length,
+//                 itemBuilder: (context, index) {
+//                   final item = items[index];
+//                   final label = itemLabel != null ? itemLabel!(item) : item.toString();
+//                   final isSelected = item == selectedValue;
+//                   return ListTile(
+//                     title: Text(label),
+//                     trailing: isSelected ? const Icon(Icons.check, color: Colors.teal) : null,
+//                     onTap: () => Navigator.pop(context, item),
+//                   );
+//                 },
+//               ),
+//             ),
+//             const SizedBox(height: 12),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
 // ─── Custom App Bar ───────────────────────────────────────────────────────────
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -53,6 +345,207 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => const Size.fromHeight(56);
+}
+
+// ─── Dropdown ──────────────────────────────────────────────────────────────
+class McDropdown<T> extends StatelessWidget {
+  final String hint;
+  final T? value;
+  final List<T> items;
+  final String Function(T)? itemLabel;
+  final Widget Function(T)? selectedItemBuilder; // Naya field sirf selected value ke liye
+  final ValueChanged<T?> onChanged;
+  final IconData? prefixIcon;
+  final Color? borderColor;
+
+  const McDropdown({
+    super.key,
+    required this.hint,
+    required this.items,
+    required this.onChanged,
+    this.value,
+    this.itemLabel,
+    this.selectedItemBuilder,
+    this.prefixIcon,
+    this.borderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final result = await showModalBottomSheet<T>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => _DropdownBottomSheet<T>(
+            title: hint,
+            items: items,
+            itemLabel: itemLabel,
+            selectedValue: value,
+          ),
+        );
+        if (result != null) {
+          onChanged(result);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.bgCardNavy,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor ?? AppColors.teal, width: 1.0),
+        ),
+        child: Row(
+          children: [
+            if (prefixIcon != null) ...[
+              Icon(prefixIcon, color: AppColors.textMuted, size: 20),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: value != null && selectedItemBuilder != null
+                  ? selectedItemBuilder!(value!)
+                  : Text(
+                      value != null
+                          ? (itemLabel != null ? itemLabel!(value!) : value.toString())
+                          : hint,
+                      style: TextStyle(
+                        color: value != null ? AppColors.primary : AppColors.textMuted,
+                        fontSize: 15,
+                      ),
+                    ),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DropdownBottomSheet<T> extends StatefulWidget {
+  final String title;
+  final List<T> items;
+  final String Function(T)? itemLabel;
+  final T? selectedValue;
+
+  const _DropdownBottomSheet({
+    required this.title,
+    required this.items,
+    this.itemLabel,
+    this.selectedValue,
+  });
+
+  @override
+  State<_DropdownBottomSheet<T>> createState() => _DropdownBottomSheetState<T>();
+}
+
+class _DropdownBottomSheetState<T> extends State<_DropdownBottomSheet<T>> {
+  late List<T> filteredItems;
+  final TextEditingController searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    filteredItems = widget.items;
+  }
+
+  void _filterItems(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        filteredItems = widget.items;
+      } else {
+        filteredItems = widget.items.where((item) {
+          final label = widget.itemLabel != null
+              ? widget.itemLabel!(item)
+              : item.toString();
+          return label.toLowerCase().contains(query.toLowerCase());
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(widget.title, style: AppTextStyles.heading3),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: TextField(
+              controller: searchController,
+              onChanged: _filterItems,
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
+                filled: true,
+                fillColor: AppColors.bgNavy,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: filteredItems.length,
+              itemBuilder: (context, index) {
+                final item = filteredItems[index];
+                final label = widget.itemLabel != null
+                    ? widget.itemLabel!(item)
+                    : item.toString();
+                final isSelected = widget.selectedValue == item;
+
+                return ListTile(
+                  title: Text(
+                    label,
+                    style: TextStyle(
+                      color: isSelected ? AppColors.teal : AppColors.textTail,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  trailing: isSelected
+                      ? const Icon(Icons.check_circle, color: AppColors.teal)
+                      : null,
+                  onTap: () => Navigator.pop(context, item),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────

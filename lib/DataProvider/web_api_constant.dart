@@ -25,6 +25,7 @@ class WebApiConstant {
   static const String API_URL_MASTER_COUNTRY               = BASE_URL + "master/countries/";
   static const String API_URL_MASTER_RELATIONS             = BASE_URL + "master/relations/";
   static const String API_URL_MASTER_OCCUPATIONS           = BASE_URL + "master/occupations/";
+  static const String API_URL_MASTER_DISABILITY_TYPES     = BASE_URL + "master/disability-types/";
 
   // Video APIs
   static const String API_URL_VIDEO_TOPICS                 = BASE_URL + "videos/topics/";

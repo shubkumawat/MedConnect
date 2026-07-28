@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
-import '../../../../Model/GetCountryApiResponseModel.dart';
+import '../../../data/models/GetCountryApiResponseModel.dart';
 import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
 
 /// Master relation list ka model
@@ -43,6 +43,29 @@ class OccupationModel {
   }
 }
 
+class DisabilityTypeModel {
+  final int id;
+  final String disabilityTypeId;
+  final String name;
+  final String code;
+
+  DisabilityTypeModel({
+    required this.id,
+    required this.disabilityTypeId,
+    required this.name,
+    required this.code,
+  });
+
+  factory DisabilityTypeModel.fromJson(Map<String, dynamic> json) {
+    return DisabilityTypeModel(
+      id: json['id'] ?? 0,
+      disabilityTypeId: json['disability_type_id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      code: json['code']?.toString() ?? '',
+    );
+  }
+}
+
 
 /// Single controller — PersonalInfo, MedicalInfo aur EmergencyInfo
 /// teeno screens isi ek controller ko use karenge (Get.put once, phir Get.find).
@@ -69,6 +92,43 @@ class ProfileController extends GetxController {
   RxBool isRelationLoading = false.obs;
   RxList<RelationModel> relationList = <RelationModel>[].obs;
   Rx<RelationModel?> selectedEmergencyRelationModel = Rx<RelationModel?>(null);
+
+  /// Filtered and sorted list for Emergency Contacts
+  List<RelationModel> get filteredEmergencyRelations {
+    // Definining categories to include
+    final spouseKeywords = ['spouse', 'husband', 'wife'];
+    final parentKeywords = ['parent', 'mother', 'father'];
+    final siblingKeywords = ['sibling', 'brother', 'sister'];
+    final friendKeywords = ['friend'];
+    final otherKeywords = ['other', 'others'];
+
+    List<RelationModel> filtered = relationList.where((r) {
+      final name = r.name.toLowerCase();
+      final code = r.code.toLowerCase();
+      
+      return spouseKeywords.any((k) => name.contains(k) || code.contains(k)) ||
+             parentKeywords.any((k) => name.contains(k) || code.contains(k)) ||
+             siblingKeywords.any((k) => name.contains(k) || code.contains(k)) ||
+             friendKeywords.any((k) => name.contains(k) || code.contains(k)) ||
+             otherKeywords.any((k) => name.contains(k) || code.contains(k));
+    }).toList();
+
+    // Custom Sorting: Spouse -> Parent -> Sibling -> Friend -> Other
+    filtered.sort((a, b) {
+      int getOrder(RelationModel r) {
+        final n = r.name.toLowerCase();
+        final c = r.code.toLowerCase();
+        if (spouseKeywords.any((k) => n.contains(k) || c.contains(k))) return 1;
+        if (parentKeywords.any((k) => n.contains(k) || c.contains(k))) return 2;
+        if (siblingKeywords.any((k) => n.contains(k) || c.contains(k))) return 3;
+        if (friendKeywords.any((k) => n.contains(k) || c.contains(k))) return 4;
+        return 5; // Other
+      }
+      return getOrder(a).compareTo(getOrder(b));
+    });
+
+    return filtered;
+  }
 
   Future<void> getMasterRelationAPI(BuildContext context) async {
     try {
@@ -195,6 +255,46 @@ class ProfileController extends GetxController {
     }
   }
 
+  // ------------------ Master Disability Type List (API se) ------------------
+  RxBool isDisabilityTypeLoading = false.obs;
+  RxList<DisabilityTypeModel> disabilityTypeList = <DisabilityTypeModel>[].obs;
+  Rx<DisabilityTypeModel?> selectedDisabilityTypeModel = Rx<DisabilityTypeModel?>(null);
+
+  Future<void> getMasterDisabilityTypeAPI(BuildContext context) async {
+    try {
+      isDisabilityTypeLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
+
+      final response = await ApiProvider().getMasterDisabilityTypeAPI(
+        context,
+        WebApiConstant.API_URL_MASTER_DISABILITY_TYPES,
+        {},
+        userAccessToken ?? '',
+      );
+
+      isDisabilityTypeLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null && response is Map) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          final List list = response['data']?['disability_types'] ?? [];
+          disabilityTypeList.value = list.map((e) => DisabilityTypeModel.fromJson(e)).toList();
+
+          // Sync with loaded profile
+          if (disabilityTypeCtrl.text.isNotEmpty) {
+            selectedDisabilityTypeModel.value = disabilityTypeList.firstWhereOrNull(
+                  (d) => d.code.toLowerCase() == disabilityTypeCtrl.text.toLowerCase() ||
+                  d.name.toLowerCase() == disabilityTypeCtrl.text.toLowerCase(),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      isDisabilityTypeLoading.value = false;
+      PrintLog.printLog("Exception DisabilityType: $e");
+    }
+  }
+
   // ==================================================================
   // ---------------------  MEDICAL INFO (Step 2)  --------------------
   // ==================================================================
@@ -250,7 +350,7 @@ class ProfileController extends GetxController {
   RxString selectedState = ''.obs;
 
   RxString emergencyRelation = ''.obs; // spouse/parent/sibling/friend/other
-  final emergencyRelations = ['Parent', 'Sibling', 'Spouse', 'Friend', 'Other'];
+  final emergencyRelations = ['Spouse', 'Parent', 'Sibling', 'Friend', 'Other'];
   final states = [
     'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
     'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
@@ -274,12 +374,17 @@ class ProfileController extends GetxController {
 
   Future<void> _initData() async {
     await _loadToken();
-    // Get context is tricky in onInit if not careful, but here we usually use it for Get.context
     if (Get.context != null) {
-      await getMasterCountryAPI(Get.context!);
-      await getMasterRelationAPI(Get.context!);
-      await getMasterOccupationAPI(Get.context!);
-      await getPatientProfileAPI(Get.context!);
+      // Token ho ya na ho, countries load honi chahiye (login flow ke liye)
+      getMasterCountryAPI(Get.context!);
+      
+      // Baki APIs agar token mangti hain toh woh error handle karengi
+      if (userAccessToken != null && userAccessToken!.isNotEmpty) {
+        getMasterRelationAPI(Get.context!);
+        getMasterOccupationAPI(Get.context!);
+        getMasterDisabilityTypeAPI(Get.context!);
+        getPatientProfileAPI(Get.context!);
+      }
     }
   }
 
@@ -370,7 +475,28 @@ class ProfileController extends GetxController {
             if (medical != null) {
               hasChronicDisease.value = medical['chronic_disease'] == true;
               isPhysicallyHandicapped.value = medical['physically_handicapped'] == true;
-              disabilityTypeCtrl.text = medical['disability_type']?.toString() ?? '';
+              
+              // Handle Disability Type (String or Map)
+              var disData = medical['disability_type'];
+              if (disData is Map) {
+                disabilityTypeCtrl.text = disData['name']?.toString() ?? '';
+                final disCode = disData['code']?.toString() ?? '';
+                if (disabilityTypeList.isNotEmpty) {
+                  selectedDisabilityTypeModel.value = disabilityTypeList.firstWhereOrNull(
+                        (d) => d.code.toLowerCase() == disCode.toLowerCase() ||
+                        d.name.toLowerCase() == disabilityTypeCtrl.text.toLowerCase(),
+                  );
+                }
+              } else {
+                disabilityTypeCtrl.text = disData?.toString() ?? '';
+                if (disabilityTypeList.isNotEmpty) {
+                  selectedDisabilityTypeModel.value = disabilityTypeList.firstWhereOrNull(
+                        (d) => d.code.toLowerCase() == disabilityTypeCtrl.text.toLowerCase() ||
+                        d.name.toLowerCase() == disabilityTypeCtrl.text.toLowerCase(),
+                  );
+                }
+              }
+
               isOrganDonor.value = medical['organ_donor'] == true;
 
               final List? allergies = medical['allergies'];
@@ -417,10 +543,10 @@ class ProfileController extends GetxController {
               var relData = emergency['relation'];
               String relCode = '';
               if (relData is Map) {
-                emergencyRelation.value = relData['name']?.toString() ?? '';
+                emergencyRelation.value = (relData['name']?.toString() ?? '').capitalizeFirst ?? '';
                 relCode = relData['code']?.toString() ?? '';
               } else {
-                emergencyRelation.value = relData?.toString() ?? '';
+                emergencyRelation.value = (relData?.toString() ?? '').capitalizeFirst ?? '';
                 relCode = emergencyRelation.value;
               }
               
@@ -526,7 +652,9 @@ class ProfileController extends GetxController {
         "occupation": selectedOccupationModel.value?.code ?? occupationCtrl.text.trim(),
         "chronic_disease": hasChronicDisease.value,
         "physically_handicapped": isPhysicallyHandicapped.value,
-        "disability_type": isPhysicallyHandicapped.value ? disabilityTypeCtrl.text.trim() : "",
+        "disability_type": isPhysicallyHandicapped.value 
+            ? (selectedDisabilityTypeModel.value?.code ?? disabilityTypeCtrl.text.trim()) 
+            : "",
         "organ_donor": isOrganDonor.value,
         "allergies": selectedAllergies.toList(),
         "medications": selectedMedications.toList(),

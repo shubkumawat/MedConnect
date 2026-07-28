@@ -1,13 +1,16 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../core/widgets/otp_input_row.dart';
 import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
 import 'package:digitalhealth/app/core/Util/CustomTextField/CustomTextField.dart';
 import '../controllers/login_controller.dart';
+import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +20,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final LoginController controller = Get.put(LoginController());
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.getMasterCountryAPI(context);
+    });
+  }
 
   void _verifyOtp(String otp) async {
     if (mounted) {
@@ -33,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Obx(
-            () => Column(
+                () => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 40),
@@ -56,19 +67,31 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 Text(
                   controller.showOtp.value
-                      ? 'OTP sent to +91 987XX 3210'
+                      ? 'OTP sent to +${controller.selectedCountry.value?.phoneCode ?? '91'} ${controller.phoneController.value.text}'
                       : 'No password needed — your phone is your identity.',
                   style: AppTextStyles.body,
                 ),
                 const SizedBox(height: 40),
                 if (!controller.showOtp.value) ...[
-                  CustomTextField(
-                    hint: 'Enter 10-digit mobile number',
+                  // 🔑 Ek hi unified field — left me tappable country code, right me phone number
+                  PhoneInputWithCountry<CountryModel>(
+                    items: controller.countryList,
+                    value: controller.selectedCountry.value,
+                    itemLabel: (c) => "${c.flagEmoji} +${c.phoneCode}",
+                    countryName: (c) => c.name ?? "",   // 🔑 apne CountryModel ka sahi field name yahan daalo
+                    selectedItemBuilder: (c) => Text(
+                      "${c.flagEmoji} +${c.phoneCode}",
+                      style: const TextStyle(fontSize: 15, color: Colors.black87),
+                    ),
+                    onCountryChanged: (val) {
+                      controller.selectedCountry.value = val;
+                    },
                     controller: controller.phoneController.value,
-                    prefixIcon: Icons.phone_android_rounded,
                     keyboardType: TextInputType.phone,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     maxLength: 10,
+                    hint: 'Mobile number',
+                    isCountryLoading: controller.isCountryLoading.value,
                   ),
                   const SizedBox(height: 24),
                   CustomPrimaryButton(

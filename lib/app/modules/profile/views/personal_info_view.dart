@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
 import 'package:digitalhealth/app/core/Util/CustomTextField/CustomTextField.dart';
+import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../core/Util/CustomCardWidgets/CustomCardWidgets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
@@ -230,20 +231,18 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       if (controller.isCountryLoading.value) {
                         return const Center(child: CircularProgressIndicator(color: AppColors.teal));
                       }
-                      return McDropdown(
+                      return McDropdown<CountryModel>(
                         hint: 'Nationality',
-                        value: controller.selectedCountry.value == null
-                            ? null
-                            : '${controller.selectedCountry.value!.flagEmoji}  ${controller.selectedCountry.value!.name}',
-                        items: controller.countryList
-                            .map((c) => '${c.flagEmoji}  ${c.name}')
-                            .toList(),
+                        value: controller.selectedCountry.value,
+                        items: controller.countryList,
+                        selectedItemBuilder: (c) => Text(
+                          c.flagEmoji,
+                          style: const TextStyle(fontSize: 24),
+                        ),
+                        itemLabel: (c) => '${c.flagEmoji}  ${c.name}',
                         prefixIcon: Icons.flag_circle_outlined,
                         onChanged: (v) {
-                          final match = controller.countryList.firstWhereOrNull(
-                            (c) => '${c.flagEmoji}  ${c.name}' == v,
-                          );
-                          controller.onCountrySelected(match);
+                          controller.onCountrySelected(v);
                         },
                       );
                     }),

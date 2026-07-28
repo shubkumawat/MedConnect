@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:digitalhealth/app/data/models/GetCountryApiResponseModel.dart' show CountryModel;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -37,6 +38,9 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
       }
       if (controller.occupationList.isEmpty) {
         controller.getMasterOccupationAPI(context);
+      }
+      if (controller.disabilityTypeList.isEmpty) {
+        controller.getMasterDisabilityTypeAPI(context);
       }
     });
   }
@@ -230,18 +234,18 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                         if (controller.isCountryLoading.value) {
                           return const LinearProgressIndicator(color: AppColors.teal, backgroundColor: AppColors.bgCardNavy);
                         }
-                        return McDropdown(
+                        return McDropdown<CountryModel>(
                           hint: 'Nationality',
-                          value: controller.selectedCountry.value == null
-                              ? null
-                              : '${controller.selectedCountry.value!.flagEmoji}  ${controller.selectedCountry.value!.name}',
-                          items: controller.countryList.map((c) => '${c.flagEmoji}  ${c.name}').toList(),
+                          value: controller.selectedCountry.value,
+                          items: controller.countryList,
+                          selectedItemBuilder: (c) => Text(
+                            c.flagEmoji,
+                            style: const TextStyle(fontSize: 22),
+                          ),
+                          itemLabel: (c) => '${c.flagEmoji}  ${c.name}',
                           prefixIcon: Icons.public,
                           onChanged: (v) {
-                            final match = controller.countryList.firstWhereOrNull(
-                                  (c) => '${c.flagEmoji}  ${c.name}' == v,
-                            );
-                            controller.selectedCountry.value = match;
+                            controller.selectedCountry.value = v;
                           },
                         );
                       }),
@@ -371,10 +375,20 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                       Obx(() => controller.isPhysicallyHandicapped.value
                           ? Padding(
                         padding: const EdgeInsets.only(top: 12),
-                        child: CustomTextField(
-                          hint: 'Specify Disability',
-                          controller: controller.disabilityTypeCtrl,
+                        child: controller.isDisabilityLoading.value
+                            ? const LinearProgressIndicator(color: AppColors.teal, backgroundColor: AppColors.bgCardNavy)
+                            : McDropdown<DisabilityTypeModel>(
+                          hint: 'Disability Type',
+                          value: controller.selectedDisabilityTypeModel.value,
+                          items: controller.disabilityTypeList,
+                          itemLabel: (d) => d.name,
                           prefixIcon: Icons.info_outline,
+                          onChanged: (v) {
+                            controller.selectedDisabilityTypeModel.value = v;
+                            if (v != null) {
+                              controller.disabilityTypeCtrl.text = v.name;
+                            }
+                          },
                         ),
                       )
                           : const SizedBox.shrink()),
@@ -400,7 +414,7 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                   child: Column(
                     children: [
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: CustomTextField(
@@ -411,10 +425,10 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Transform.translate(
-                              offset: const Offset(0, -18),
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 20),
                               child: Obx(
-                                    () => McDropdown(
+                                () => McDropdown(
                                   hint: 'State',
                                   value: controller.selectedState.value.isEmpty
                                       ? null

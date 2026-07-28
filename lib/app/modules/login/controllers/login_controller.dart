@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
+import '../../../data/models/GetCountryApiResponseModel.dart';
 import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
+import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
 
@@ -17,6 +19,53 @@ class LoginController extends GetxController {
   RxBool isLoading = false.obs;
   RxString receivedOtp = "".obs;
   Rx<TextEditingController> phoneController = TextEditingController().obs;
+
+  // Country logic
+  RxBool isCountryLoading = false.obs;
+  RxList<CountryModel> countryList = <CountryModel>[].obs;
+  Rx<CountryModel?> selectedCountry = Rx<CountryModel?>(null);
+
+  @override
+  void onInit() {
+    super.onInit();
+    // Context is not available immediately in onInit, but we can fetch it later or 
+    // use a delay if needed. Usually for master data it's fine.
+    // However, getSendOtpAPI takes context. Let's make getMasterCountryAPI separate.
+  }
+
+  Future<void> getMasterCountryAPI(BuildContext context) async {
+    try {
+      isCountryLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
+
+      final response = await ApiProvider().getMasterCountryAPI(
+        context,
+        WebApiConstant.API_URL_MASTER_COUNTRY,
+        {},
+        userAccessToken ?? '',
+      );
+
+      isCountryLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          final List list = response['data'] ?? [];
+          countryList.value = list.map((e) => CountryModel.fromJson(e)).toList();
+
+          // Set India as default if found
+          if (selectedCountry.value == null && countryList.isNotEmpty) {
+            selectedCountry.value = countryList.firstWhereOrNull(
+              (c) => c.name.toLowerCase() == 'india' || c.phoneCode == '91'
+            ) ?? countryList.first;
+          }
+        }
+      }
+    } catch (e) {
+      isCountryLoading.value = false;
+      PrintLog.printLog("Exception: $e");
+    }
+  }
 
   Future<void> getSendOtpAPI(BuildContext context) async {
     try {

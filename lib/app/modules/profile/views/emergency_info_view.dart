@@ -106,12 +106,21 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
                       prefixIcon: Icons.person_outline_rounded,
                     ),
                     const SizedBox(height: 16),
-                    Obx(() => McDropdown(
+                    Obx(() => McDropdown<String>(
                         hint: 'Relationship',
                         value: controller.emergencyRelation.value.isEmpty ? null : controller.emergencyRelation.value,
                         items: controller.emergencyRelations,
                         prefixIcon: Icons.link_rounded,
-                        onChanged: (v) => controller.emergencyRelation.value = v ?? '',
+                        onChanged: (v) {
+                          controller.emergencyRelation.value = v ?? '';
+                          if (v != null) {
+                            // Sync with model if exists for API code
+                            controller.selectedEmergencyRelationModel.value = controller.relationList.firstWhereOrNull(
+                                  (r) => r.name.toLowerCase() == v.toLowerCase() || 
+                                         r.code.toLowerCase() == v.toLowerCase(),
+                            );
+                          }
+                        },
                     )),
                     const SizedBox(height: 16),
                     CustomTextField(
@@ -141,7 +150,7 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
                     ),
                     const SizedBox(height: 16),
                     Obx(
-                      () => McDropdown(
+                      () => McDropdown<String>(
                         hint: 'State',
                         value: controller.selectedState.value.isEmpty ? null : controller.selectedState.value,
                         items: controller.states,
@@ -218,7 +227,7 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
                       Fluttertoast.showToast(msg: "Please enter emergency contact name");
                       return;
                     }
-                    if (controller.emergencyRelation.value.isEmpty) {
+                    if (controller.selectedEmergencyRelationModel.value == null && controller.emergencyRelation.value.isEmpty) {
                       Fluttertoast.showToast(msg: "Please select relationship");
                       return;
                     }

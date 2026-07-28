@@ -220,7 +220,7 @@ class _FindScreenState extends State<FindScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(h.hospitalId, style: AppTextStyles.bodyBold.copyWith(fontSize: 17)),
+                        // Text(h.hospitalId, style: AppTextStyles.bodyBold.copyWith(fontSize: 17)),
                         Text(h.name, style: AppTextStyles.bodyBold.copyWith(fontSize: 17)),
                         const SizedBox(height: 4),
                         Text('${h.hospitalType} · ${h.cityName}', style: AppTextStyles.caption.copyWith(color: AppColors.textMuted)),
