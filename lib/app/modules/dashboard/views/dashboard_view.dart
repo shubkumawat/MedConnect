@@ -1,0 +1,139 @@
+import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../family/views/family_view.dart';
+import '../../find/views/find_view.dart';
+import '../../home/views/home_view.dart';
+import '../../profile/views/profile_view.dart';
+import '../../records/views/records_view.dart';
+import '../controllers/dashboard_controller.dart';
+
+class DashboardScreen extends GetView<DashboardController> {
+  const DashboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Make sure controller is initialized
+    Get.put(DashboardController());
+
+    final List<Widget> _screens = const [
+      HomeScreen(),
+      RecordsScreen(),
+      FindScreen(),
+      FamilyScreen(),
+      ProfileScreen(),
+    ];
+
+    final List<_NavItem> _navItems = const [
+      _NavItem(icon: Icons.home_rounded, label: 'Home', activeColor: AppColors.teal),
+      _NavItem(icon: Icons.medical_services_rounded, label: 'Records', activeColor: AppColors.teal),
+      _NavItem(icon: Icons.search_rounded, label: 'Find', activeColor: AppColors.teal),
+      _NavItem(icon: Icons.group_rounded, label: 'Family', activeColor: AppColors.teal),
+      _NavItem(icon: Icons.person_rounded, label: 'Profile', activeColor: AppColors.teal),
+    ];
+
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      resizeToAvoidBottomInset: false,
+      extendBody: true, // Content flows behind the floating nav bar
+      body: Obx(() => IndexedStack(
+        index: controller.currentIndex.value,
+        children: _screens,
+      )),
+      bottomNavigationBar: Container(
+        height: 90,
+        margin: const EdgeInsets.fromLTRB(18, 0, 18, 28),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(35),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.white.withOpacity(0.75),
+                borderRadius: BorderRadius.circular(35),
+                border: Border.all(
+                  color:  AppColors.teal.withOpacity(0.3),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 25,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(_navItems.length, (i) {
+                  final item = _navItems[i];
+                  return GestureDetector(
+                    onTap: () => controller.changeIndex(i),
+                    behavior: HitTestBehavior.opaque,
+                    child: Obx(() {
+                      final isActive = controller.currentIndex.value == i;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.fastOutSlowIn,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOutCubic,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? item.activeColor
+                                    : Colors.transparent,
+                                shape: BoxShape.circle,
+                                boxShadow: isActive ? [
+                                  BoxShadow(
+                                    color: item.activeColor.withOpacity(0.4),
+                                    blurRadius: 15,
+                                    offset: const Offset(0, 4),
+                                  )
+                                ] : [],
+                              ),
+                              child: Icon(
+                                item.icon,
+                                color: isActive
+                                    ? Colors.white
+                                    : AppColors.textMuted.withOpacity(0.8),
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.label,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
+                                color: isActive
+                                    ? item.activeColor
+                                    : AppColors.textMuted.withOpacity(0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  );
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem {
+  final IconData icon;
+  final String label;
+  final Color activeColor;
+  const _NavItem({required this.icon, required this.label, required this.activeColor});
+}

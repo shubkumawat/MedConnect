@@ -1,0 +1,623 @@
+import 'package:digitalhealth/app/data/services/storage_service.dart';
+import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../../DataProvider/api_provider.dart';
+import '../../../../DataProvider/web_api_constant.dart';
+import '../../../../Model/GetCountryApiResponseModel.dart';
+import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
+
+/// Master relation list ka model
+class RelationModel {
+  final int id;
+  final String name;
+  final String code;
+
+  RelationModel({required this.id, required this.name, required this.code});
+
+  factory RelationModel.fromJson(Map<String, dynamic> json) {
+    return RelationModel(
+      id: json['id'] ?? 0,
+      name: json['name']?.toString() ?? '',
+      code: json['code']?.toString() ?? '',
+    );
+  }
+}
+
+class OccupationModel {
+  final int id;
+  final String name;
+  final String code;
+
+  OccupationModel({required this.id, required this.name, required this.code});
+
+  factory OccupationModel.fromJson(Map<String, dynamic> json) {
+    return OccupationModel(
+      id: json['id'] ?? 0,
+      name: json['name']?.toString() ?? '',
+      code: json['code']?.toString() ?? '',
+    );
+  }
+}
+
+
+/// Single controller — PersonalInfo, MedicalInfo aur EmergencyInfo
+/// teeno screens isi ek controller ko use karenge (Get.put once, phir Get.find).
+class ProfileController extends GetxController {
+  String? userAccessToken;
+
+  RxBool isLoading = false.obs;
+
+  // ==================================================================
+  // ---------------------  PERSONAL INFO (Step 1)  ------------------
+  // ==================================================================
+  final fullNameCtrl = TextEditingController();
+  final emailCtrl = TextEditingController();
+  final dobCtrl = TextEditingController(); // display ke liye: dd / MM / yyyy
+  Rx<DateTime?> selectedDob = Rx<DateTime?>(null);
+
+  RxString selectedGender = ''.obs; // API me lowercase jayega: male/female/other
+  RxInt age = 0.obs;
+  RxString mobileNumber = ''.obs;
+
+  final genders = ['Male', 'Female', 'Other'];
+
+  // ------------------ Master Relation List (API se) ------------------
+  RxBool isRelationLoading = false.obs;
+  RxList<RelationModel> relationList = <RelationModel>[].obs;
+  Rx<RelationModel?> selectedEmergencyRelationModel = Rx<RelationModel?>(null);
+
+  Future<void> getMasterRelationAPI(BuildContext context) async {
+    try {
+      isRelationLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
+
+      final response = await ApiProvider().getMasterRelationAPI(
+        context,
+        WebApiConstant.API_URL_MASTER_RELATIONS,
+        {},
+        userAccessToken ?? '',
+      );
+
+      isRelationLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null && response is Map) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          final List list = response['data']?['relations'] ?? [];
+          relationList.value = list.map((e) => RelationModel.fromJson(e)).toList();
+
+          // Sync with loaded profile if needed
+          if (emergencyRelation.value.isNotEmpty) {
+            selectedEmergencyRelationModel.value = relationList.firstWhereOrNull(
+                  (r) => r.code.toLowerCase() == emergencyRelation.value.toLowerCase() ||
+                  r.name.toLowerCase() == emergencyRelation.value.toLowerCase(),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      isRelationLoading.value = false;
+      PrintLog.printLog("Exception Relation: $e");
+    }
+  }
+
+  // ------------------ Master Country List (API se) ------------------
+  RxBool isCountryLoading = false.obs;
+  RxList<CountryModel> countryList = <CountryModel>[].obs;
+  Rx<CountryModel?> selectedCountry = Rx<CountryModel?>(null);
+
+  Future<void> getMasterCountryAPI(BuildContext context) async {
+    try {
+      isCountryLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
+
+
+      final response = await ApiProvider().getMasterCountryAPI(
+        context,
+        WebApiConstant.API_URL_MASTER_COUNTRY,
+        {},
+        userAccessToken ?? '',
+      );
+
+      isCountryLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          final List list = response['data'] ?? [];
+          countryList.value = list.map((e) => CountryModel.fromJson(e)).toList();
+
+          // Agar profile me pehle se koi nationality id saved hai to usko yaha select kar do
+          if (selectedNationalityId.value != null) {
+            selectedCountry.value = countryList.firstWhereOrNull(
+                  (c) => c.id == selectedNationalityId.value,
+            );
+          }
+        } else {
+          Fluttertoast.showToast(msg: response['message'] ?? '');
+        }
+      }
+    } catch (e) {
+      isCountryLoading.value = false;
+      PrintLog.printLog("Exception: $e");
+      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+    }
+  }
+
+  void onCountrySelected(CountryModel? country) {
+    selectedCountry.value = country;
+    selectedNationalityId.value = country?.id;
+  }
+
+  Rx<int?> selectedNationalityId = Rx<int?>(null);
+
+  // ------------------ Master Occupation List (API se) ------------------
+  RxBool isOccupationLoading = false.obs;
+  RxList<OccupationModel> occupationList = <OccupationModel>[].obs;
+  Rx<OccupationModel?> selectedOccupationModel = Rx<OccupationModel?>(null);
+
+  Future<void> getMasterOccupationAPI(BuildContext context) async {
+    try {
+      isOccupationLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
+
+      final response = await ApiProvider().getMasterOccupationAPI(
+        context,
+        WebApiConstant.API_URL_MASTER_OCCUPATIONS,
+        {},
+        userAccessToken ?? '',
+      );
+
+      isOccupationLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null && response is Map) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          final List list = response['data']?['occupations'] ?? [];
+          occupationList.value = list.map((e) => OccupationModel.fromJson(e)).toList();
+
+          // Sync with loaded profile
+          if (occupationCtrl.text.isNotEmpty) {
+            selectedOccupationModel.value = occupationList.firstWhereOrNull(
+                  (o) => o.code.toLowerCase() == occupationCtrl.text.toLowerCase() ||
+                  o.name.toLowerCase() == occupationCtrl.text.toLowerCase(),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      isOccupationLoading.value = false;
+      PrintLog.printLog("Exception Occupation: $e");
+    }
+  }
+
+  // ==================================================================
+  // ---------------------  MEDICAL INFO (Step 2)  --------------------
+  // ==================================================================
+  RxString bloodGroup = ''.obs;
+  RxString heightUnit = 'cm'.obs;
+  final heightCtrl = TextEditingController();
+  final weightCtrl = TextEditingController();
+
+  RxString maritalStatus = ''.obs; // single/married/divorced/widowed
+  final occupationCtrl = TextEditingController();
+
+  RxBool hasChronicDisease = false.obs;
+  RxBool isPhysicallyHandicapped = false.obs;
+  final disabilityTypeCtrl = TextEditingController();
+  RxBool isOrganDonor = false.obs;
+
+  final bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+  final maritalStatusOptions = ['Single', 'Married', 'Divorced', 'Widowed'];
+
+  final allergyTags = ['Penicillin', 'Peanuts', 'Latex', 'Dust', 'Dairy'];
+  RxList<String> selectedAllergies = <String>[].obs;
+
+  // medications free-text chips (fixed list nahi hai, user khud add karega)
+  final medicationInputCtrl = TextEditingController();
+  RxList<String> selectedMedications = <String>[].obs;
+
+  void toggleAllergy(String tag) {
+    if (selectedAllergies.contains(tag)) {
+      selectedAllergies.remove(tag);
+    } else {
+      selectedAllergies.add(tag);
+    }
+  }
+
+  void addMedication() {
+    final val = medicationInputCtrl.text.trim();
+    if (val.isNotEmpty && !selectedMedications.contains(val)) {
+      selectedMedications.add(val);
+      medicationInputCtrl.clear();
+    }
+  }
+
+  void removeMedication(String tag) {
+    selectedMedications.remove(tag);
+  }
+
+  // ==================================================================
+  // -------------------  EMERGENCY INFO (Step 3)  --------------------
+  // ==================================================================
+  final emergencyNameCtrl = TextEditingController();
+  final emergencyMobileCtrl = TextEditingController();
+  final cityCtrl = TextEditingController();
+  RxString selectedState = ''.obs;
+
+  RxString emergencyRelation = ''.obs; // spouse/parent/sibling/friend/other
+  final emergencyRelations = ['Parent', 'Sibling', 'Spouse', 'Friend', 'Other'];
+  final states = [
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+    'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+    'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan',
+    'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh',
+    'Uttarakhand', 'West Bengal', 'Andaman and Nicobar Islands',
+    'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi',
+    'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
+  ];
+
+  RxBool showInsurance = false.obs;
+  final insuranceProviderCtrl = TextEditingController();
+  final policyNumberCtrl = TextEditingController();
+
+  @override
+  void onInit() {
+    super.onInit();
+    _initData();
+  }
+
+  Future<void> _initData() async {
+    await _loadToken();
+    // Get context is tricky in onInit if not careful, but here we usually use it for Get.context
+    if (Get.context != null) {
+      await getMasterCountryAPI(Get.context!);
+      await getMasterRelationAPI(Get.context!);
+      await getMasterOccupationAPI(Get.context!);
+      await getPatientProfileAPI(Get.context!);
+    }
+  }
+
+  Future<void> _loadToken() async {
+    userAccessToken = await StorageService().getString(StorageService.token);
+  }
+
+  // ==================================================================
+  // ---------------------  API : get-profile  ---------------------
+  // ==================================================================
+  Future<void> getPatientProfileAPI(BuildContext context) async {
+    try {
+      isLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
+
+      final response = await ApiProvider().getPatientProfileAPI(
+        context,
+        WebApiConstant.API_URL_PATIENT_PROFILE,
+        {},
+        userAccessToken ?? '',
+      );
+
+      isLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          final data = response['data'];
+          if (data != null) {
+            // Personal Info
+            fullNameCtrl.text = data['full_name']?.toString() ?? '';
+            emailCtrl.text = data['email']?.toString() ?? '';
+            mobileNumber.value = data['mobile_number']?.toString() ?? '';
+            age.value = data['age'] ?? 0;
+            if (data['date_of_birth'] != null) {
+              selectedDob.value = DateTime.tryParse(data['date_of_birth'].toString());
+              if (selectedDob.value != null) {
+                dobCtrl.text = DateFormat('dd / MM / yyyy').format(selectedDob.value!);
+
+                // Calculate age locally if 0
+                if (age.value == 0) {
+                  DateTime now = DateTime.now();
+                  int calculatedAge = now.year - selectedDob.value!.year;
+                  if (now.month < selectedDob.value!.month ||
+                      (now.month == selectedDob.value!.month && now.day < selectedDob.value!.day)) {
+                    calculatedAge--;
+                  }
+                  age.value = calculatedAge;
+                }
+              }
+            }
+            // Handle Gender (String or Map)
+            var genderData = data['gender'];
+            String genderVal = '';
+            if (genderData is Map) {
+              genderVal = genderData['name']?.toString() ?? '';
+            } else {
+              genderVal = genderData?.toString() ?? '';
+            }
+
+            if (genderVal.isNotEmpty) {
+              selectedGender.value = genderVal[0].toUpperCase() + genderVal.substring(1).toLowerCase();
+            }
+
+            if (data['nationality'] != null) {
+              selectedNationalityId.value = data['nationality']['id'];
+              // Agar country list pehle se loaded hai to select kar lo
+              if (countryList.isNotEmpty) {
+                selectedCountry.value = countryList.firstWhereOrNull(
+                      (c) => c.id == selectedNationalityId.value,
+                );
+              }
+            }
+
+            // Medical Info
+            // Handle Blood Group (String or Map)
+            var bgData = data['blood_group'];
+            if (bgData is Map) {
+              bloodGroup.value = bgData['name']?.toString() ?? '';
+            } else {
+              bloodGroup.value = bgData?.toString() ?? '';
+            }
+
+            heightCtrl.text = data['height']?.toString() ?? '';
+            weightCtrl.text = data['weight']?.toString() ?? '';
+
+            final medical = data['medical'];
+            if (medical != null) {
+              hasChronicDisease.value = medical['chronic_disease'] == true;
+              isPhysicallyHandicapped.value = medical['physically_handicapped'] == true;
+              disabilityTypeCtrl.text = medical['disability_type']?.toString() ?? '';
+              isOrganDonor.value = medical['organ_donor'] == true;
+
+              final List? allergies = medical['allergies'];
+              if (allergies != null) {
+                selectedAllergies.value = allergies.map((e) => e['allergy_name'].toString()).toList();
+              }
+
+              final List? medications = medical['current_medications'];
+              if (medications != null) {
+                selectedMedications.value = medications.map((e) => e.toString()).toList();
+              }
+            }
+
+            maritalStatus.value = (data['marital_status']?.toString() ?? '').capitalizeFirst ?? '';
+            
+            // Handle Occupation (String or Map)
+            var occData = data['occupation'];
+            if (occData is Map) {
+              occupationCtrl.text = occData['name']?.toString() ?? '';
+              final occCode = occData['code']?.toString() ?? '';
+              if (occupationList.isNotEmpty) {
+                selectedOccupationModel.value = occupationList.firstWhereOrNull(
+                      (o) => o.code.toLowerCase() == occCode.toLowerCase() ||
+                      o.name.toLowerCase() == occupationCtrl.text.toLowerCase(),
+                );
+              }
+            } else {
+              occupationCtrl.text = occData?.toString() ?? '';
+              if (occupationList.isNotEmpty) {
+                selectedOccupationModel.value = occupationList.firstWhereOrNull(
+                      (o) => o.code.toLowerCase() == occupationCtrl.text.toLowerCase() ||
+                      o.name.toLowerCase() == occupationCtrl.text.toLowerCase(),
+                );
+              }
+            }
+
+            // Emergency Info
+            final emergency = data['emergency_contact'];
+            if (emergency != null) {
+              emergencyNameCtrl.text = emergency['contact_name']?.toString() ?? '';
+              emergencyMobileCtrl.text = emergency['phone_number']?.toString() ?? '';
+              
+              // Handle Relation (String or Map)
+              var relData = emergency['relation'];
+              String relCode = '';
+              if (relData is Map) {
+                emergencyRelation.value = relData['name']?.toString() ?? '';
+                relCode = relData['code']?.toString() ?? '';
+              } else {
+                emergencyRelation.value = relData?.toString() ?? '';
+                relCode = emergencyRelation.value;
+              }
+              
+              if (relationList.isNotEmpty) {
+                selectedEmergencyRelationModel.value = relationList.firstWhereOrNull(
+                      (r) => r.code.toLowerCase() == relCode.toLowerCase() ||
+                      r.name.toLowerCase() == emergencyRelation.value.toLowerCase(),
+                );
+              }
+            }
+
+            final address = data['home_address']?.toString() ?? '';
+            if (address.isNotEmpty) {
+              final parts = address.split(',');
+              if (parts.isNotEmpty) cityCtrl.text = parts[0].trim();
+              if (parts.length > 1) selectedState.value = parts[1].trim();
+            }
+
+            final insurance = data['insurance'];
+            if (insurance != null) {
+              insuranceProviderCtrl.text = insurance['provider']?.toString() ?? '';
+              policyNumberCtrl.text = insurance['policy_number']?.toString() ?? '';
+              if (insuranceProviderCtrl.text.isNotEmpty || policyNumberCtrl.text.isNotEmpty) {
+                showInsurance.value = true;
+              }
+            }
+          }
+        } else {
+          Fluttertoast.showToast(msg: response['message'] ?? '');
+        }
+      }
+    } catch (e) {
+      isLoading.value = false;
+      PrintLog.printLog("Exception getPatientProfileAPI: $e");
+    }
+  }
+
+  // ==================================================================
+  // ---------------------  API : update-profile  ---------------------
+  // ==================================================================
+  Future<void> updateProfileAPI(BuildContext context, VoidCallback onSuccess) async {
+    try {
+      isLoading.value = true;
+
+      final Map<String, dynamic> dictParameter = <String, dynamic>{
+        "full_name": fullNameCtrl.text.trim(),
+        "date_of_birth": selectedDob.value != null
+            ? DateFormat('yyyy-MM-dd').format(selectedDob.value!)
+            : '',
+        "email": emailCtrl.text.trim(),
+        "gender": selectedGender.value.toLowerCase(),
+        "nationality": selectedNationalityId.value,
+      };
+      final token= await StorageService().getString(StorageService.token);
+
+      final response = await ApiProvider().updateProfileApi(
+        context,
+        WebApiConstant.API_URL_VERIFY_UPDATE_PROFILE,
+        dictParameter,
+        token!,
+      );
+
+      isLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          Fluttertoast.showToast(msg: response['message'] ?? 'Profile updated successfully.');
+
+
+          // response me jo updated user data aaya usse local prefs bhi update kar do
+          final userData = response['data']?['user'];
+          if (userData != null) {
+            final storage = StorageService();
+            await storage.setString(StorageService.userName, userData['full_name']?.toString() ?? '');
+            await storage.setString(StorageService.email, userData['email']?.toString() ?? '');
+          }
+
+          onSuccess();
+        } else {
+          Fluttertoast.showToast(msg: response['message'] ?? '');
+        }
+      }
+    } catch (e) {
+      isLoading.value = false;
+      PrintLog.printLog("Exception: $e");
+      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+    }
+  }
+
+  // ==================================================================
+  // ---------------------  API : update-medical  ----------------------
+  // ==================================================================
+  Future<void> updateMedicalAPI(BuildContext context, VoidCallback onSuccess) async {
+    try {
+      isLoading.value = true;
+
+      final Map<String, dynamic> dictParameter = <String, dynamic>{
+        "blood_group": bloodGroup.value,
+        "height": double.tryParse(heightCtrl.text.trim()) ?? 0,
+        "weight": double.tryParse(weightCtrl.text.trim()) ?? 0,
+        "marital_status": maritalStatus.value.toLowerCase(),
+        "occupation": selectedOccupationModel.value?.code ?? occupationCtrl.text.trim(),
+        "chronic_disease": hasChronicDisease.value,
+        "physically_handicapped": isPhysicallyHandicapped.value,
+        "disability_type": isPhysicallyHandicapped.value ? disabilityTypeCtrl.text.trim() : "",
+        "organ_donor": isOrganDonor.value,
+        "allergies": selectedAllergies.toList(),
+        "medications": selectedMedications.toList(),
+      };
+
+      final response = await ApiProvider().updateMedicalApi(
+        context,
+        WebApiConstant.API_URL_PATIENT_UPDATE_MEDICAL,
+        dictParameter,
+        userAccessToken!,
+      );
+
+      isLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          Fluttertoast.showToast(msg: response['message'] ?? 'Medical information updated successfully.');
+          onSuccess();
+        } else {
+          Fluttertoast.showToast(msg: response['message'] ?? '');
+        }
+      }
+    } catch (e) {
+      isLoading.value = false;
+      PrintLog.printLog("Exception: $e");
+      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+    }
+  }
+
+  // ==================================================================
+  // --------------------  API : update-emergency  ---------------------
+  // ==================================================================
+  Future<void> updateEmergencyAPI(BuildContext context, VoidCallback onSuccess) async {
+    try {
+      isLoading.value = true;
+
+      final homeAddress = [cityCtrl.text.trim(), selectedState.value]
+          .where((e) => e.isNotEmpty)
+          .join(', ');
+
+      final Map<String, dynamic> dictParameter = <String, dynamic>{
+        "contact_name": emergencyNameCtrl.text.trim(),
+        "relation": selectedEmergencyRelationModel.value?.code ?? emergencyRelation.value.toLowerCase(),
+        "mobile_number": emergencyMobileCtrl.text.trim(),
+        "home_address": homeAddress,
+        "insurance_provider": insuranceProviderCtrl.text.trim(),
+        "policy_number": policyNumberCtrl.text.trim(),
+      };
+
+      final response = await ApiProvider().updateEmergencyAPI(
+        context,
+        WebApiConstant.API_URL_PATIENT_UPDATE_EMERGENCY,
+        dictParameter,
+        userAccessToken!,
+      );
+
+      isLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          Fluttertoast.showToast(
+              msg: response['message'] ?? 'Emergency & Insurance details updated successfully.');
+          onSuccess();
+        } else {
+          Fluttertoast.showToast(msg: response['message'] ?? '');
+        }
+      }
+    } catch (e) {
+      isLoading.value = false;
+      PrintLog.printLog("Exception: $e");
+      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+    }
+  }
+
+  @override
+  void onClose() {
+    fullNameCtrl.dispose();
+    emailCtrl.dispose();
+    dobCtrl.dispose();
+    heightCtrl.dispose();
+    weightCtrl.dispose();
+    occupationCtrl.dispose();
+    disabilityTypeCtrl.dispose();
+    medicationInputCtrl.dispose();
+    emergencyNameCtrl.dispose();
+    emergencyMobileCtrl.dispose();
+    cityCtrl.dispose();
+    insuranceProviderCtrl.dispose();
+    policyNumberCtrl.dispose();
+    super.onClose();
+  }
+}
