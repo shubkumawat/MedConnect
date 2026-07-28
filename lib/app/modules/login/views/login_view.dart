@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 40),
                 if (!controller.showOtp.value) ...[
-                  // 🔑 Ek hi unified field — left me tappable country code, right me phone number
+                  // Ek hi unified field — left me tappable country code, right me phone number
                   PhoneInputWithCountry<CountryModel>(
                     items: controller.countryList,
                     value: controller.selectedCountry.value,

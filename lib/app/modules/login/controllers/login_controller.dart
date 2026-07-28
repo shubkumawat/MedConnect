@@ -50,7 +50,8 @@ class LoginController extends GetxController {
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          final List list = response['data'] ?? [];
+          // API structure: response['data']['countries'] is the list
+          final List list = response['data']['countries'] ?? [];
           countryList.value = list.map((e) => CountryModel.fromJson(e)).toList();
 
           // Set India as default if found

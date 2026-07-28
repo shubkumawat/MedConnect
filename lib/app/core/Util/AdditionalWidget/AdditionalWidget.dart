@@ -45,12 +45,12 @@ import 'package:digitalhealth/app/core/theme/app_colors.dart';
 /// Ek hi text field jisme left side mein tappable country code (flag)
 /// hota hai aur usi field ke andar right side mein phone number type hota hai.
 /// Do alag boxes ki jagah — ek unified look.
-class PhoneInputWithCountry<T> extends StatelessWidget {
+class PhoneInputWithCountry<T> extends StatefulWidget {
   final List<T> items;
   final T? value;
   final String Function(T)? itemLabel;
   final Widget Function(T)? selectedItemBuilder;
-  final String Function(T)? countryName; // 🔑 bottom sheet me naam dikhane ke liye
+  final String Function(T)? countryName; // 🔑 dropdown me naam dikhane ke liye
   final ValueChanged<T?> onCountryChanged;
   final TextEditingController controller;
   final TextInputType keyboardType;
@@ -75,160 +75,288 @@ class PhoneInputWithCountry<T> extends StatelessWidget {
     this.isCountryLoading = false,
   });
 
-  Future<void> _openCountryPicker(BuildContext context) async {
-    final result = await showModalBottomSheet<T>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _CountryPickerSheet<T>(
-        items: items,
-        itemLabel: itemLabel,
-        countryName: countryName,
-        selectedValue: value,
-      ),
-    );
-    if (result != null) {
-      onCountryChanged(result);
+  @override
+  State<PhoneInputWithCountry<T>> createState() => _PhoneInputWithCountryState<T>();
+}
+
+class _PhoneInputWithCountryState<T> extends State<PhoneInputWithCountry<T>> {
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
+  final GlobalKey _fieldKey = GlobalKey();
+
+  void _toggleDropdown() {
+    if (_overlayEntry != null) {
+      _closeDropdown();
+    } else {
+      _openDropdown();
     }
+  }
+
+  void _openDropdown() {
+    final renderBox = _fieldKey.currentContext!.findRenderObject() as RenderBox;
+    final size = renderBox.size;
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) {
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: _closeDropdown, // bahar tap karne pe close ho jaye
+          child: Stack(
+            children: [
+              Positioned.fill(child: Container(color: Colors.transparent)),
+              CompositedTransformFollower(
+                link: _layerLink,
+                showWhenUnlinked: false,
+                offset: Offset(0, size.height + 6), // field ke thoda neeche
+                child: Material(
+                  elevation: 6,
+                  borderRadius: BorderRadius.circular(12),
+                  child: _CountryDropdownList<T>(
+                    width:220, // dropdown ki width
+                    items: widget.items,
+                    itemLabel: widget.itemLabel,
+                    countryName: widget.countryName,
+                    selectedValue: widget.value,
+                    onSelected: (item) {
+                      widget.onCountryChanged(item);
+                      _closeDropdown();
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _closeDropdown() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _overlayEntry?.remove();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.bgCardNavy,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.teal, width: 1.0),
-      ),
-      child: Row(
-        children: [
-          // ── Left side: tappable country code ──────────────────────────
-          InkWell(
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
-            onTap: isCountryLoading ? null : () => _openCountryPicker(context),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              child: isCountryLoading && items.isEmpty
-                  ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CupertinoActivityIndicator(radius: 8),
-              )
-                  : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  value != null && selectedItemBuilder != null
-                      ? selectedItemBuilder!(value!)
-                      : Text(
-                    value != null
-                        ? (itemLabel != null ? itemLabel!(value!) : value.toString())
-                        : "🌐",
-                    style: const TextStyle(fontSize: 18, color: Colors.black87),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Colors.black87),
-                ],
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: Container(
+        key: _fieldKey,
+        decoration: BoxDecoration(
+          color: AppColors.bgCardNavy,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.teal, width: 1.0),
+        ),
+        child: Row(
+          children: [
+            // ── Left side: tappable country code ──────────────────────
+            InkWell(
+              borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+              onTap: widget.isCountryLoading ? null : _toggleDropdown,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                child: widget.isCountryLoading && widget.items.isEmpty
+                    ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CupertinoActivityIndicator(radius: 8),
+                )
+                    : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    widget.value != null && widget.selectedItemBuilder != null
+                        ? widget.selectedItemBuilder!(widget.value as T)
+                        : Text(
+                      widget.value != null
+                          ? (widget.itemLabel != null
+                          ? widget.itemLabel!(widget.value as T)
+                          : widget.value.toString())
+                          : "🌐",
+                      style: const TextStyle(fontSize: 18, color: Colors.black87),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _overlayEntry != null
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                      color: Colors.black87,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          // ── Divider between country code aur number ────────────────────
-          Container(
-            width: 1,
-            height: 28,
-            color: AppColors.teal.withOpacity(0.4),
-          ),
-
-          // ── Right side: phone number input, same field ki tarah ────────
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType: keyboardType,
-              inputFormatters: inputFormatters,
-              maxLength: maxLength,
-              style: const TextStyle(fontSize: 15, color: Colors.black87),
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: TextStyle(color: Colors.black.withOpacity(0.4)),
-                border: InputBorder.none,
-                counterText: '', // maxLength ka counter chhupa diya
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
+            // ── Divider ─────────────────────────────────────────────────
+            Container(
+              width: 1,
+              height: 28,
+              color: AppColors.teal.withOpacity(0.4),
             ),
-          ),
-        ],
+
+            // ── Right side: phone number input ──────────────────────────
+// ── Right side: phone number input ──────────────────────────
+            Expanded(
+              child: TextField(
+                controller: widget.controller,
+                keyboardType: widget.keyboardType,
+                inputFormatters: widget.inputFormatters,
+                maxLength: widget.maxLength,
+                textAlign: TextAlign.left,
+                textDirection: TextDirection.ltr,
+                cursorColor: AppColors.teal,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Colors.black87,
+                ),
+                decoration: InputDecoration(
+                  hintText: widget.hint,
+                  hintStyle: TextStyle(color: Colors.black.withOpacity(0.1)),
+                  border: InputBorder.none,
+                  counterText: '',
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
+            ),          ],
+        ),
       ),
     );
   }
 }
 
-class _CountryPickerSheet<T> extends StatelessWidget {
+// ── Dropdown list with search ─────────────────────────────────────────
+class _CountryDropdownList<T> extends StatefulWidget {
+  final double width;
   final List<T> items;
   final String Function(T)? itemLabel;
   final String Function(T)? countryName;
   final T? selectedValue;
+  final ValueChanged<T> onSelected;
 
-  const _CountryPickerSheet({
+  const _CountryDropdownList({
+    required this.width,
     required this.items,
+    required this.onSelected,
     this.itemLabel,
     this.countryName,
     this.selectedValue,
   });
 
   @override
+  State<_CountryDropdownList<T>> createState() => _CountryDropdownListState<T>();
+}
+
+class _CountryDropdownListState<T> extends State<_CountryDropdownList<T>> {
+  final TextEditingController _searchController = TextEditingController();
+  late List<T> _filteredItems;
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredItems = widget.items;
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text.trim().toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredItems = widget.items;
+      } else {
+        _filteredItems = widget.items.where((item) {
+          final label = widget.itemLabel != null ? widget.itemLabel!(item) : item.toString();
+          final name = widget.countryName != null ? widget.countryName!(item) : '';
+          return label.toLowerCase().contains(query) || name.toLowerCase().contains(query);
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.6,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+    return Container(
+      width: widget.width,
+      constraints: const BoxConstraints(maxHeight: 320),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Search bar ─────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+            child: TextField(
+              controller: _searchController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: "Search country...",
+                prefixIcon: const Icon(Icons.search, size: 20),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.teal),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              "Select Country",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const Divider(height: 1),
+
+          // ── List ────────────────────────────────────────────────
+          Flexible(
+            child: _filteredItems.isEmpty
+                ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Text("No country found", style: TextStyle(color: Colors.grey)),
+            )
+                : ListView.builder(
+              shrinkWrap: true,
+              itemCount: _filteredItems.length,
+              itemBuilder: (context, index) {
+                final item = _filteredItems[index];
+                final label = widget.itemLabel != null ? widget.itemLabel!(item) : item.toString();
+                final name = widget.countryName != null ? widget.countryName!(item) : null;
+                final isSelected = item == widget.selectedValue;
+                return ListTile(
+                  dense: true,
+                  title: name != null
+                      ? Text(name, style: const TextStyle(fontSize: 14))
+                      : Text(label, style: const TextStyle(fontSize: 14)),
+                  subtitle: name != null
+                      ? Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey))
+                      : null,
+                  trailing: isSelected ? const Icon(Icons.check, color: Colors.teal, size: 18) : null,
+                  onTap: () => widget.onSelected(item),
+                );
+              },
             ),
-            const SizedBox(height: 8),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  final label = itemLabel != null ? itemLabel!(item) : item.toString();
-                  final name = countryName != null ? countryName!(item) : null;
-                  final isSelected = item == selectedValue;
-                  return ListTile(
-                    title: name != null
-                        ? Text(name, style: const TextStyle(fontSize: 15))
-                        : Text(label),
-                    subtitle: name != null
-                        ? Text(label, style: const TextStyle(fontSize: 13, color: Colors.grey))
-                        : null,
-                    trailing: isSelected ? const Icon(Icons.check, color: Colors.teal) : null,
-                    onTap: () => Navigator.pop(context, item),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
