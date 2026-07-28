@@ -41,6 +41,7 @@ class DashboardScreen extends GetView<DashboardController> {
         index: controller.currentIndex.value,
         children: _screens,
       )),
+
       bottomNavigationBar: Container(
         height: 90,
         margin: const EdgeInsets.fromLTRB(18, 0, 18, 28),
