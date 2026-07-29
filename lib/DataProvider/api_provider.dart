@@ -280,7 +280,25 @@ class ApiProvider {
   //   }
   // }
 
-      Future<Map<String, dynamic>?> getMasterRelationAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
+      Future<Map<String, dynamic>?> getAllMasterDataAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
+    Map<String, dynamic>? result;
+    try {
+      CustomLoading().show(context);
+      final Response? response = await requestGetForApi(context, url, dictParameter, token);
+
+      if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
+        result = Map<String, dynamic>.from(response.data);
+      }
+      CustomLoading().hide(context);
+      return result;
+    } catch (e) {
+      CustomLoading().hide(context);
+      PrintLog.printLog("Exception getAllMasterDataAPI..........$e.........");
+      return result;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getMasterRelationAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
     Map<String, dynamic>? result;
       try{
        CustomLoading().show(context);

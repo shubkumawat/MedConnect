@@ -38,9 +38,9 @@ class LoginController extends GetxController {
       isCountryLoading.value = true;
       userAccessToken = await StorageService().getString(StorageService.token);
 
-      final response = await ApiProvider().getMasterCountryAPI(
+      final response = await ApiProvider().getAllMasterDataAPI(
         context,
-        WebApiConstant.API_URL_MASTER_COUNTRY,
+        WebApiConstant.API_URL_MASTER_ALL,
         {},
         userAccessToken ?? '',
       );
@@ -51,7 +51,7 @@ class LoginController extends GetxController {
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
           // API structure: response['data']['countries'] is the list
-          final List list = response['data']['countries'] ?? [];
+          final List list = response['data']?['countries'] ?? [];
           countryList.value = list.map((e) => CountryModel.fromJson(e)).toList();
 
           // Set India as default if found

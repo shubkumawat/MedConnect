@@ -22,6 +22,7 @@ class WebApiConstant {
   static const String API_URL_UPDATE_ACCESS_CONTROL        = BASE_URL + "patients/update-access-control/";
 
   // Master Data
+  static const String API_URL_MASTER_ALL                   = BASE_URL + "master/";
   static const String API_URL_MASTER_COUNTRY               = BASE_URL + "master/countries/";
   static const String API_URL_MASTER_RELATIONS             = BASE_URL + "master/relations/";
   static const String API_URL_MASTER_OCCUPATIONS           = BASE_URL + "master/occupations/";

@@ -130,6 +130,88 @@ class ProfileController extends GetxController {
     return filtered;
   }
 
+  Future<void> getAllMasterDataAPI(BuildContext context) async {
+    try {
+      isRelationLoading.value = true;
+      isCountryLoading.value = true;
+      isOccupationLoading.value = true;
+      isDisabilityTypeLoading.value = true;
+      
+      userAccessToken = await StorageService().getString(StorageService.token);
+
+      final response = await ApiProvider().getAllMasterDataAPI(
+        context,
+        WebApiConstant.API_URL_MASTER_ALL,
+        {},
+        userAccessToken ?? '',
+      );
+
+      isRelationLoading.value = false;
+      isCountryLoading.value = false;
+      isOccupationLoading.value = false;
+      isDisabilityTypeLoading.value = false;
+
+      PrintLog.printLog(response);
+
+      if (response != null && response is Map) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          final data = response['data'];
+          if (data != null) {
+            // Relations
+            final List relations = data['relations'] ?? [];
+            relationList.value = relations.map((e) => RelationModel.fromJson(e)).toList();
+
+            // Countries
+            final List countries = data['countries'] ?? [];
+            countryList.value = countries.map((e) => CountryModel.fromJson(e)).toList();
+
+            // Occupations
+            final List occupations = data['occupations'] ?? [];
+            occupationList.value = occupations.map((e) => OccupationModel.fromJson(e)).toList();
+
+            // Disability Types
+            final List disabilities = data['disability_types'] ?? [];
+            disabilityTypeList.value = disabilities.map((e) => DisabilityTypeModel.fromJson(e)).toList();
+
+            // Sync selections if needed
+            if (emergencyRelation.value.isNotEmpty) {
+              selectedEmergencyRelationModel.value = relationList.firstWhereOrNull(
+                (r) => r.code.toLowerCase() == emergencyRelation.value.toLowerCase() ||
+                r.name.toLowerCase() == emergencyRelation.value.toLowerCase(),
+              );
+            }
+
+            if (selectedNationalityId.value != null) {
+              selectedCountry.value = countryList.firstWhereOrNull(
+                (c) => c.id == selectedNationalityId.value,
+              );
+            }
+
+            if (occupationCtrl.text.isNotEmpty) {
+              selectedOccupationModel.value = occupationList.firstWhereOrNull(
+                (o) => o.code.toLowerCase() == occupationCtrl.text.toLowerCase() ||
+                o.name.toLowerCase() == occupationCtrl.text.toLowerCase(),
+              );
+            }
+
+            if (disabilityTypeCtrl.text.isNotEmpty) {
+              selectedDisabilityTypeModel.value = disabilityTypeList.firstWhereOrNull(
+                (d) => d.code.toLowerCase() == disabilityTypeCtrl.text.toLowerCase() ||
+                d.name.toLowerCase() == disabilityTypeCtrl.text.toLowerCase(),
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      isRelationLoading.value = false;
+      isCountryLoading.value = false;
+      isOccupationLoading.value = false;
+      isDisabilityTypeLoading.value = false;
+      PrintLog.printLog("Exception getAllMasterDataAPI: $e");
+    }
+  }
+
   Future<void> getMasterRelationAPI(BuildContext context) async {
     try {
       isRelationLoading.value = true;
@@ -375,14 +457,11 @@ class ProfileController extends GetxController {
   Future<void> _initData() async {
     await _loadToken();
     if (Get.context != null) {
-      // Token ho ya na ho, countries load honi chahiye (login flow ke liye)
-      getMasterCountryAPI(Get.context!);
+      // Call the consolidated Master API
+      await getAllMasterDataAPI(Get.context!);
       
-      // Baki APIs agar token mangti hain toh woh error handle karengi
+      // Load profile if token is available
       if (userAccessToken != null && userAccessToken!.isNotEmpty) {
-        getMasterRelationAPI(Get.context!);
-        getMasterOccupationAPI(Get.context!);
-        getMasterDisabilityTypeAPI(Get.context!);
         getPatientProfileAPI(Get.context!);
       }
     }

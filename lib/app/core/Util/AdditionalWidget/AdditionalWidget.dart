@@ -226,7 +226,8 @@ class _PhoneInputWithCountryState<T> extends State<PhoneInputWithCountry<T>> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
               ),
-            ),          ],
+            ),
+          ],
         ),
       ),
     );
