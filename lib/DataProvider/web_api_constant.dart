@@ -17,6 +17,7 @@ class WebApiConstant {
   static const String API_URL_FAMILY_MEMBER_COUNT          = BASE_URL + "patients/family-member-count/";
   static const String API_URL_FAMILY_MEMBER_LIST           = BASE_URL + "patients/family-members/";
   static const String API_URL_FAMILY_MEMBER_DETAIL         = BASE_URL + "patients/family-member-detail/";
+  static const String API_URL_GIVE_ACCESS                  = BASE_URL + "patients/give-access/";
 
   // Access Management
   static const String API_URL_UPDATE_ACCESS_CONTROL        = BASE_URL + "patients/update-access-control/";

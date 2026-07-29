@@ -70,6 +70,7 @@ class DisabilityTypeModel {
 /// Single controller — PersonalInfo, MedicalInfo aur EmergencyInfo
 /// teeno screens isi ek controller ko use karenge (Get.put once, phir Get.find).
 class ProfileController extends GetxController {
+  bool _isDisposed = false;
   String? userAccessToken;
 
   RxBool isLoading = false.obs;
@@ -151,6 +152,7 @@ class ProfileController extends GetxController {
       isOccupationLoading.value = false;
       isDisabilityTypeLoading.value = false;
 
+      if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null && response is Map) {
@@ -225,6 +227,7 @@ class ProfileController extends GetxController {
       );
 
       isRelationLoading.value = false;
+      if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null && response is Map) {
@@ -266,6 +269,7 @@ class ProfileController extends GetxController {
       );
 
       isCountryLoading.value = false;
+      if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null) {
@@ -315,6 +319,7 @@ class ProfileController extends GetxController {
       );
 
       isOccupationLoading.value = false;
+      if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null && response is Map) {
@@ -355,6 +360,7 @@ class ProfileController extends GetxController {
       );
 
       isDisabilityTypeLoading.value = false;
+      if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null && response is Map) {
@@ -487,12 +493,14 @@ class ProfileController extends GetxController {
       );
 
       isLoading.value = false;
+      if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
           final data = response['data'];
           if (data != null) {
+            if (_isDisposed) return;
             // Personal Info
             fullNameCtrl.text = data['full_name']?.toString() ?? '';
             emailCtrl.text = data['email']?.toString() ?? '';
@@ -501,6 +509,7 @@ class ProfileController extends GetxController {
             if (data['date_of_birth'] != null) {
               selectedDob.value = DateTime.tryParse(data['date_of_birth'].toString());
               if (selectedDob.value != null) {
+                if (_isDisposed) return;
                 dobCtrl.text = DateFormat('dd / MM / yyyy').format(selectedDob.value!);
 
                 // Calculate age locally if 0
@@ -558,7 +567,7 @@ class ProfileController extends GetxController {
               // Handle Disability Type (String or Map)
               var disData = medical['disability_type'];
               if (disData is Map) {
-                disabilityTypeCtrl.text = disData['name']?.toString() ?? '';
+                if (!_isDisposed) disabilityTypeCtrl.text = disData['name']?.toString() ?? '';
                 final disCode = disData['code']?.toString() ?? '';
                 if (disabilityTypeList.isNotEmpty) {
                   selectedDisabilityTypeModel.value = disabilityTypeList.firstWhereOrNull(
@@ -567,7 +576,7 @@ class ProfileController extends GetxController {
                   );
                 }
               } else {
-                disabilityTypeCtrl.text = disData?.toString() ?? '';
+                if (!_isDisposed) disabilityTypeCtrl.text = disData?.toString() ?? '';
                 if (disabilityTypeList.isNotEmpty) {
                   selectedDisabilityTypeModel.value = disabilityTypeList.firstWhereOrNull(
                         (d) => d.code.toLowerCase() == disabilityTypeCtrl.text.toLowerCase() ||
@@ -594,7 +603,7 @@ class ProfileController extends GetxController {
             // Handle Occupation (String or Map)
             var occData = data['occupation'];
             if (occData is Map) {
-              occupationCtrl.text = occData['name']?.toString() ?? '';
+              if (!_isDisposed) occupationCtrl.text = occData['name']?.toString() ?? '';
               final occCode = occData['code']?.toString() ?? '';
               if (occupationList.isNotEmpty) {
                 selectedOccupationModel.value = occupationList.firstWhereOrNull(
@@ -603,7 +612,7 @@ class ProfileController extends GetxController {
                 );
               }
             } else {
-              occupationCtrl.text = occData?.toString() ?? '';
+              if (!_isDisposed) occupationCtrl.text = occData?.toString() ?? '';
               if (occupationList.isNotEmpty) {
                 selectedOccupationModel.value = occupationList.firstWhereOrNull(
                       (o) => o.code.toLowerCase() == occupationCtrl.text.toLowerCase() ||
@@ -615,8 +624,10 @@ class ProfileController extends GetxController {
             // Emergency Info
             final emergency = data['emergency_contact'];
             if (emergency != null) {
-              emergencyNameCtrl.text = emergency['contact_name']?.toString() ?? '';
-              emergencyMobileCtrl.text = emergency['phone_number']?.toString() ?? '';
+              if (!_isDisposed) {
+                emergencyNameCtrl.text = emergency['contact_name']?.toString() ?? '';
+                emergencyMobileCtrl.text = emergency['phone_number']?.toString() ?? '';
+              }
               
               // Handle Relation (String or Map)
               var relData = emergency['relation'];
@@ -640,14 +651,18 @@ class ProfileController extends GetxController {
             final address = data['home_address']?.toString() ?? '';
             if (address.isNotEmpty) {
               final parts = address.split(',');
-              if (parts.isNotEmpty) cityCtrl.text = parts[0].trim();
+              if (!_isDisposed) {
+                if (parts.isNotEmpty) cityCtrl.text = parts[0].trim();
+              }
               if (parts.length > 1) selectedState.value = parts[1].trim();
             }
 
             final insurance = data['insurance'];
             if (insurance != null) {
-              insuranceProviderCtrl.text = insurance['provider']?.toString() ?? '';
-              policyNumberCtrl.text = insurance['policy_number']?.toString() ?? '';
+              if (!_isDisposed) {
+                insuranceProviderCtrl.text = insurance['provider']?.toString() ?? '';
+                policyNumberCtrl.text = insurance['policy_number']?.toString() ?? '';
+              }
               if (insuranceProviderCtrl.text.isNotEmpty || policyNumberCtrl.text.isNotEmpty) {
                 showInsurance.value = true;
               }
@@ -689,6 +704,7 @@ class ProfileController extends GetxController {
       );
 
       isLoading.value = false;
+      if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null) {
@@ -747,6 +763,7 @@ class ProfileController extends GetxController {
       );
 
       isLoading.value = false;
+      if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null) {
@@ -792,6 +809,7 @@ class ProfileController extends GetxController {
       );
 
       isLoading.value = false;
+      if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null) {
@@ -812,6 +830,7 @@ class ProfileController extends GetxController {
 
   @override
   void onClose() {
+    _isDisposed = true;
     fullNameCtrl.dispose();
     emailCtrl.dispose();
     dobCtrl.dispose();

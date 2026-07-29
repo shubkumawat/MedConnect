@@ -30,17 +30,8 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.countryList.isEmpty) {
-        controller.getMasterCountryAPI(context);
-      }
-      if (controller.relationList.isEmpty) {
-        controller.getMasterRelationAPI(context);
-      }
-      if (controller.occupationList.isEmpty) {
-        controller.getMasterOccupationAPI(context);
-      }
-      if (controller.disabilityTypeList.isEmpty) {
-        controller.getMasterDisabilityTypeAPI(context);
+      if (controller.countryList.isEmpty || controller.relationList.isEmpty || controller.occupationList.isEmpty || controller.disabilityTypeList.isEmpty) {
+        controller.getAllMasterDataAPI(context);
       }
     });
   }

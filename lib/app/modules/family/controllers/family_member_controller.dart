@@ -11,6 +11,7 @@ import '../../../../DataProvider/api_provider.dart';
 import 'package:digitalhealth/DataProvider/app_shared_preferences.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
+import 'package:digitalhealth/app/data/services/storage_service.dart';
 import 'package:digitalhealth/app/data/models/family_member_model.dart';
 
 import '../../../data/models/GetCountryApiResponseModel.dart';
@@ -244,6 +245,65 @@ class FamilyMemberController extends GetxController {
 
   Future<void> _loadToken() async {
     userAccessToken = await AppSharedPreferences().getString(AppSharedPreferences.token);
+  }
+
+  Future<void> getAllMasterDataAPI(BuildContext context) async {
+    try {
+      isRelationLoading.value = true;
+      isCountryLoading.value = true;
+      isOccupationLoading.value = true;
+      isDisabilityLoading.value = true;
+      
+      userAccessToken = await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      final response = await ApiProvider().getAllMasterDataAPI(
+        context,
+        WebApiConstant.API_URL_MASTER_ALL,
+        {},
+        userAccessToken ?? '',
+      );
+
+      isRelationLoading.value = false;
+      isCountryLoading.value = false;
+      isOccupationLoading.value = false;
+      isDisabilityLoading.value = false;
+
+      PrintLog.printLog(response);
+
+      if (response != null && response is Map) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          final data = response['data'];
+          if (data != null) {
+            // Relations
+            final List relations = data['relations'] ?? [];
+            relationList.value = relations.map((e) => RelationModel.fromJson(e)).toList();
+
+            // Countries
+            final List countries = data['countries'] ?? [];
+            countryList.value = countries.map((e) => CountryModel.fromJson(e)).toList();
+
+            // Occupations
+            final List occupations = data['occupations'] ?? [];
+            occupationList.value = occupations.map((e) => OccupationModel.fromJson(e)).toList();
+
+            // Disability Types
+            final List disabilities = data['disability_types'] ?? [];
+            disabilityTypeList.value = disabilities.map((e) => DisabilityTypeModel.fromJson(e)).toList();
+
+            // Sync selections if needed
+            if (familyMemberDetail.value != null) {
+               _populateFields(familyMemberDetail.value!);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      isRelationLoading.value = false;
+      isCountryLoading.value = false;
+      isOccupationLoading.value = false;
+      isDisabilityLoading.value = false;
+      PrintLog.printLog("Exception getAllMasterDataAPI: $e");
+    }
   }
 
   Future<void> getMasterRelationAPI(BuildContext context) async {
@@ -498,10 +558,18 @@ class FamilyMemberController extends GetxController {
 
   Future<void> deleteFamilyMember(BuildContext context, String patientId, VoidCallback onSuccess) async {
     try {
-      // final Map<String, dynamic> dictParameter = {
-      //   "full_name": fullNameCtrl.text.trim(),
-      //
-      // }
+      final storage = StorageService();
+      String accessType = await storage.getString(StorageService.accessType);
+      if (accessType == "2") {
+        Get.snackbar(
+          "Access Restricted",
+          "You don't have permission to delete family members.",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
 
       isLoading.value = true;
       userAccessToken = await AppSharedPreferences().getString(AppSharedPreferences.token);
@@ -624,6 +692,19 @@ class FamilyMemberController extends GetxController {
     if (!_validate()) return;
 
     try {
+      /* final storage = StorageService();
+      String accessType = await storage.getString(StorageService.accessType);
+      if (accessType == "2") {
+        Get.snackbar(
+          "Access Restricted",
+          "You don't have permission to add family members.",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      } */
+
       isLoading.value = true;
       userAccessToken = await AppSharedPreferences().getString(AppSharedPreferences.token);
 
@@ -711,6 +792,19 @@ class FamilyMemberController extends GetxController {
     if (currentPatientId == null) return;
 
     try {
+      /* final storage = StorageService();
+      String accessType = await storage.getString(StorageService.accessType);
+      if (accessType == "2") {
+        Get.snackbar(
+          "Access Restricted",
+          "You don't have permission to edit family members.",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      } */
+
       isLoading.value = true;
       userAccessToken = await AppSharedPreferences().getString(AppSharedPreferences.token);
 
@@ -790,6 +884,38 @@ class FamilyMemberController extends GetxController {
       isLoading.value = false;
       PrintLog.printLog("Exception: $e");
       Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+    }
+  }
+
+  Future<void> giveAccessAPI(BuildContext context, String patientId, {String type = "give"}) async {
+    try {
+      isLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
+
+      final response = await ApiProvider().giveAccessAPI(
+        context,
+        WebApiConstant.API_URL_GIVE_ACCESS,
+        {
+          "patient_id": patientId,
+          "type": type,
+        },
+        userAccessToken ?? '',
+      );
+
+      isLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null) {
+        if (response['error'] != true && response['error_code'] == 0) {
+          Fluttertoast.showToast(msg: response['message'] ?? 'Access given successfully');
+        } else {
+          Fluttertoast.showToast(msg: response['message'] ?? 'Failed to give access');
+        }
+      }
+
+    } catch (e) {
+      isLoading.value = false;
+      PrintLog.printLog("Exception giveAccessAPI: $e");
     }
   }
 

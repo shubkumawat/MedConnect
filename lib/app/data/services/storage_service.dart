@@ -10,6 +10,7 @@ class StorageService {
   static const mobileNo = "mobileNo";
   static const email = "email";
   static const userName = "userName";
+  static const accessType = "accessType";
   static const otpToken = "otpToken";
   static const userData = "userData";
   static const userProfile = "userProfile";

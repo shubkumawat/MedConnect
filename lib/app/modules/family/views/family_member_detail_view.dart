@@ -3,7 +3,9 @@ import 'package:get/get.dart';
 import 'package:digitalhealth/app/core/theme/app_colors.dart';
 import 'package:digitalhealth/app/core/theme/app_text_theme.dart';
 import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
 import 'package:digitalhealth/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import 'package:digitalhealth/app/data/services/storage_service.dart';
 import '../controllers/family_member_controller.dart';
 import 'add_family_member_screen.dart';
 
@@ -40,6 +42,19 @@ class FamilyMemberDetailScreen extends StatelessWidget {
             icon: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 28),
             onPressed: () async {
               if (controller.familyMemberDetail.value != null) {
+                /* final storage = StorageService();
+                String accessType = await storage.getString(StorageService.accessType);
+                if (accessType == "2") {
+                  Get.snackbar(
+                    "Access Restricted",
+                    "You don't have permission to edit patient details.",
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                  return;
+                } */
+                
                 controller.isUpdateMode.value = true;
                 controller.currentPatientId = controller.familyMemberDetail.value!.patientId;
                 await Get.to(() => const AddFamilyMemberScreen());
@@ -52,8 +67,20 @@ class FamilyMemberDetailScreen extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent, size: 26),
-            onPressed: () {
+            onPressed: () async {
               if (controller.familyMemberDetail.value != null) {
+                final storage = StorageService();
+                String accessType = await storage.getString(StorageService.accessType);
+                if (accessType == "2") {
+                  Get.snackbar(
+                    "Access Restricted",
+                    "You don't have permission to delete patient details.",
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                  return;
+                }
                 _showDeleteConfirmation(context, controller);
               }
             },
@@ -258,6 +285,17 @@ class FamilyMemberDetailScreen extends StatelessWidget {
             value: controller.emergencyOnly.value,
             onChanged: (v) => controller.updateAccessControl(Get.context!, false, v),
           )),
+          const SizedBox(height: 24),
+          CustomPrimaryButton(
+            text: 'Give Full Access',
+            onTap: () {
+              if (controller.familyMemberDetail.value?.patientId != null) {
+                controller.giveAccessAPI(Get.context!, controller.familyMemberDetail.value!.patientId!);
+              }
+            },
+            color: AppColors.primary,
+            height: 48,
+          ),
         ],
       ),
     );

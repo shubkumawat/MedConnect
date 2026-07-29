@@ -784,6 +784,24 @@ class ApiProvider {
     }
   }
 
+  Future<Map<String, dynamic>?> giveAccessAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
+    Map<String, dynamic>? result;
+    try {
+      CustomLoading().show(context);
+      final Response? response = await requestPostForApi(context, url, dictParameter, token);
+
+      if (response != null && (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 400)) {
+        result = Map<String, dynamic>.from(response.data);
+      }
+      CustomLoading().hide(context);
+      return result;
+    } catch (e) {
+      CustomLoading().hide(context);
+      PrintLog.printLog("Exception giveAccessAPI: $e");
+      return result;
+    }
+  }
+
   Future<Response?> requestGetForApi(context, String url, Map<String, dynamic> dictParameter,String token) async {
     try {
       Map<String, String> headers = {

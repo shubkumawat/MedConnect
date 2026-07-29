@@ -10,10 +10,12 @@ import '../../../core/Util/CustomCardWidgets/CustomCardWidgets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import 'medical_info_view.dart';
+import '../../dashboard/views/dashboard_view.dart';
 import '../controllers/profile_controller.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
-  const PersonalInfoScreen(BuildContext? context, {super.key});
+  final bool isFromLogin;
+  const PersonalInfoScreen(BuildContext? context, {super.key, this.isFromLogin = false});
 
   @override
   State<PersonalInfoScreen> createState() => _PersonalInfoScreenState();
@@ -278,11 +280,15 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       return;
                     }
                     controller.updateProfileAPI(context, () {
-                      controller.getPatientProfileAPI(context); // Refresh data after update
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const MedicalInfoScreen(null)),
-                      );
+                      if (widget.isFromLogin) {
+                        Get.offAll(() => const DashboardScreen());
+                      } else {
+                        controller.getPatientProfileAPI(context); // Refresh data only if not navigating away
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const MedicalInfoScreen(null)),
+                        );
+                      }
                     });
                   },
                 ),

@@ -17,14 +17,6 @@ class DashboardScreen extends GetView<DashboardController> {
     // Make sure controller is initialized
     Get.put(DashboardController());
 
-    final List<Widget> _screens = const [
-      HomeScreen(),
-      RecordsScreen(),
-      FindScreen(),
-      FamilyScreen(),
-      ProfileScreen(),
-    ];
-
     final List<_NavItem> _navItems = const [
       _NavItem(icon: Icons.home_rounded, label: 'Home', activeColor: AppColors.teal),
       _NavItem(icon: Icons.medical_services_rounded, label: 'Records', activeColor: AppColors.teal),
@@ -39,7 +31,13 @@ class DashboardScreen extends GetView<DashboardController> {
       extendBody: true, // Content flows behind the floating nav bar
       body: Obx(() => IndexedStack(
         index: controller.currentIndex.value,
-        children: _screens,
+        children: [
+          const HomeScreen(),
+          controller.loadedIndices.contains(1) ? const RecordsScreen() : const SizedBox.shrink(),
+          controller.loadedIndices.contains(2) ? const FindScreen() : const SizedBox.shrink(),
+          controller.loadedIndices.contains(3) ? const FamilyScreen() : const SizedBox.shrink(),
+          controller.loadedIndices.contains(4) ? const ProfileScreen() : const SizedBox.shrink(),
+        ],
       )),
 
       bottomNavigationBar: Container(

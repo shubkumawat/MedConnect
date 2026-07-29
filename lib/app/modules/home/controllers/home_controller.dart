@@ -7,7 +7,7 @@ import '../../../data/models/family_member_model.dart';
 import '../../../data/models/video_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/storage_service.dart';
-
+int access_type=0;
 class HomeController extends GetxController {
   
   var activePatientIndex = 0.obs;
@@ -37,11 +37,24 @@ class HomeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    fetchFamilyMembers();
-    fetchVideoTopics();
-    fetchTrendingVideos();
-    loadHistoryLists(); 
+    _initialLoad();
     loadReminderSettings();
+  }
+
+  Future<void> _initialLoad() async {
+    // Phase 1: Critical UI data
+    await fetchFamilyMembers();
+    
+    // Phase 2: Deferred loading for better performance
+    Future.delayed(const Duration(milliseconds: 300), () {
+      fetchVideoTopics();
+      fetchTrendingVideos();
+    });
+
+    // Phase 3: Secondary data
+    Future.delayed(const Duration(milliseconds: 600), () {
+      loadHistoryLists();
+    });
   }
 
   Future<void> loadReminderSettings() async {

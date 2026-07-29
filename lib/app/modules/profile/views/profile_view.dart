@@ -97,9 +97,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
       body: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
+        // if (controller.isLoading.value) {
+        //   return const Center(child: CircularProgressIndicator());
+        // }
         return SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -193,7 +193,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 20),
                       CustomPrimaryButton(
                         text: 'Edit Profile Flow',
-                        onTap: () => Get.to(() => const PersonalInfoScreen(null)),
+                        onTap: () async {
+                          Get.to(() => const PersonalInfoScreen(null));
+                        },
                         color: AppColors.primary,
                         height: 45,
                       ),

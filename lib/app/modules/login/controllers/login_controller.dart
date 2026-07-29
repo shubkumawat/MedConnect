@@ -1,3 +1,4 @@
+import 'package:digitalhealth/app/modules/home/controllers/home_controller.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -11,6 +12,7 @@ import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
+import '../../profile/views/personal_info_view.dart';
 
 class LoginController extends GetxController {
   String? userAccessToken;
@@ -141,19 +143,33 @@ class LoginController extends GetxController {
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          final prefs = await SharedPreferences.getInstance();
-          prefs.setBool(StorageService.isLogin, true);
-          prefs.setString(StorageService.token, response['data']['access']);
-          prefs.setString(StorageService.userID, response['data']['user']['user_id']);
-          prefs.setString(StorageService.mobileNo, response['data']['user']['mobile_number'].toString());
-          prefs.setString(StorageService.email, response['data']['user']['email'].toString());
-          prefs.setString(StorageService.userName, response['data']['user']['full_name'].toString());
+          final storage = StorageService();
+          await storage.setBool(StorageService.isLogin, true);
+          await storage.setString(StorageService.token, response['data']['access']);
+          await storage.setString(StorageService.userID, response['data']['user']['user_id']);
+          await storage.setString(StorageService.mobileNo, response['data']['user']['mobile_number'].toString());
+          await storage.setString(StorageService.email, response['data']['user']['email'].toString());
+          await storage.setString(StorageService.userName, response['data']['user']['full_name'].toString());
+
+          // Check if name or email is missing
+          String fullName = response['data']['user']['full_name']?.toString() ?? "";
+          String email = response['data']['user']['email']?.toString() ?? "";
+
+          // Save access_type
+          String accessType = response['data']['user']?['access_type']?.toString() ?? 
+                             response['data']?['access_type']?.toString() ?? "1";
+          await storage.setString(StorageService.accessType, accessType);
 
           FocusManager.instance.primaryFocus?.unfocus();
           SystemChannels.textInput.invokeMethod('TextInput.hide');
           
           await Future.delayed(const Duration(milliseconds: 350));
-          Get.offAll(() => const DashboardScreen(), transition: Transition.fadeIn);
+
+          if (fullName.isEmpty || fullName == "null" || email.isEmpty || email == "null") {
+            Get.offAll(() => const PersonalInfoScreen(null, isFromLogin: true), transition: Transition.rightToLeft);
+          } else {
+            Get.offAll(() => const DashboardScreen(), transition: Transition.fadeIn);
+          }
         } else {
           Fluttertoast.showToast(msg: response['message'] ?? '');
         }
