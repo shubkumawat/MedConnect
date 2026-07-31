@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:digitalhealth/app/modules/home/controllers/home_controller.dart';
+import 'package:healaura/app/modules/home/controllers/home_controller.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -10,7 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
-import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
+import 'package:healaura/app/core/Util/Print/print_log.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
@@ -155,11 +155,11 @@ class LoginController extends GetxController {
           otpRebuildKey.value++;
           _startResendCooldown();
           // Extract OTP from data object as seen in logs
-          if (response['data'] != null && response['data']['otp'] != null) {
-            receivedOtp.value = response['data']['otp'].toString();
-          } else if (response['otp'] != null) {
-            receivedOtp.value = response['otp'].toString();
-          }
+          // if (response['data'] != null && response['data']['otp'] != null) {
+          //   receivedOtp.value = response['data']['otp'].toString();
+          // } else if (response['otp'] != null) {
+          //   receivedOtp.value = response['otp'].toString();
+          // }
           PrintLog.printLog("Received OTP Set: ${receivedOtp.value}");
         } else {
           Fluttertoast.showToast(msg: response['message'] ?? 'Error sending OTP');

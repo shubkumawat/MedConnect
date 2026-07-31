@@ -12,16 +12,16 @@ void main() {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
-  runApp(const MedConnectApp());
+  runApp(const HealAuraApp());
 }
 
-class MedConnectApp extends StatelessWidget {
-  const MedConnectApp({super.key});
+class HealAuraApp extends StatelessWidget {
+  const HealAuraApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Med Connect',
+      title: 'HealAura',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

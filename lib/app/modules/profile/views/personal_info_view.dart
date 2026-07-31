@@ -2,34 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
-import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:digitalhealth/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
-import '../../../core/Util/CustomCardWidgets/CustomCardWidgets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import 'medical_info_view.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../controllers/profile_controller.dart';
+import 'widgets/profile_form_shell.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
   final bool isFromLogin;
-  const PersonalInfoScreen(BuildContext? context, {super.key, this.isFromLogin = false});
+  const PersonalInfoScreen(BuildContext? context,
+      {super.key, this.isFromLogin = false});
 
   @override
   State<PersonalInfoScreen> createState() => _PersonalInfoScreenState();
 }
 
 class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
-  // Yaha se poora flow shuru hota hai isliye controller yaha put ho raha hai.
-  // MedicalInfo/EmergencyInfo Get.find() se same instance use karenge.
-  ProfileController controller = Get.put(ProfileController());
+  final ProfileController controller = Get.put(ProfileController());
 
   @override
   void initState() {
     super.initState();
-    // Master country list — sirf ek baar fetch karo (agar pehle se load nahi hua)
     if (controller.countryList.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         controller.getMasterCountryAPI(context);
@@ -39,265 +36,198 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.primary,
-                AppColors.tealDark,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Personal Info',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
+    return ProfileFormScaffold(
+      title: 'Personal information',
+      subtitle: 'Help doctors instantly know who you are',
+      step: 1,
+      heroIcon: Icons.person_rounded,
+      bottomBar: Obx(
+        () => ProfilePrimaryButton(
+          text: widget.isFromLogin ? 'Save & continue' : 'Continue to medical',
+          isLoading: controller.isLoading.value,
+          onTap: _onContinue,
         ),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              McProgressBar(
-                value: 1 / 3,
-                color: AppColors.teal,
-                label: 'Step 1 of 3: Personal Details',
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'This helps your doctor instantly know who you are',
-                style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
-              ),
-              const SizedBox(height: 24),
-
-              // Photo picker
-              Center(
-                child: GestureDetector(
-                  onTap: () {},
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 110,
-                        height: 110,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.navHome.withOpacity(0.5), width: 3),
-                          color: AppColors.bgCardNavy,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 15,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.person_rounded, color: AppColors.textMuted, size: 50),
+      children: [
+        ProfileSectionCard(
+          title: 'Profile photo',
+          caption: 'Optional — you can add this later',
+          icon: Icons.camera_alt_outlined,
+          children: [
+            Center(
+              child: Stack(
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFE8F5F1),
+                      border: Border.all(
+                        color: AppColors.teal.withValues(alpha: 0.35),
+                        width: 3,
                       ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: AppColors.teal,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
-                        ),
-                      ),
-                    ],
+                    ),
+                    child: const Icon(Icons.person_rounded,
+                        color: AppColors.teal, size: 48),
                   ),
-                ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.tealDark,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(Icons.camera_alt_rounded,
+                          color: Colors.white, size: 15),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 40),
-
-              McCard(
-                isPremium: true,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Basic Details', style: AppTextStyles.heading3),
-                    const SizedBox(height: 20),
-                    CustomTextField(
-                      hint: 'Full Name',
-                      controller: controller.fullNameCtrl,
-                      prefixIcon: Icons.person_outline_rounded,
-                    ),
-                    const SizedBox(height: 16),
-                    CustomTextField(
-                      hint: 'Email Address',
-                      controller: controller.emailCtrl,
-                      prefixIcon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 16),
-                    CustomTextField(
-                      hint: 'Date of Birth',
-                      controller: controller.dobCtrl,
-                      prefixIcon: Icons.calendar_today_outlined,
-                      readOnly: true,
-                      onTap: () async {
-                        final d = await showDatePicker(
-                          context: context,
-                          initialDate: controller.selectedDob.value ?? DateTime(1990),
-                          firstDate: DateTime(1920),
-                          lastDate: DateTime.now(),
-                          builder: (ctx, child) => Theme(
-                            data: Theme.of(ctx).copyWith(
-                              colorScheme: ColorScheme.light(
-                                primary: AppColors.teal,
-                                onPrimary: Colors.white,
-                                surface: Colors.white,
-                                onSurface: Colors.black,
-                              ),
-                              textButtonTheme: TextButtonThemeData(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppColors.teal,
-                                ),
-                              ),
-                            ),
-                            child: child!,
-                          ),
-                        );
-                        if (d != null) {
-                          controller.selectedDob.value = d;
-                          controller.dobCtrl.text =
-                              '${d.day.toString().padLeft(2, '0')} / ${d.month.toString().padLeft(2, '0')} / ${d.year}';
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              McCard(
-                isPremium: true,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Identity', style: AppTextStyles.heading3),
-                    const SizedBox(height: 20),
-                    Text('Gender', style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 12),
-                    Obx(
-                      () => Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: controller.genders.map((g) {
-                          final sel = controller.selectedGender.value == g;
-                          return GestureDetector(
-                            onTap: () => controller.selectedGender.value = g,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: sel ? AppColors.teal : AppColors.bgNavy,
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(
-                                  color: sel ? AppColors.teal : AppColors.border,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Text(
-                                g,
-                                style: AppTextStyles.captionBold.copyWith(
-                                  color: sel ? Colors.white : AppColors.textMuted,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
+            ),
+          ],
+        ),
+        ProfileSectionCard(
+          title: 'Basic details',
+          caption: 'Your legal name and contact',
+          icon: Icons.badge_outlined,
+          children: [
+            CustomTextField(
+              hint: 'Full Name',
+              controller: controller.fullNameCtrl,
+              prefixIcon: Icons.person_outline_rounded,
+            ),
+            const SizedBox(height: 14),
+            CustomTextField(
+              hint: 'Email Address',
+              controller: controller.emailCtrl,
+              prefixIcon: Icons.email_outlined,
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 14),
+            CustomTextField(
+              hint: 'Date of Birth',
+              controller: controller.dobCtrl,
+              prefixIcon: Icons.calendar_today_outlined,
+              readOnly: true,
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate:
+                      controller.selectedDob.value ?? DateTime(1990),
+                  firstDate: DateTime(1920),
+                  lastDate: DateTime.now(),
+                  builder: (ctx, child) => Theme(
+                    data: Theme.of(ctx).copyWith(
+                      colorScheme: const ColorScheme.light(
+                        primary: AppColors.teal,
+                        onPrimary: Colors.white,
+                        surface: Colors.white,
+                        onSurface: Colors.black,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    Obx(() {
-                      if (controller.isCountryLoading.value) {
-                        return const Center(child: CircularProgressIndicator(color: AppColors.teal));
-                      }
-                      return McDropdown<CountryModel>(
-                        hint: 'Nationality',
-                        value: controller.selectedCountry.value,
-                        items: controller.countryList,
-                        selectedItemBuilder: (c) => Text(
-                          c.flagEmoji,
-                          style: const TextStyle(fontSize: 24),
-                        ),
-                        itemLabel: (c) => '${c.flagEmoji}  ${c.name}',
-                        prefixIcon: Icons.flag_circle_outlined,
-                        onChanged: (v) {
-                          controller.onCountrySelected(v);
-                        },
-                      );
-                    }),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              Obx(
-                () => CustomPrimaryButton(
-                  text: 'Continue →',
-                  color: AppColors.teal,
-                  isLoading: controller.isLoading.value,
-                  onTap: () {
-                    if (controller.fullNameCtrl.text.trim().isEmpty) {
-                      Fluttertoast.showToast(msg: "Please enter full name");
-                      return;
-                    }
-                    if (controller.emailCtrl.text.trim().isEmpty) {
-                      Fluttertoast.showToast(msg: "Please enter email");
-                      return;
-                    }
-                    if (controller.selectedDob.value == null) {
-                      Fluttertoast.showToast(msg: "Please select date of birth");
-                      return;
-                    }
-                    if (controller.selectedGender.value.isEmpty) {
-                      Fluttertoast.showToast(msg: "Please select gender");
-                      return;
-                    }
-                    if (controller.selectedCountry.value == null) {
-                      Fluttertoast.showToast(msg: "Please select nationality");
-                      return;
-                    }
-                    controller.updateProfileAPI(context, () {
-                      if (widget.isFromLogin) {
-                        Get.offAll(() => const DashboardScreen());
-                      } else {
-                        controller.getPatientProfileAPI(context); // Refresh data only if not navigating away
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const MedicalInfoScreen(null)),
-                        );
-                      }
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
+                    child: child!,
+                  ),
+                );
+                if (d != null) {
+                  controller.selectedDob.value = d;
+                  controller.dobCtrl.text =
+                      '${d.day.toString().padLeft(2, '0')} / ${d.month.toString().padLeft(2, '0')} / ${d.year}';
+                }
+              },
+            ),
+          ],
         ),
-      ),
+        ProfileSectionCard(
+          title: 'Identity',
+          caption: 'Gender and nationality',
+          icon: Icons.public_rounded,
+          accent: AppColors.orange,
+          children: [
+            Text(
+              'Gender',
+              style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            Obx(
+              () => Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: controller.genders.map((g) {
+                  return ProfileChoiceChip(
+                    label: g,
+                    selected: controller.selectedGender.value == g,
+                    onTap: () => controller.selectedGender.value = g,
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Obx(() {
+              if (controller.isCountryLoading.value) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(12),
+                    child: CircularProgressIndicator(color: AppColors.teal),
+                  ),
+                );
+              }
+              return McDropdown<CountryModel>(
+                hint: 'Nationality',
+                value: controller.selectedCountry.value,
+                items: controller.countryList,
+                selectedItemBuilder: (c) => Text(
+                  '${c.flagEmoji}  ${c.name}',
+                  style: AppTextStyles.body.copyWith(color: AppColors.textTail),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                itemLabel: (c) => '${c.flagEmoji}  ${c.name}',
+                prefixIcon: Icons.flag_circle_outlined,
+                onChanged: controller.onCountrySelected,
+              );
+            }),
+          ],
+        ),
+        const SizedBox(height: 8),
+      ],
     );
+  }
+
+  void _onContinue() {
+    if (controller.fullNameCtrl.text.trim().isEmpty) {
+      Fluttertoast.showToast(msg: 'Please enter full name');
+      return;
+    }
+    if (controller.emailCtrl.text.trim().isEmpty) {
+      Fluttertoast.showToast(msg: 'Please enter email');
+      return;
+    }
+    if (controller.selectedDob.value == null) {
+      Fluttertoast.showToast(msg: 'Please select date of birth');
+      return;
+    }
+    if (controller.selectedGender.value.isEmpty) {
+      Fluttertoast.showToast(msg: 'Please select gender');
+      return;
+    }
+    if (controller.selectedCountry.value == null) {
+      Fluttertoast.showToast(msg: 'Please select nationality');
+      return;
+    }
+    controller.updateProfileAPI(context, () {
+      if (widget.isFromLogin) {
+        Get.offAll(() => const DashboardScreen());
+      } else {
+        controller.getPatientProfileAPI(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MedicalInfoScreen(null)),
+        );
+      }
+    });
   }
 }

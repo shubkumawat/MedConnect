@@ -12,35 +12,35 @@ import 'package:flutter/material.dart';
 /// Do alag boxes ki jagah — ek unified look.
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:digitalhealth/app/core/theme/app_colors.dart';
+import 'package:healaura/app/core/theme/app_colors.dart';
 
 /// Ek hi text field jisme left side mein tappable country code (flag)
 /// hota hai aur usi field ke andar right side mein phone number type hota hai.
 /// Do alag boxes ki jagah — ek unified look.
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:digitalhealth/app/core/theme/app_colors.dart';
+import 'package:healaura/app/core/theme/app_colors.dart';
 
 /// Ek hi text field jisme left side mein tappable country code (flag)
 /// hota hai aur usi field ke andar right side mein phone number type hota hai.
 /// Do alag boxes ki jagah — ek unified look.
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:digitalhealth/app/core/theme/app_colors.dart';
+import 'package:healaura/app/core/theme/app_colors.dart';
 
 /// Ek hi text field jisme left side mein tappable country code (flag)
 /// hota hai aur usi field ke andar right side mein phone number type hota hai.
 /// Do alag boxes ki jagah — ek unified look.
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:digitalhealth/app/core/theme/app_colors.dart';
+import 'package:healaura/app/core/theme/app_colors.dart';
 
 /// Ek hi text field jisme left side mein tappable country code (flag)
 /// hota hai aur usi field ke andar right side mein phone number type hota hai.
 /// Do alag boxes ki jagah — ek unified look.
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:digitalhealth/app/core/theme/app_colors.dart';
+import 'package:healaura/app/core/theme/app_colors.dart';
 
 /// Ek hi text field jisme left side mein tappable country code (flag)
 /// hota hai aur usi field ke andar right side mein phone number type hota hai.

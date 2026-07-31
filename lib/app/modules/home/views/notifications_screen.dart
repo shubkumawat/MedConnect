@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import 'package:digitalhealth/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});

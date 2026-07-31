@@ -1,12 +1,13 @@
+import 'package:healaura/app/data/services/storage_service.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
-import 'package:digitalhealth/app/data/models/medical_record_model.dart';
-import 'package:digitalhealth/app/data/models/disease_response_model.dart';
-import 'package:digitalhealth/DataProvider/api_provider.dart';
-import 'package:digitalhealth/DataProvider/app_shared_preferences.dart';
-import 'package:digitalhealth/DataProvider/web_api_constant.dart';
-import 'package:digitalhealth/app/modules/records/controllers/pdf_generator.dart';
+import 'package:healaura/app/data/models/medical_record_model.dart';
+import 'package:healaura/app/data/models/disease_response_model.dart';
+import 'package:healaura/DataProvider/api_provider.dart';
+import 'package:healaura/DataProvider/app_shared_preferences.dart';
+import 'package:healaura/DataProvider/web_api_constant.dart';
+import 'package:healaura/app/modules/records/controllers/pdf_generator.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -19,10 +20,15 @@ class RecordsController extends GetxController {
   var timelineEvents = <TimelineEvent>[].obs;
   var diseaseTimeline = <TimelineEvent>[].obs;
   var diseaseMedications = <Medication>[].obs;
+  var selectedMedication = Rxn<Medication>();
   var diseaseDocuments = <Map<String, dynamic>>[].obs;
   var diseaseBills = <Map<String, dynamic>>[].obs;
   var isDocumentsLoading = false.obs;
   var isBillsLoading = false.obs;
+  var isMedicationsLoading = false.obs;
+  var isCurrentMedicationsLoading = false.obs;
+  var isMedicationDetailLoading = false.obs;
+  var medicineSearchResults = <Map<String, dynamic>>[].obs;
   var selectedDisease = Rxn<DiseaseResult>();
   
   var isLoading = false.obs;
@@ -113,8 +119,7 @@ class RecordsController extends GetxController {
         print("details Response....$data");
         if (data != null) {
           selectedDisease.value = DiseaseResult.fromJson(data);
-          // Fetch related data
-          fetchDiseaseMedications(uuid);
+          // Fetch related data (medications load on Medications tab)
           fetchDiseaseTimeline(uuid);
           fetchDiseaseDocuments(uuid);
           fetchDiseaseBills(uuid);
@@ -127,26 +132,277 @@ class RecordsController extends GetxController {
     }
   }
 
-  Future<void> fetchDiseaseMedications(String uuid) async {
+  // ─── Current Medications (Health Record → Medications tab) ───────────────
+  // GET /medications/?active=1  |  POST /diseases/?active=1/medications
+  // Do NOT use disease/{uuid} APIs here.
+
+  Future<void> fetchCurrentMedications() async {
     try {
+      isCurrentMedicationsLoading.value = true;
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
       var response = await ApiProvider().requestGetForApi(
         Get.context,
-        "${WebApiConstant.API_URL_RECORDS_DISEASES}$uuid/medications/",
+        WebApiConstant.API_URL_RECORDS_MEDICATIONS,
+        {"active": 1},
+        token ?? "",
+      );
+
+      if (response != null && response.statusCode == 200) {
+        medications.value = _parseMedicationList(response.data);
+      }
+    } catch (e) {
+      debugPrint("Error fetching current medications: $e");
+    } finally {
+      isCurrentMedicationsLoading.value = false;
+    }
+  }
+
+  Future<bool> addCurrentMedication(Map<String, dynamic> body) async {
+    try {
+      isLoading.value = true;
+      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      // POST /health-records/diseases/?active=1/medications
+      var response = await ApiProvider().requestPostForApi(
+        Get.context,
+        WebApiConstant.API_URL_RECORDS_CURRENT_MEDICATIONS_ADD,
+        body,
+        token ?? "",
+      );
+
+      if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
+        await fetchCurrentMedications();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint("Error adding current medication: $e");
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// GET /health-records/medications/{medication_uuid}/
+  Future<Medication?> fetchMedicationDetail(String medicationUuid) async {
+    try {
+      isMedicationDetailLoading.value = true;
+      selectedMedication.value = null;
+      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      var response = await ApiProvider().requestGetForApi(
+        Get.context,
+        "${WebApiConstant.API_URL_RECORDS_MEDICATIONS}$medicationUuid/",
         {},
         token ?? "",
       );
 
       if (response != null && response.statusCode == 200) {
-        var data = response.data['data'];
-        if (data != null && data['results'] != null) {
-          diseaseMedications.value = (data['results'] as List)
-              .map((e) => Medication.fromJson(e))
-              .toList();
+        final raw = response.data;
+        Map<String, dynamic>? json;
+        if (raw is Map) {
+          if (raw['data'] is Map) {
+            json = Map<String, dynamic>.from(raw['data']);
+          } else {
+            json = Map<String, dynamic>.from(raw);
+          }
         }
+        if (json != null) {
+          final med = Medication.fromJson(json);
+          selectedMedication.value = med;
+          return med;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint("Error fetching medication detail: $e");
+      return null;
+    } finally {
+      isMedicationDetailLoading.value = false;
+    }
+  }
+
+  List<Medication> _parseMedicationList(dynamic responseData) {
+    List results = [];
+    if (responseData is Map) {
+      final data = responseData['data'];
+      if (data is Map && data['results'] != null) {
+        results = data['results'] as List;
+      } else if (data is List) {
+        results = data;
+      } else if (responseData['results'] != null) {
+        results = responseData['results'] as List;
+      }
+    }
+    return results.map((e) => Medication.fromJson(Map<String, dynamic>.from(e))).toList();
+  }
+
+  // ─── Disease Medications (Disease Details screen) ──────────────────────────
+  // GET /diseases/{disease_uuid}/medications/
+  // POST /diseases/{disease_uuid}/medications/
+
+  /// Disease-scoped medications. Uses DISEASE uuid only.
+  Future<void> fetchDiseaseMedications(String diseaseUuid) async {
+    try {
+      isMedicationsLoading.value = true;
+      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
+      var response = await ApiProvider().requestGetForApi(
+        Get.context,
+        "${WebApiConstant.API_URL_RECORDS_DISEASES}$diseaseUuid/medications/",
+        {},
+        token ?? "",
+      );
+
+      if (response != null && response.statusCode == 200) {
+        diseaseMedications.value = _parseMedicationList(response.data);
       }
     } catch (e) {
       debugPrint("Error fetching disease medications: $e");
+    } finally {
+      isMedicationsLoading.value = false;
+    }
+  }
+
+  Future<bool> addDiseaseMedication({
+    required String diseaseUuid,
+    required Map<String, dynamic> body,
+  }) async {
+    try {
+      isLoading.value = true;
+      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      var response = await ApiProvider().requestPostForApi(
+        Get.context,
+        "${WebApiConstant.API_URL_RECORDS_DISEASES}$diseaseUuid/medications/",
+        body,
+        token ?? "",
+      );
+
+      if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
+        await fetchDiseaseMedications(diseaseUuid);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint("Error adding disease medication: $e");
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Kept for callers — disease-scoped add.
+  Future<bool> addMedication({
+    required String diseaseUuid,
+    required Map<String, dynamic> body,
+  }) =>
+      addDiseaseMedication(diseaseUuid: diseaseUuid, body: body);
+
+  /// Edit uses medication UUID only. Refresh the list that was edited.
+  Future<bool> updateMedication({
+    required String medicationUuid,
+    required Map<String, dynamic> body,
+    String? diseaseUuid,
+    bool isCurrentMedication = false,
+  }) async {
+    try {
+      isLoading.value = true;
+      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      var response = await ApiProvider().requestPatchForApi(
+        Get.context,
+        "${WebApiConstant.API_URL_RECORDS_MEDICATIONS}$medicationUuid/",
+        body,
+        token ?? "",
+      );
+
+      if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
+        if (isCurrentMedication || diseaseUuid == null || diseaseUuid.isEmpty) {
+          await fetchCurrentMedications();
+        } else {
+          await fetchDiseaseMedications(diseaseUuid);
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint("Error updating medication: $e");
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Delete uses medication UUID only.
+  Future<bool> deleteMedication({
+    required String medicationUuid,
+    String? diseaseUuid,
+    bool isCurrentMedication = false,
+  }) async {
+    try {
+      isLoading.value = true;
+      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      var response = await ApiProvider().requestDeleteForApi(
+        Get.context,
+        "${WebApiConstant.API_URL_RECORDS_MEDICATIONS}$medicationUuid/",
+        token ?? "",
+      );
+
+      if (response != null &&
+          (response.statusCode == 200 ||
+              response.statusCode == 204 ||
+              response.statusCode == 201)) {
+        if (isCurrentMedication || diseaseUuid == null || diseaseUuid.isEmpty) {
+          await fetchCurrentMedications();
+        } else {
+          await fetchDiseaseMedications(diseaseUuid);
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint("Error deleting medication: $e");
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchMedicines(String keyword) async {
+    try {
+      if (keyword.trim().isEmpty) {
+        medicineSearchResults.clear();
+        return [];
+      }
+      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
+      var response = await ApiProvider().requestGetForApi(
+        Get.context,
+        WebApiConstant.API_URL_RECORDS_MEDICINES_SEARCH,
+        {"q": keyword.trim()},
+        token ?? "",
+      );
+
+      if (response != null && response.statusCode == 200) {
+        var data = response.data['data'];
+        List results = [];
+        if (data is Map && data['results'] != null) {
+          results = data['results'] as List;
+        } else if (data is List) {
+          results = data;
+        } else if (response.data['results'] != null) {
+          results = response.data['results'] as List;
+        }
+        medicineSearchResults.value =
+            results.map((e) => Map<String, dynamic>.from(e)).toList();
+        return medicineSearchResults.toList();
+      }
+      medicineSearchResults.clear();
+      return [];
+    } catch (e) {
+      debugPrint("Error searching medicines: $e");
+      medicineSearchResults.clear();
+      return [];
     }
   }
 
@@ -417,7 +673,12 @@ class RecordsController extends GetxController {
 
     try {
       isLoading.value = true;
-      
+
+      // Ensure medications are loaded for PDF (active only)
+      if (diseaseMedications.isEmpty) {
+        await fetchDiseaseMedications(uuid);
+      }
+
       // Ensure ProfileController is available for the PDF report
       if (!Get.isRegistered<ProfileController>()) {
         Get.put(ProfileController());

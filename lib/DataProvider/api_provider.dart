@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
-import 'package:digitalhealth/app/core/Util/CustomLoading/custom_loading.dart';
-import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
+import 'package:healaura/app/core/Util/CustomLoading/custom_loading.dart';
+import 'package:healaura/app/core/Util/Print/print_log.dart';
 import '../app/data/models/disease_response_model.dart';
 import 'web_api_constant.dart';
 
@@ -1017,7 +1017,7 @@ class ApiProvider {
           connectTimeout: Duration(seconds: 30),
           headers: headers);
       _dio.options = options;
-      Response response = await _dio.post(url+"?demo=true", data: dictParameter, options: Options(
+      Response response = await _dio.post(url.contains('?') ? "$url&demo=true" : "$url?demo=true", data: dictParameter, options: Options(
           followRedirects: false,
           validateStatus: (status) =>true,
           headers: headers

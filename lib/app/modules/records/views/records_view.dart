@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:digitalhealth/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
 import '../../../data/models/disease_response_model.dart';
+import '../../../data/models/medical_record_model.dart';
 import '../controllers/records_controller.dart';
 import 'add_medication_screen.dart';
 import 'add_disease_screen.dart' hide SizedBox;
 import 'disease_detail_screen.dart';
 import 'ai_prescription_screen.dart';
+import 'medication_detail_screen.dart';
+import '../../home/controllers/home_controller.dart';
+import '../../home/views/qr_view.dart';
 
 class RecordsScreen extends StatefulWidget {
   const RecordsScreen({super.key});
@@ -28,10 +32,20 @@ class _RecordsScreenState extends State<RecordsScreen>
     super.initState();
     controller.fetchDiseases();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    // Medications tab (index 1) — current medications only
+    if (_tabController.index == 1) {
+      controller.fetchCurrentMedications();
+    }
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -119,9 +133,26 @@ class _RecordsScreenState extends State<RecordsScreen>
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+            icon: const Icon(Icons.qr_code_2_rounded, color: Colors.white),
             onPressed: () {
-              // TODO: Show patient QR or Scan
+              String name = "Patient";
+              String? photo;
+              String? patientId;
+              if (Get.isRegistered<HomeController>()) {
+                final home = Get.find<HomeController>();
+                if (home.patients.isNotEmpty) {
+                  final i = home.activePatientIndex.value.clamp(0, home.patients.length - 1);
+                  final p = home.patients[i];
+                  name = p.fullName ?? name;
+                  photo = p.profilePhoto;
+                  patientId = p.patientId;
+                }
+              }
+              Get.to(() => QrScreen(
+                    patientName: name,
+                    patientId: patientId,
+                    profilePhoto: photo,
+                  ));
             },
           ),
           const SizedBox(width: 8),
@@ -198,23 +229,33 @@ class _RecordsScreenState extends State<RecordsScreen>
                 },
               )),
 
-          // ── Medications Tab ───────────────────────────────────
-          Obx(() => controller.isLoading.value 
-            ? const Center(child: CircularProgressIndicator())
-            : controller.medications.isEmpty
-              ? _buildEmptyState(
-                  icon: Icons.medication_outlined,
-                  title: "No Medications",
-                  subtitle: "Add your current medications to get timely reminders.",
-                  onTap: () => Get.to(AddMedicationScreen()),
-                )
-              : ListView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-                itemCount: controller.medications.length,
-                itemBuilder: (context, index) {
-                  final m = controller.medications[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
+          // ── Medications Tab (Current Medications only) ─────────
+          Obx(() {
+            if (controller.isCurrentMedicationsLoading.value) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (controller.medications.isEmpty) {
+              return _buildEmptyState(
+                icon: Icons.medication_outlined,
+                title: "No Current Medications",
+                subtitle: "Add your current medications to get timely reminders.",
+                onTap: () async {
+                  // await Get.to(() => const AddMedicationScreen(isCurrentMedication: true));
+                },
+              );
+            }
+            return ListView.builder(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+              itemCount: controller.medications.length,
+              itemBuilder: (context, index) {
+                final m = controller.medications[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (m.id.isEmpty) return;
+                      Get.to(() => MedicationDetailScreen(medicationUuid: m.id));
+                    },
                     child: McCard(
                       padding: const EdgeInsets.all(18),
                       child: Row(
@@ -226,48 +267,68 @@ class _RecordsScreenState extends State<RecordsScreen>
                               color: AppColors.teal.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Icon(Icons.medication_rounded, color: AppColors.teal, size: 28),
+                            child: const Icon(Icons.medication_rounded,
+                                color: AppColors.teal, size: 28),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(m.name, style: AppTextStyles.bodyBold.copyWith(fontSize: 16)),
+                                Text(m.name,
+                                    style: AppTextStyles.bodyBold.copyWith(fontSize: 16)),
                                 const SizedBox(height: 4),
-                                Text('${m.frequency} · ${m.timing}', style: AppTextStyles.caption),
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.teal.withOpacity(0.08),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    m.diseaseName,
-                                    style: AppTextStyles.caption.copyWith(
-                                      color: AppColors.teal,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 10,
+                                Text(
+                                  m.subtitle.isNotEmpty
+                                      ? m.subtitle
+                                      : '${m.frequencyDisplay} · ${m.timing}',
+                                  style: AppTextStyles.caption,
+                                ),
+                                if (m.diseaseName.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.teal.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      m.diseaseName,
+                                      style: AppTextStyles.caption.copyWith(
+                                        color: AppColors.teal,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 10,
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
-                          CustomIconButton(
-                            icon: Icons.alarm_rounded,
-                            onTap: () {},
-                            bgColor: AppColors.orange.withOpacity(0.1),
-                            iconColor: AppColors.orange,
-                            size: 40,
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert, color: AppColors.textTail),
+                            onSelected: (value) async {
+                              if (value == 'delete') {
+                                await _confirmDeleteCurrentMedication(m);
+                              }
+                            },
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Delete',
+                                    style: TextStyle(color: AppColors.statusRed)),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
-              )),
+                  ),
+                );
+              },
+            );
+          }),
 
           // ── Timeline Tab ──────────────────────────────────────
           Obx(() => Column(
@@ -326,6 +387,35 @@ class _RecordsScreenState extends State<RecordsScreen>
     );
   }
 
+  Future<void> _confirmDeleteCurrentMedication(Medication med) async {
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Delete Medication'),
+        content: Text('Remove "${med.name}" from current medications?'),
+        actions: [
+          TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      final ok = await controller.deleteMedication(
+        medicationUuid: med.id,
+        isCurrentMedication: true,
+      );
+      Get.snackbar(
+        ok ? 'Success' : 'Error',
+        ok ? 'Medication deleted' : 'Failed to delete medication',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: ok ? Colors.green : Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
   Future<bool?> _showDeleteConfirmation(BuildContext context, DiseaseResult d) async {
     return await showDialog<bool>(
       context: context,
@@ -371,7 +461,7 @@ class _RecordsScreenState extends State<RecordsScreen>
             const SizedBox(height: 10),
             _SheetOption(icon: Icons.medication, label: 'Add Medication', color: AppColors.teal, onTap: () { 
               Navigator.pop(context);
-              Get.to(AddMedicationScreen());
+              Get.to(() => const AddMedicationScreen(isCurrentMedication: true));
             }),
             const SizedBox(height: 10),
             _SheetOption(icon: Icons.camera_alt, label: 'Scan Prescription (AI)', color: AppColors.primary, onTap: () { 

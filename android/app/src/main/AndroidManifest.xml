@@ -6,7 +6,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
-        android:label="digitalhealth"
+        android:label="HealAura"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

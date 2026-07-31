@@ -1,17 +1,18 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'add_timeline_event_screen.dart';
-import 'package:digitalhealth/app/modules/records/views/ai_prescription_screen.dart';
+import 'package:healaura/app/modules/records/views/ai_prescription_screen.dart';
 import 'add_disease_screen.dart';
 import 'add_medication_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:digitalhealth/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
 import '../controllers/records_controller.dart';
+import 'package:healaura/app/data/models/medical_record_model.dart';
 import 'package:intl/intl.dart';
 
 class DiseaseDetailScreen extends StatefulWidget {
@@ -51,9 +52,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 5, vsync: this);
-    _tabCtrl.addListener(() {
-      setState(() {});
-    });
+    _tabCtrl.addListener(_onTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.selectedDisease.value = null;
       controller.diseaseMedications.clear();
@@ -62,8 +61,18 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
     });
   }
 
+  void _onTabChanged() {
+    if (_tabCtrl.indexIsChanging) return;
+    setState(() {});
+    // Second tab (index 1) = Medications — load active meds with disease UUID
+    if (_tabCtrl.index == 1) {
+      controller.fetchDiseaseMedications(widget.uuid);
+    }
+  }
+
   @override
   void dispose() {
+    _tabCtrl.removeListener(_onTabChanged);
     _tabCtrl.dispose();
     super.dispose();
   }
@@ -174,14 +183,24 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
             ],
           ),
       ),
-      floatingActionButton: _tabCtrl.index == 4 ? FloatingActionButton.extended(
-        onPressed: () {
-          Get.to(() => AddTimelineEventScreen(diseaseUuid: widget.uuid));
-        },
-        backgroundColor: AppColors.teal,
-        icon: const Icon(Icons.add_task_rounded, color: Colors.white),
-        label: const Text('Add to Timeline', style: TextStyle(color: Colors.white)),
-      ) : null,
+      floatingActionButton: _tabCtrl.index == 1
+          ? FloatingActionButton(
+              onPressed: () async {
+                await Get.to(() => AddMedicationScreen(diseaseUuid: widget.uuid));
+              },
+              backgroundColor: AppColors.teal,
+              child: const Icon(Icons.add, color: Colors.white),
+            )
+          : _tabCtrl.index == 4
+              ? FloatingActionButton.extended(
+                  onPressed: () {
+                    Get.to(() => AddTimelineEventScreen(diseaseUuid: widget.uuid));
+                  },
+                  backgroundColor: AppColors.teal,
+                  icon: const Icon(Icons.add_task_rounded, color: Colors.white),
+                  label: const Text('Add to Timeline', style: TextStyle(color: Colors.white)),
+                )
+              : null,
     );
   }
 
@@ -235,59 +254,131 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
   }
 
   Widget _buildMedicationsTab() {
-    return Obx(() => ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Center(child: Text('Medications linked to this condition', style: AppTextStyles.caption)),
-        const SizedBox(height: 16),
-        if (controller.diseaseMedications.isEmpty)
+    return Obx(() {
+      if (controller.isMedicationsLoading.value) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 88),
+        children: [
           Center(
-            child: Padding(
-              padding: const EdgeInsets.all(40.0),
-              child: Column(
-                children: [
-                  Icon(Icons.medication_outlined, size: 48, color: AppColors.textMuted.withOpacity(0.5)),
-                  const SizedBox(height: 12),
-                  Text("No medications found", style: AppTextStyles.body.copyWith(color: AppColors.textMuted)),
-                ],
+            child: Text(
+              'Current medications for this condition',
+              style: AppTextStyles.caption,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (controller.diseaseMedications.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40.0),
+                child: Column(
+                  children: [
+                    Icon(Icons.medication_outlined,
+                        size: 48, color: AppColors.textMuted.withOpacity(0.5)),
+                    const SizedBox(height: 12),
+                    Text(
+                      "No active medications",
+                      style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      "Tap + to add a medication",
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          )
-        else
-          ...controller.diseaseMedications.map((med) => McCard(
-            isPremium: true,
-            padding: const EdgeInsets.all(16),
-            // margin: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.teal.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+            )
+          else
+            ...controller.diseaseMedications.map((med) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: McCard(
+                    isPremium: true,
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.teal.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.medication_rounded,
+                              color: AppColors.teal, size: 24),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                med.name.isNotEmpty ? med.name : 'Unknown Medication',
+                                style: AppTextStyles.bodyBold,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                med.subtitle.isNotEmpty ? med.subtitle : 'No details',
+                                style: AppTextStyles.caption,
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert, color: AppColors.textTail),
+                          onSelected: (value) async {
+                            if (value == 'edit') {
+                              await Get.to(() => AddMedicationScreen(
+                                    diseaseUuid: widget.uuid,
+                                    medication: med,
+                                  ));
+                            } else if (value == 'delete') {
+                              _confirmDeleteMedication(med);
+                            }
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'edit', child: Text('Edit',style: TextStyle(color: AppColors.textTail),)),
+                            PopupMenuItem(value: 'delete', child: Text('Delete',style: TextStyle(color: AppColors.statusRed))),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Icon(Icons.medication_rounded, color: AppColors.teal, size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(med.name ?? 'Unknown Medication', style: AppTextStyles.bodyBold),
-                      const SizedBox(height: 2),
-                      Text('${med.frequency ?? ''} · ${med.timing ?? ''}', style: AppTextStyles.caption),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-              ],
-            ),
-          )),
-        const SizedBox(height: 12),
-        CustomOutlineButton(text: '+ Add Medication', onTap: () => Get.to(() => const AddMedicationScreen())),
-      ],
-    ));
+                )),
+        ],
+      );
+    });
+  }
+
+  Future<void> _confirmDeleteMedication(Medication med) async {
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Delete Medication'),
+        content: Text('Remove "${med.name}" from current medications?'),
+        actions: [
+          TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      final ok = await controller.deleteMedication(
+        medicationUuid: med.id,
+        diseaseUuid: widget.uuid,
+        isCurrentMedication: false,
+      );
+      Get.snackbar(
+        ok ? 'Success' : 'Error',
+        ok ? 'Medication deleted' : 'Failed to delete medication',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: ok ? Colors.green : Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 
   Widget _buildSlipsTab() {

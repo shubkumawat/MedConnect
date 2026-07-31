@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:digitalhealth/app/core//Util/Print/print_log.dart';
+import 'package:healaura/app/core//Util/Print/print_log.dart';
 
 class AppSharedPreferences {
   static const isLogin = "isLogin";

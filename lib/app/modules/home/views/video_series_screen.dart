@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart';
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:digitalhealth/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
 import '../../../data/models/video_model.dart';
 import '../controllers/video_series_controller.dart';
 

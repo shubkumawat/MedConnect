@@ -1,5 +1,5 @@
-import 'package:digitalhealth/app/data/services/storage_service.dart';
-import 'package:digitalhealth/app/modules/login/views/login_view.dart';
+import 'package:healaura/app/data/services/storage_service.dart';
+import 'package:healaura/app/modules/login/views/login_view.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 

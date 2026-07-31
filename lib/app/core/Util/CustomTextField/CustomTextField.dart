@@ -10,6 +10,7 @@ import '../Font/font_family.dart';
 class CustomTextField extends StatelessWidget {
   final String hint;
   final TextEditingController? controller;
+  final FocusNode? focusNode;
   final IconData? prefixIcon;
   final IconData? suffixIcon;
   final bool obscureText;
@@ -27,6 +28,7 @@ class CustomTextField extends StatelessWidget {
     super.key,
     required this.hint,
     this.controller,
+    this.focusNode,
     this.prefixIcon,
     this.suffixIcon,
     this.obscureText = false,
@@ -45,6 +47,7 @@ class CustomTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
+      focusNode: focusNode,
       obscureText: obscureText,
       keyboardType: keyboardType,
       validator: validator,

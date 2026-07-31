@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
-import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:digitalhealth/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
 import '../controllers/family_member_controller.dart';
 import 'add_family_member_screen.dart';
 import 'family_member_detail_view.dart';

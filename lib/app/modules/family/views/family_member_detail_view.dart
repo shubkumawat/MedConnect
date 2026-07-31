@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:digitalhealth/app/core/theme/app_colors.dart';
-import 'package:digitalhealth/app/core/theme/app_text_theme.dart';
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
-import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:digitalhealth/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
-import 'package:digitalhealth/app/data/services/storage_service.dart';
+import 'package:healaura/app/core/theme/app_colors.dart';
+import 'package:healaura/app/core/theme/app_text_theme.dart';
+import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import 'package:healaura/app/data/services/storage_service.dart';
 import '../controllers/family_member_controller.dart';
 import 'add_family_member_screen.dart';
 
@@ -154,6 +154,19 @@ class FamilyMemberDetailScreen extends StatelessWidget {
                                   style: AppTextStyles.tealLabel.copyWith(fontSize: 12),
                                 ),
                               ),
+                              if (member.mobileNumber != null && member.mobileNumber!.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.phone_android_rounded, size: 14, color: AppColors.textMuted),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      member.mobileNumber!,
+                                      style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -179,6 +192,10 @@ class FamilyMemberDetailScreen extends StatelessWidget {
                     icon: Icons.person_search_rounded,
                     children: [
                       _buildDetailItem(Icons.event_note_rounded, 'Date of Birth', member.dateOfBirth ?? 'N/A'),
+                      _buildDetailItem(Icons.phone_android_rounded, 'Mobile Number',
+                          (member.mobileNumber != null && member.mobileNumber!.isNotEmpty)
+                              ? member.mobileNumber!
+                              : 'N/A'),
                       _buildDetailItem(Icons.height_rounded, 'Height', '${member.height ?? 'N/A'} cm'),
                       _buildDetailItem(Icons.scale_rounded, 'Weight', '${member.weight ?? 'N/A'} kg'),
                       _buildDetailItem(Icons.language_rounded, 'Nationality', member.nationality?.name ?? 'N/A'),

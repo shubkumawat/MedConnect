@@ -6,9 +6,9 @@ import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../core/widgets/otp_input_row.dart';
-import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
 import '../controllers/login_controller.dart';
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
         children: [
           const TextSpan(text: 'Enter the 6-digit code sent to '),
           TextSpan(
-            text: '+$code $number',
+            text: '$code $number',
             style: AppTextStyles.bodyBold.copyWith(color: AppColors.textDark),
           ),
           const TextSpan(text: '  '),
@@ -171,10 +171,10 @@ class _LoginScreenState extends State<LoginScreen> {
       PhoneInputWithCountry<CountryModel>(
         items: controller.countryList,
         value: controller.selectedCountry.value,
-        itemLabel: (c) => "${c.flagEmoji} +${c.phoneCode}",
+        itemLabel: (c) => "${c.flagEmoji} ${c.phoneCode}",
         countryName: (c) => c.name ?? "",   // 🔑 apne CountryModel ka sahi field name yahan daalo
         selectedItemBuilder: (c) => Text(
-          "${c.flagEmoji} +${c.phoneCode}",
+          "${c.flagEmoji} ${c.phoneCode}",
           style: const TextStyle(fontSize: 15, color: Colors.black87),
         ),
         onCountryChanged: (val) {

@@ -1,24 +1,99 @@
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
-import 'package:digitalhealth/app/data/models/doctor_model.dart';
-import 'package:digitalhealth/DataProvider/api_provider.dart';
-import 'package:digitalhealth/DataProvider/web_api_constant.dart';
+import 'package:healaura/app/data/models/doctor_model.dart';
+import 'package:healaura/DataProvider/api_provider.dart';
+import 'package:healaura/DataProvider/web_api_constant.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../../DataProvider/app_shared_preferences.dart';
+
+enum FindSortMode { nearest, rating, reviews, name }
 
 class FindController extends GetxController {
   var specializations = <Specialization>[].obs;
   var hospitals = <Hospital>[].obs;
   var isLoading = false.obs;
   var isHospitalLoading = false.obs;
+  /// 0 = All specialties; 1..n map to specializations[i-1]
   var selectedSpecIndex = 0.obs;
   var showMap = false.obs;
+  var searchQuery = ''.obs;
+  var sortMode = FindSortMode.nearest.obs;
 
   var hospitalDetail = Rxn<HospitalDetail>();
   var isDetailLoading = false.obs;
   var userPosition = Rxn<Position>();
+
+  /// Client-side filter + sort over API hospital list (does not change API).
+  List<Hospital> get filteredHospitals {
+    var list = List<Hospital>.from(hospitals);
+    final q = searchQuery.value.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list.where((h) {
+        return h.name.toLowerCase().contains(q) ||
+            h.cityName.toLowerCase().contains(q) ||
+            h.address.toLowerCase().contains(q) ||
+            h.hospitalType.toLowerCase().contains(q);
+      }).toList();
+    }
+    if (selectedSpecIndex.value > 0 &&
+        selectedSpecIndex.value <= specializations.length) {
+      final spec =
+          specializations[selectedSpecIndex.value - 1].name.toLowerCase();
+      list = list
+          .where((h) =>
+              h.hospitalType.toLowerCase().contains(spec) ||
+              h.name.toLowerCase().contains(spec))
+          .toList();
+    }
+    switch (sortMode.value) {
+      case FindSortMode.rating:
+        list.sort((a, b) => (double.tryParse(b.averageRating) ?? 0)
+            .compareTo(double.tryParse(a.averageRating) ?? 0));
+        break;
+      case FindSortMode.reviews:
+        list.sort((a, b) => b.totalReviews.compareTo(a.totalReviews));
+        break;
+      case FindSortMode.name:
+        list.sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case FindSortMode.nearest:
+        list.sort((a, b) {
+          if (a.isFeatured != b.isFeatured) return a.isFeatured ? -1 : 1;
+          return (double.tryParse(b.averageRating) ?? 0)
+              .compareTo(double.tryParse(a.averageRating) ?? 0);
+        });
+        break;
+    }
+    return list;
+  }
+
+  void setSearch(String value) {
+    searchQuery.value = value;
+  }
+
+  void selectSpecialty(int index) {
+    selectedSpecIndex.value = index;
+  }
+
+  void setSort(FindSortMode mode) {
+    sortMode.value = mode;
+  }
+
+  String get sortLabel {
+    switch (sortMode.value) {
+      case FindSortMode.nearest:
+        return 'Nearest';
+      case FindSortMode.rating:
+        return 'Top rated';
+      case FindSortMode.reviews:
+        return 'Most reviewed';
+      case FindSortMode.name:
+        return 'A–Z';
+    }
+  }
 
   @override
   void onInit() {
@@ -146,7 +221,6 @@ class FindController extends GetxController {
 
   Future<void> fetchHospitalDetail(String hospitalId) async {
     try {
-      Fluttertoast.showToast(msg: "Loading...${hospitalId}");
       isDetailLoading(true);
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
       final response = await ApiProvider().getHospitalDetailAPI(null, hospitalId, token ?? '');

@@ -1,15 +1,16 @@
 import 'dart:io';
 
-import 'package:digitalhealth/app/data/models/GetCountryApiResponseModel.dart' show CountryModel;
+import 'package:healaura/app/data/models/GetCountryApiResponseModel.dart' show CountryModel;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
-import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:digitalhealth/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
-import 'package:digitalhealth/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
 import '../../../core/Util/Print/print_log.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
@@ -129,6 +130,18 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                       ),
                       const SizedBox(height: 16),
                       CustomTextField(
+                        hint: 'Mobile Number',
+                        controller: controller.mobileNumberCtrl,
+                        prefixIcon: Icons.phone_android_rounded,
+                        keyboardType: TextInputType.phone,
+                        maxLength: 10,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      CustomTextField(
                         hint: 'Date of Birth',
                         controller: controller.dobCtrl,
                         prefixIcon: Icons.calendar_month_outlined,
@@ -230,8 +243,9 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                           value: controller.selectedCountry.value,
                           items: controller.countryList,
                           selectedItemBuilder: (c) => Text(
-                            c.flagEmoji,
-                            style: const TextStyle(fontSize: 22),
+                            '${c.flagEmoji}  ${c.name}',
+                            style: AppTextStyles.body.copyWith(color: AppColors.textTail),
+                            overflow: TextOverflow.ellipsis,
                           ),
                           itemLabel: (c) => '${c.flagEmoji}  ${c.name}',
                           prefixIcon: Icons.public,
@@ -470,6 +484,10 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                         prefixIcon: Icons.phone_android_rounded,
                         keyboardType: TextInputType.phone,
                         maxLength: 10,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       // Obx(() {

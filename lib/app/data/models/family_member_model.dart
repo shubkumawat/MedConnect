@@ -114,7 +114,9 @@ class FamilyMember {
         ? (json['nationality'] is Map ? Nationality.fromJson(json['nationality']) : null)
         : null;
     email = json['email'];
-    mobileNumber = json['mobile_number'];
+    mobileNumber = json['mobile_number']?.toString() ??
+        json['mobile']?.toString() ??
+        json['phone']?.toString();
     medical = json['medical'] != null ? Medical.fromJson(json['medical']) : null;
     emergencyContact = json['emergency_contact'] != null
         ? EmergencyContact.fromJson(json['emergency_contact'])

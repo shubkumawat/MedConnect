@@ -23,6 +23,17 @@ class WebApiConstant {
   static const String API_URL_RECORDS_DISEASES             = BASE_URL + "health-records/diseases/";
   static const String API_URL_RECORDS_DISEASES_META        = BASE_URL + "health-records/diseases/meta";
   static const String API_URL_RECORDS_PRESCRIPTIONS        = BASE_URL + "health-records/prescriptions/";
+  static const String API_URL_RECORDS_MEDICATIONS          = BASE_URL + "health-records/medications/";
+  /// Current-medication add (global active meds — not disease-scoped).
+  /// Matches backend path: /health-records/diseases/?active=1/medications
+  static const String API_URL_RECORDS_CURRENT_MEDICATIONS_ADD = BASE_URL + "health-records/diseases/?active=1/medications";
+  static const String API_URL_RECORDS_MEDICINES_SEARCH     = BASE_URL + "health-records/medicines/search/";
+
+  // Patient Health QR
+  static const String API_URL_QR_CODES                    = BASE_URL + "qr-codes/";
+  static const String API_URL_QR_CURRENT                  = BASE_URL + "qr-codes/current/";
+  static const String API_URL_QR_REGENERATE               = BASE_URL + "qr-codes/regenerate/";
+  static const String MEDIA_BASE_URL                      = "https://medconnect.airainnovations.com";
 
   // Access Management
   static const String API_URL_UPDATE_ACCESS_CONTROL        = BASE_URL + "patients/update-access-control/";
@@ -47,7 +58,7 @@ class WebApiConstant {
   // Doctor / Hospital APIs
   static const String API_URL_DOCTOR_SPECIALIZATIONS      = BASE_URL + "doctor/specializations/";
   static const String API_URL_DOCTOR_NEARBY              = BASE_URL + "doctor/nearby/";
-  static const String API_URL_HOSPITALS                    = BASE_URL + "doctor/hospitals/";
+  static const String API_URL_HOSPITALS                    = BASE_URL + "";
   static const String API_URL_HOSPITAL_DETAIL             = BASE_URL + "doctor/hospitals/"; // /{hospital_id}/
   static const String API_URL_HOSPITAL_REVIEW             = BASE_URL + "doctor/hospitals/"; // /{hospital_id}/review/
   static const String API_URL_CLINIC_REVIEW               = BASE_URL + "doctor/clinics/";   // /{clinic_id}/review/

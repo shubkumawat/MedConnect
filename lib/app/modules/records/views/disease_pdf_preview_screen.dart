@@ -6,11 +6,11 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:digitalhealth/app/data/models/disease_response_model.dart';
-import 'package:digitalhealth/app/data/models/medical_record_model.dart';
-import 'package:digitalhealth/app/modules/profile/controllers/profile_controller.dart';
-import 'package:digitalhealth/app/core/theme/app_colors.dart';
-import 'package:digitalhealth/app/core/theme/app_text_theme.dart';
+import 'package:healaura/app/data/models/disease_response_model.dart';
+import 'package:healaura/app/data/models/medical_record_model.dart';
+import 'package:healaura/app/modules/profile/controllers/profile_controller.dart';
+import 'package:healaura/app/core/theme/app_colors.dart';
+import 'package:healaura/app/core/theme/app_text_theme.dart';
 
 class DiseasePdfPreviewScreen extends StatefulWidget {
   final DiseaseResult disease;
@@ -128,7 +128,7 @@ class _DiseasePdfPreviewScreenState extends State<DiseasePdfPreviewScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                Text("MedConnect — Health", 
+                                Text("HealAura — Health", 
                                   style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.tealDark)),
                               ],
                             ),
@@ -289,7 +289,12 @@ class _DiseasePdfPreviewScreenState extends State<DiseasePdfPreviewScreen> {
         const Icon(Icons.circle, size: 6, color: AppColors.teal),
         const SizedBox(width: 10),
         Expanded(child: Text(m.name ?? "--", style: AppTextStyles.bodyBold.copyWith(fontSize: 12))),
-        Text("${m.frequency ?? "--"} | ${m.timing ?? "--"}", style: AppTextStyles.caption.copyWith(color: AppColors.textMuted)),
+        Text(
+          m.frequency.isNotEmpty || m.timing.isNotEmpty
+              ? "${m.frequency.isNotEmpty ? m.frequency : "--"} | ${m.timing.isNotEmpty ? m.timing : "--"}"
+              : "--",
+          style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
+        ),
       ],
     ),
   );

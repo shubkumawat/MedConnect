@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:digitalhealth/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:get/get.dart';
 import '../controllers/records_controller.dart';
@@ -243,7 +243,7 @@ class _AiPrescriptionScreenState extends State<AiPrescriptionScreen>
       case 2:
         return _StepReview(data: _extractedData, confidence: _confidence, image: _image);
       case 3:
-        return _StepSaveDone(scanResult: _scanResult);
+        return _StepSaveDone(scanResult: _scanResult, diseaseUuid: widget.diseaseUuid);
       default:
         return const SizedBox();
     }
@@ -497,7 +497,8 @@ class _StepReview extends StatelessWidget {
 // ── Step 3: Saved ─────────────────────────────────────────────────────────────
 class _StepSaveDone extends StatelessWidget {
   final Map<String, dynamic>? scanResult;
-  const _StepSaveDone({this.scanResult});
+  final String? diseaseUuid;
+  const _StepSaveDone({this.scanResult, this.diseaseUuid});
 
   @override
   Widget build(BuildContext context) {
@@ -527,9 +528,12 @@ class _StepSaveDone extends StatelessWidget {
                 onTap: () {
                   final medications = scanResult?['medications'] as List?;
                   if (medications != null && medications.isNotEmpty) {
-                    Get.off(() => AddMedicationScreen(initialData: medications[0]));
+                    Get.off(() => AddMedicationScreen(
+                          diseaseUuid: diseaseUuid,
+                          initialData: Map<String, dynamic>.from(medications[0]),
+                        ));
                   } else {
-                    Get.off(() => const AddMedicationScreen());
+                    Get.off(() => AddMedicationScreen(diseaseUuid: diseaseUuid));
                   }
                 },
               ),
@@ -539,7 +543,6 @@ class _StepSaveDone extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        // CustomOutlineButton(text: '⏰ Set Reminders', onTap: () => Get.off(() => const NotificationsScreen())),
       ],
     );
   }

@@ -1,4 +1,4 @@
-import 'package:digitalhealth/app/data/services/storage_service.dart';
+import 'package:healaura/app/data/services/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
-import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
+import 'package:healaura/app/core/Util/Print/print_log.dart';
 
 /// Master relation list ka model
 class RelationModel {
@@ -83,9 +83,31 @@ class ProfileController extends GetxController {
   final dobCtrl = TextEditingController(); // display ke liye: dd / MM / yyyy
   Rx<DateTime?> selectedDob = Rx<DateTime?>(null);
 
+  /// Reactive display name for Profile UI (TextEditingController alone won't refresh Obx).
+  RxString profileDisplayName = ''.obs;
+
   RxString selectedGender = ''.obs; // API me lowercase jayega: male/female/other
   RxInt age = 0.obs;
   RxString mobileNumber = ''.obs;
+
+  void setProfileName(String? raw) {
+    final cleaned = _parseName(raw);
+    fullNameCtrl.text = cleaned;
+    profileDisplayName.value = cleaned;
+  }
+
+  static String _parseName(dynamic raw) {
+    if (raw == null) return '';
+    if (raw is Map) {
+      return (raw['full_name'] ?? raw['name'] ?? raw['value'] ?? '')
+          .toString()
+          .trim();
+    }
+    var s = raw.toString().trim();
+    // Guard against accidental Map.toString() leakage
+    if (s.startsWith('{') && s.contains(':')) return '';
+    return s;
+  }
 
   final genders = ['Male', 'Female', 'Other'];
 
@@ -492,7 +514,6 @@ class ProfileController extends GetxController {
         userAccessToken ?? '',
       );
 
-      isLoading.value = false;
       if (_isDisposed) return;
       PrintLog.printLog(response);
 
@@ -502,7 +523,7 @@ class ProfileController extends GetxController {
           if (data != null) {
             if (_isDisposed) return;
             // Personal Info
-            fullNameCtrl.text = data['full_name']?.toString() ?? '';
+            setProfileName(data['full_name'] ?? data['name']);
             emailCtrl.text = data['email']?.toString() ?? '';
             mobileNumber.value = data['mobile_number']?.toString() ?? '';
             age.value = data['age'] ?? 0;
@@ -673,8 +694,9 @@ class ProfileController extends GetxController {
         }
       }
     } catch (e) {
-      isLoading.value = false;
       PrintLog.printLog("Exception getPatientProfileAPI: $e");
+    } finally {
+      if (!_isDisposed) isLoading.value = false;
     }
   }
 
@@ -710,7 +732,8 @@ class ProfileController extends GetxController {
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
           Fluttertoast.showToast(msg: response['message'] ?? 'Profile updated successfully.');
-
+          // Keep Profile screen name in sync after edit
+          profileDisplayName.value = fullNameCtrl.text.trim();
 
           // response me jo updated user data aaya usse local prefs bhi update kar do
           final userData = response['data']?['user'];

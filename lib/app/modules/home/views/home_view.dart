@@ -1,319 +1,142 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import 'package:digitalhealth/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
-import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:digitalhealth/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import '../../../data/models/family_member_model.dart';
 import '../../../data/models/video_model.dart';
-import '../../../data/services/storage_service.dart';
+import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../family/controllers/family_member_controller.dart';
+import '../../family/views/add_family_member_screen.dart';
 import '../controllers/home_controller.dart';
-import '../../family/views/family_view.dart';
+import 'notifications_screen.dart';
 import 'qr_view.dart';
 import 'video_series_screen.dart';
-import 'notifications_screen.dart';
-import '../../family/views/add_family_member_screen.dart';
 
-class HomeScreen extends GetView<HomeController> {
+/// Home redesigned around a clear care flow:
+/// 1) Who am I caring for?  → swipeable Health Passport
+/// 2) What needs attention? → Today's Care
+/// 3) Where can I go next?  → Quick Jump
+/// 4) What can I learn?     → Learn hub (continue + topics)
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late final HomeController controller;
+  late final PageController _passportPage;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(HomeController());
+    _passportPage = PageController(viewportFraction: 0.88);
+  }
+
+  @override
+  void dispose() {
+    _passportPage.dispose();
+    super.dispose();
+  }
+
+  String get _greeting {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  Future<void> _onRefresh() async {
+    await controller.fetchFamilyMembers();
+    await Future.wait([
+      controller.fetchVideoTopics(),
+      controller.fetchTrendingVideos(),
+      controller.loadHistoryLists(),
+    ]);
+  }
+
+  Future<void> _addMember() async {
+    final familyController = Get.find<FamilyMemberController>();
+    familyController.clearFields();
+    final result = await Get.to(() => const AddFamilyMemberScreen());
+    if (result == true) {
+      await controller.fetchFamilyMembers();
+      if (controller.patients.isNotEmpty) {
+        final last = controller.patients.length - 1;
+        controller.changePatient(last);
+        if (_passportPage.hasClients) {
+          _passportPage.animateToPage(
+            last,
+            duration: 320.ms,
+            curve: Curves.easeOutCubic,
+          );
+        }
+      }
+    }
+  }
+
+  void _jumpTab(int index) {
+    if (Get.isRegistered<DashboardController>()) {
+      Get.find<DashboardController>().changeIndex(index);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final controller = Get.put(HomeController());
+    final top = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      backgroundColor: AppColors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.primary,
-                AppColors.tealDark,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        automaticallyImplyLeading: false,
-        title: const Text(
-          'Med Connect',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
-        ),
-        actions: [
-          CustomIconButton(
-            icon: Icons.notifications_none_rounded,
-            onTap: () => Get.to(() => const NotificationsScreen()),
-            bgColor: Colors.white.withOpacity(0.15),
-            iconColor: Colors.white,
-          ),
-          const SizedBox(width: 12),
-        ],
-      ),
+      backgroundColor: const Color(0xFFF3F7F5),
       body: RefreshIndicator(
-        onRefresh: () => controller.fetchFamilyMembers(),
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+        color: AppColors.teal,
+        displacement: 40,
+        onRefresh: _onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            SliverToBoxAdapter(child: _TopBar(topPad: top, greeting: _greeting)),
+            SliverToBoxAdapter(
+              child: _PassportSection(
+                controller: controller,
+                pageController: _passportPage,
+                onAdd: _addMember,
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 16),
-                    // Patient Switcher
-                    McCard(
-                      padding: const EdgeInsets.all(18),
-                      color: AppColors.bgCardNavy,
-                      isPremium: true,
-                      child: Obx(() {
-                        if (controller.isLoading.value && controller.patients.isEmpty) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              ...List.generate(controller.patients.length, (i) {
-                                final member = controller.patients[i];
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 16),
-                                  child: GestureDetector(
-                                    onTap: () => controller.changePatient(i),
-                                    child: PatientAvatar(
-                                      initials: controller.getInitials(member.fullName ?? ''),
-                                      color: i == 0 ? AppColors.primary : (i == 1 ? AppColors.teal : AppColors.orange),
-                                      isActive: controller.activePatientIndex.value == i,
-                                      size: 52,
-                                      label: member.relation?.name ?? 'Member',
-                                    ),
-                                  ),
-                                );
-                              }),
-                              GestureDetector(
-                                onTap: () async {
-                                  final familyController = Get.find<FamilyMemberController>();
-                                  familyController.clearFields();
-                                  var result = await Get.to(() => const AddFamilyMemberScreen());
-                                  if (result == true) {
-                                    controller.fetchFamilyMembers();
-                                  }
-                                },
-                                child: Column(
-                                  children: [
-                                    Container(
-                                      width: 52,
-                                      height: 52,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: AppColors.border, width: 2),
-                                        color: AppColors.bgCardNavy,
-                                      ),
-                                      child: const Icon(Icons.add, color: AppColors.textMuted),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text('Add', style: AppTextStyles.caption),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 14),
-                    Obx(() {
-                      if (controller.patients.isEmpty) return const SizedBox();
-                      final activeIdx = controller.activePatientIndex.value;
-                      if (activeIdx >= controller.patients.length) return const SizedBox();
-                      return _buildVitalsCard(context, controller.patients[activeIdx]);
-                    }),
-                    const SizedBox(height: 20),
-                    // Obx(() {
-                      // if (!controller.showMedReminders.value && !controller.showVacReminders.value) {
-                      //   return const SizedBox.shrink();
-                      // }
-                      // return
-            Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SectionHeader(title: 'Reminders', actionLabel: 'See all', onAction: () {}),
-                          const SizedBox(height: 12),
-                          // if (controller.showMedReminders.value)
-                            const _ReminderCard(
-                              title: 'Paracetamol',
-                              subtitle: 'Today, 10:00 AM',
-                              borderColor: AppColors.orange,
-                              trailing: Icon(Icons.chevron_right, color: AppColors.textGray),
-                            ),
-                          // if (controller.showMedReminders.value && controller.showVacReminders.value)
-                            const SizedBox(height: 12),
-                          // if (controller.showVacReminders.value)
-                            _ReminderCard(
-                              title: 'Flu Shot',
-                              subtitle: 'Next Week',
-                              borderColor: AppColors.teal,
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.teal.withOpacity(0.25),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Text('PENDING', style: TextStyle(color: AppColors.green, fontWeight: FontWeight.w700, fontSize: 11)),
-                              ),
-                            ),
-                        ],
-                      ),
-                    // }),
-                    const SizedBox(height: 20),
-                    SectionHeader(title: 'Health Summary'),
-                    const SizedBox(height: 12),
-                    Obx(() {
-                      if (controller.patients.isEmpty) return const SizedBox();
-                      final activeIdx = controller.activePatientIndex.value;
-                      if (activeIdx >= controller.patients.length) return const SizedBox();
-                      final patient = controller.patients[activeIdx];
-                      final medCount = patient.medical?.currentMedications?.length ?? 0;
-                      return Row(
-                        children: [
-                          Expanded(child: StatCard(value: patient.medical?.chronicDisease == true ? '1' : '0', label: 'Diseases', accentColor: AppColors.statusActive, icon: Icons.sick_rounded)),
-                          const SizedBox(width: 10),
-                          Expanded(child: StatCard(value: medCount.toString(), label: 'Meds', accentColor: AppColors.teal, icon: Icons.medication_rounded)),
-                          const SizedBox(width: 10),
-                          const Expanded(child: StatCard(value: '0', label: 'Records', accentColor: AppColors.primary, icon: Icons.folder_rounded)),
-                        ],
-                      );
-                    }),
-                    const SizedBox(height: 20),
-                    Obx(() {
-                      if (controller.continueWatching.isEmpty) return const SizedBox();
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SectionHeader(title: 'Continue Watching'),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 160,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: controller.continueWatching.length,
-                              itemBuilder: (context, index) => _ContinueWatchingCard(video: controller.continueWatching[index]),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
-                      );
-                    }),
-                    SectionHeader(title: 'Health Videos', actionLabel: 'See all', onAction: () => Get.to(() => const VideoSeriesScreen())),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 36,
-                      child: Obx(() {
-                        if (controller.isTopicsLoading.value) return const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal)));
-                        final labels = controller.topicChipLabels;
-                        final selectedIdx = controller.selectedTopicIndex.value;
-                        return ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: labels.length,
-                          itemBuilder: (_, i) => McFilterChip(label: labels[i], isSelected: selectedIdx == i, activeColor: AppColors.orange, onTap: () => controller.changeTopic(i)),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 16),
+                    _TodaysCare(controller: controller)
+                        .animate()
+                        .fadeIn(delay: 120.ms, duration: 420.ms)
+                        .slideY(begin: 0.06, end: 0),
+                    const SizedBox(height: 22),
+                    _QuickJump(
+                      onRecords: () => _jumpTab(1),
+                      onFind: () => _jumpTab(2),
+                      onFamily: () => _jumpTab(3),
+                      onVideos: () => Get.to(() => const VideoSeriesScreen()),
+                    )
+                        .animate()
+                        .fadeIn(delay: 180.ms, duration: 420.ms)
+                        .slideY(begin: 0.06, end: 0),
+                    const SizedBox(height: 26),
+                    _LearnHub(controller: controller)
+                        .animate()
+                        .fadeIn(delay: 240.ms, duration: 420.ms),
+                    const SizedBox(height: 130),
                   ],
                 ),
-              ),
-              Obx(() {
-                if (controller.isVideoLoading.value) return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.teal)));
-                if (controller.videos.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('No videos found')));
-                return ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: controller.videos.length,
-                  itemBuilder: (context, index) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _VideoCard(video: controller.videos[index], onTap: () => Get.to(() => const VideoSeriesScreen())),
-                  ),
-                );
-              }),
-              const SizedBox(height: 100),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVitalsCard(BuildContext context, dynamic patient) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: AppColors.white, blurRadius: 20, offset: const Offset(0, 10))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [AppColors.primary, AppColors.tealDark]),
-              ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Health Profile', style: AppTextStyles.caption.copyWith(color: Colors.white70)),
-                          Text(patient.fullName ?? 'Guest User', style: AppTextStyles.heading2.copyWith(color: Colors.white)),
-                        ],
-                      ),
-                      GestureDetector(
-                        onTap: () => Get.to(() => QrScreen()),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.appBarColor),
-                              color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                          child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 28),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.bgCardNavy,
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-
-                border: Border.all(color: AppColors.appBarColor),
-              ),
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-              // String? bloodGroup;
-              // String? height;
-              // String? weight;
-                  _VitalItem(label: 'Blood', value: (patient.bloodGroup?.toString() ?? '--').isEmpty ? '--' : patient.bloodGroup.toString(), icon: Icons.bloodtype_rounded, color: Colors.redAccent),
-                  _VitalItem(label: 'Age', value: '${patient.age?.toString() ?? "--"} yrs', icon: Icons.calendar_today, color: AppColors.teal),
-                  _VitalItem(label: 'Gender', value: (patient.gender?.toString() ?? "--").isEmpty ? '--' : patient.gender.toString().capitalizeFirst!, icon: Icons.transgender, color: AppColors.orange),
-                ],
               ),
             ),
           ],
@@ -323,97 +146,1149 @@ class HomeScreen extends GetView<HomeController> {
   }
 }
 
-class _VitalItem extends StatelessWidget {
-  final String label, value;
+// ═══════════════════════════════════════════════════════════════════════════
+// TOP BAR
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _TopBar extends StatelessWidget {
+  final double topPad;
+  final String greeting;
+  const _TopBar({required this.topPad, required this.greeting});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, topPad + 10, 16, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(13),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.teal.withValues(alpha: 0.12),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Image.asset(
+              'assets/logo/ic_logo_icon.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  greeting,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textGray,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  'HealAura',
+                  style: AppTextStyles.heading3.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _IconBtn(
+            icon: Icons.notifications_none_rounded,
+            onTap: () => Get.to(() => const NotificationsScreen()),
+          ),
+        ],
+      ),
+    )
+        .animate()
+        .fadeIn(duration: 350.ms)
+        .slideY(begin: -0.1, end: 0, curve: Curves.easeOut);
+  }
+}
+
+class _IconBtn extends StatelessWidget {
   final IconData icon;
-  final Color color;
-  const _VitalItem({required this.label, required this.value, required this.icon, required this.color});
+  final VoidCallback onTap;
+  const _IconBtn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(icon, color: AppColors.tealDark, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HEALTH PASSPORT — swipe between family members
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _PassportSection extends StatelessWidget {
+  final HomeController controller;
+  final PageController pageController;
+  final VoidCallback onAdd;
+
+  const _PassportSection({
+    required this.controller,
+    required this.pageController,
+    required this.onAdd,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 8),
-        Text(value, style: AppTextStyles.bodyBold),
-        Text(label, style: AppTextStyles.caption),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 10, 22, 0),
+          child: Row(
+            children: [
+              Text('Health Passport', style: AppTextStyles.heading3),
+              const Spacer(),
+              GestureDetector(
+                onTap: onAdd,
+                child: Row(
+                  children: [
+                    Icon(Icons.person_add_alt_1_rounded,
+                        size: 16, color: AppColors.teal),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Add member',
+                      style: AppTextStyles.tealLabel.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 268,
+          child: Obx(() {
+            if (controller.isLoading.value && controller.patients.isEmpty) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.teal),
+              );
+            }
+            if (controller.patients.isEmpty) {
+              return _EmptyPassport(onAdd: onAdd);
+            }
+            return PageView.builder(
+              controller: pageController,
+              itemCount: controller.patients.length,
+              onPageChanged: controller.changePatient,
+              physics: const BouncingScrollPhysics(),
+              itemBuilder: (context, index) {
+                return AnimatedBuilder(
+                  animation: pageController,
+                  builder: (context, child) {
+                    double scale = 1;
+                    if (pageController.position.haveDimensions) {
+                      final page = pageController.page ?? index.toDouble();
+                      scale = (1 - (page - index).abs() * 0.06).clamp(0.9, 1.0);
+                    }
+                    return Transform.scale(scale: scale, child: child);
+                  },
+                  child: _PassportCard(
+                    patient: controller.patients[index],
+                    initials: controller.getInitials(
+                      controller.patients[index].fullName ?? '',
+                    ),
+                  ),
+                );
+              },
+            );
+          }),
+        ),
+        const SizedBox(height: 10),
+        Obx(() {
+          final n = controller.patients.length;
+          if (n <= 1) return const SizedBox(height: 6);
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(n, (i) {
+              final active = controller.activePatientIndex.value == i;
+              return AnimatedContainer(
+                duration: 220.ms,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: active ? 18 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: active ? AppColors.teal : AppColors.teal.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              );
+            }),
+          );
+        }),
+      ],
+    )
+        .animate()
+        .fadeIn(delay: 60.ms, duration: 450.ms)
+        .slideY(begin: 0.05, end: 0);
+  }
+}
+
+class _EmptyPassport extends StatelessWidget {
+  final VoidCallback onAdd;
+  const _EmptyPassport({required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GestureDetector(
+        onTap: onAdd,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: AppColors.teal.withValues(alpha: 0.35),
+              width: 1.5,
+            ),
+            color: Colors.white,
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.teal.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add_rounded, color: AppColors.teal, size: 28),
+                ),
+                const SizedBox(height: 12),
+                Text('Add your first family member', style: AppTextStyles.bodyBold),
+                const SizedBox(height: 4),
+                Text(
+                  'Build their digital health passport',
+                  style: AppTextStyles.caption.copyWith(color: AppColors.textGray),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PassportCard extends StatelessWidget {
+  final FamilyMember patient;
+  final String initials;
+
+  const _PassportCard({required this.patient, required this.initials});
+
+  @override
+  Widget build(BuildContext context) {
+    final blood = patient.bloodGroup?.trim().isNotEmpty == true
+        ? patient.bloodGroup!
+        : '--';
+    final age = patient.age != null ? '${patient.age}' : '--';
+    final gender = (patient.gender?.trim().isNotEmpty == true)
+        ? (patient.gender!.capitalizeFirst ?? patient.gender!)
+        : '--';
+    final meds = patient.medical?.currentMedications?.length ?? 0;
+    final diseases = patient.medical?.chronicDisease == true ? 1 : 0;
+    final relation = patient.relation?.name ?? 'Member';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0B6E4F).withValues(alpha: 0.28),
+              blurRadius: 28,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            children: [
+              // Base gradient
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF0A5C45), Color(0xFF147A68), Color(0xFF1B9E8E)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+              // Soft orbs
+              Positioned(
+                right: -40,
+                top: -30,
+                child: Container(
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.07),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: -50,
+                bottom: -40,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 18, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.18),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                          ),
+                          child: Center(
+                            child: Text(
+                              initials,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                patient.fullName ?? 'Guest',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.heading2.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  relation.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        _QrFab(
+                          onTap: () => Get.to(
+                            () => QrScreen(
+                              patientName: patient.fullName ?? 'Patient',
+                              patientId: patient.patientId,
+                              profilePhoto: patient.profilePhoto,
+                              initials: initials,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    // Vitals strip
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              _PassportMetric(label: 'Blood', value: blood),
+                              _PassportMetric(label: 'Age', value: age == '--' ? '--' : '$age yrs'),
+                              _PassportMetric(label: 'Gender', value: gender),
+                              _PassportMetric(label: 'Meds', value: '$meds'),
+                              _PassportMetric(label: 'Conditions', value: '$diseases', last: true),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.swipe_rounded,
+                          size: 14,
+                          color: Colors.white.withValues(alpha: 0.55),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Swipe to switch family member',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.55),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Show QR',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PassportMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool last;
+  const _PassportMetric({
+    required this.label,
+    required this.value,
+    this.last = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        decoration: last
+            ? null
+            : BoxDecoration(
+                border: Border(
+                  right: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                ),
+              ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.65),
+                fontSize: 9,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QrFab extends StatelessWidget {
+  final VoidCallback onTap;
+  const _QrFab({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          width: 50,
+          height: 50,
+          child: Icon(Icons.qr_code_2_rounded, color: AppColors.tealDark, size: 26),
+        ),
+      ),
+    )
+        .animate(onPlay: (c) => c.repeat(reverse: true))
+        .scale(
+          begin: const Offset(1, 1),
+          end: const Offset(1.05, 1.05),
+          duration: 1600.ms,
+          curve: Curves.easeInOut,
+        );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TODAY'S CARE — attention timeline
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _TodaysCare extends StatelessWidget {
+  final HomeController controller;
+  const _TodaysCare({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final items = <_CareItem>[];
+      if (controller.showMedReminders.value) {
+        items.add(
+          const _CareItem(
+            title: 'Paracetamol',
+            meta: '10:00 AM · Dose due',
+            icon: Icons.medication_liquid_rounded,
+            accent: AppColors.orange,
+            tag: 'MED',
+          ),
+        );
+      }
+      if (controller.showVacReminders.value) {
+        items.add(
+          const _CareItem(
+            title: 'Flu Shot',
+            meta: 'Next week · Clinic',
+            icon: Icons.vaccines_rounded,
+            accent: AppColors.teal,
+            tag: 'VAX',
+          ),
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Today\'s Care', style: AppTextStyles.heading3),
+              const Spacer(),
+              if (items.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${items.length} due',
+                    style: AppTextStyles.captionBold.copyWith(
+                      color: AppColors.orange,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (items.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'No reminders for today — you\'re all clear.',
+                      style: AppTextStyles.body.copyWith(color: AppColors.textGray),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            SizedBox(
+              height: 118,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (_, i) => _CareTicket(item: items[i]),
+              ),
+            ),
+        ],
+      );
+    });
+  }
+}
+
+class _CareItem {
+  final String title;
+  final String meta;
+  final IconData icon;
+  final Color accent;
+  final String tag;
+  const _CareItem({
+    required this.title,
+    required this.meta,
+    required this.icon,
+    required this.accent,
+    required this.tag,
+  });
+}
+
+class _CareTicket extends StatelessWidget {
+  final _CareItem item;
+  const _CareTicket({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 210,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: item.accent.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: item.accent.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: item.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(item.icon, color: item.accent, size: 18),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: item.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  item.tag,
+                  style: TextStyle(
+                    color: item.accent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Text(item.title, style: AppTextStyles.bodyBold, maxLines: 1),
+          const SizedBox(height: 2),
+          Text(
+            item.meta,
+            style: AppTextStyles.caption.copyWith(color: AppColors.textGray),
+            maxLines: 1,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QUICK JUMP
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _QuickJump extends StatelessWidget {
+  final VoidCallback onRecords;
+  final VoidCallback onFind;
+  final VoidCallback onFamily;
+  final VoidCallback onVideos;
+
+  const _QuickJump({
+    required this.onRecords,
+    required this.onFind,
+    required this.onFamily,
+    required this.onVideos,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = [
+      _JumpItem('Records', Icons.folder_shared_rounded, const Color(0xFF0B6E4F), onRecords),
+      _JumpItem('Find care', Icons.local_hospital_rounded, AppColors.teal, onFind),
+      _JumpItem('Family', Icons.groups_rounded, AppColors.orange, onFamily),
+      _JumpItem('Videos', Icons.play_circle_rounded, AppColors.accentBlue, onVideos),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Quick Jump', style: AppTextStyles.heading3),
+        const SizedBox(height: 12),
+        Row(
+          children: actions
+              .map(
+                (a) => Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: a == actions.last ? 0 : 10),
+                    child: _JumpTile(item: a),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
       ],
     );
   }
 }
 
-class _ReminderCard extends StatelessWidget {
-  final String title, subtitle;
-  final Color borderColor;
-  final Widget trailing;
-  const _ReminderCard({required this.title, required this.subtitle, required this.borderColor, required this.trailing});
+class _JumpItem {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  const _JumpItem(this.label, this.icon, this.color, this.onTap);
+}
+
+class _JumpTile extends StatelessWidget {
+  final _JumpItem item;
+  const _JumpTile({required this.item});
+
   @override
   Widget build(BuildContext context) {
-    return McCard(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(width: 4, height: 40, decoration: BoxDecoration(color: borderColor, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(width: 16),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: AppTextStyles.bodyBold), Text(subtitle, style: AppTextStyles.caption)])),
-          trailing,
-        ],
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: item.color.withValues(alpha: 0.14)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: item.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(item.icon, color: item.color, size: 20),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                item.label,
+                style: AppTextStyles.caption.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _ContinueWatchingCard extends StatelessWidget {
-  final VideoModel video;
-  const _ContinueWatchingCard({required this.video});
+// ═══════════════════════════════════════════════════════════════════════════
+// LEARN HUB
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _LearnHub extends StatelessWidget {
+  final HomeController controller;
+  const _LearnHub({required this.controller});
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 200,
-      margin: const EdgeInsets.only(right: 12),
-      decoration: BoxDecoration(color: AppColors.bgCardNavy, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border.withOpacity(0.5))),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(video.thumbnail ?? '', fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.primary.withOpacity(0.1))),
-                  const Center(child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 40)),
-                ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Learn', style: AppTextStyles.heading3),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => Get.to(() => const VideoSeriesScreen()),
+              child: Text(
+                'Browse all',
+                style: AppTextStyles.tealLabel.copyWith(fontSize: 12),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(video.title ?? '', style: AppTextStyles.captionBold, maxLines: 2, overflow: TextOverflow.ellipsis),
-          ),
-        ],
-      ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Short health explainers for your family',
+          style: AppTextStyles.caption.copyWith(color: AppColors.textGray),
+        ),
+        const SizedBox(height: 14),
+
+        // Featured continue watching
+        Obx(() {
+          if (controller.continueWatching.isEmpty) return const SizedBox.shrink();
+          final v = controller.continueWatching.first;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _FeaturedContinue(video: v),
+          );
+        }),
+
+        // Topics
+        SizedBox(
+          height: 38,
+          child: Obx(() {
+            if (controller.isTopicsLoading.value) {
+              return const Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal),
+                ),
+              );
+            }
+            final labels = controller.topicChipLabels;
+            final selected = controller.selectedTopicIndex.value;
+            return ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: labels.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final active = selected == i;
+                return GestureDetector(
+                  onTap: () => controller.changeTopic(i),
+                  child: AnimatedContainer(
+                    duration: 200.ms,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: active ? AppColors.tealDark : Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: active
+                            ? Colors.transparent
+                            : AppColors.border.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    child: Text(
+                      labels[i],
+                      style: AppTextStyles.captionBold.copyWith(
+                        color: active ? Colors.white : AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          }),
+        ),
+        const SizedBox(height: 14),
+
+        // Horizontal video rail
+        Obx(() {
+          if (controller.isVideoLoading.value) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Center(child: CircularProgressIndicator(color: AppColors.teal)),
+            );
+          }
+          if (controller.videos.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                'No videos for this topic yet',
+                style: AppTextStyles.body.copyWith(color: AppColors.textGray),
+              ),
+            );
+          }
+          return SizedBox(
+            height: 196,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: controller.videos.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (_, i) => _VideoRailCard(video: controller.videos[i])
+                  .animate()
+                  .fadeIn(delay: (50 * i).ms, duration: 320.ms)
+                  .slideX(begin: 0.05, end: 0),
+            ),
+          );
+        }),
+      ],
     );
   }
 }
 
-class _VideoCard extends StatelessWidget {
+class _FeaturedContinue extends StatelessWidget {
   final VideoModel video;
-  final VoidCallback onTap;
-  const _VideoCard({required this.video, required this.onTap});
+  const _FeaturedContinue({required this.video});
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: McCard(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+      onTap: () => Get.to(() => const VideoSeriesScreen()),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: SizedBox(
+          height: 150,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(
+                video.thumbnail ?? '',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AppColors.tealDark,
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.1),
+                      Colors.black.withValues(alpha: 0.72),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 14,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.orange,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'CONTINUE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            video.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${video.presenterName} · ${video.formattedDuration}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoRailCard extends StatelessWidget {
+  final VideoModel video;
+  const _VideoRailCard({required this.video});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Get.to(() => const VideoSeriesScreen()),
+      child: SizedBox(
+        width: 168,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(video.thumbnail ?? '', width: 100, height: 70, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: 100, height: 70, color: AppColors.primary.withOpacity(0.1))),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.network(
+                      video.thumbnail ?? '',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        child: const Icon(Icons.play_circle_outline, color: AppColors.teal),
+                      ),
+                    ),
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          video.formattedDuration,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(width: 16),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(video.title ?? '', style: AppTextStyles.bodyBold, maxLines: 2, overflow: TextOverflow.ellipsis), const SizedBox(height: 4), Text(video.title ?? '', style: AppTextStyles.caption, maxLines: 1, overflow: TextOverflow.ellipsis)])),
+            const SizedBox(height: 8),
+            Text(
+              video.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.captionBold.copyWith(
+                color: AppColors.textDark,
+                fontSize: 12,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              video.formattedViews,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textGray,
+                fontSize: 11,
+              ),
+            ),
           ],
         ),
       ),

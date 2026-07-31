@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart' as dio;
@@ -8,11 +9,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../DataProvider/api_provider.dart';
-import 'package:digitalhealth/DataProvider/app_shared_preferences.dart';
+import 'package:healaura/DataProvider/app_shared_preferences.dart';
 import '../../../../DataProvider/web_api_constant.dart';
-import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
-import 'package:digitalhealth/app/data/services/storage_service.dart';
-import 'package:digitalhealth/app/data/models/family_member_model.dart';
+import 'package:healaura/app/core/Util/Print/print_log.dart';
+import 'package:healaura/app/data/services/storage_service.dart';
+import 'package:healaura/app/data/models/family_member_model.dart';
 
 import '../../../data/models/GetCountryApiResponseModel.dart';
 
@@ -144,6 +145,7 @@ class FamilyMemberController extends GetxController {
 
   // ---------------- Personal ----------------
   final fullNameCtrl = TextEditingController();
+  final mobileNumberCtrl = TextEditingController();
   final dobCtrl = TextEditingController();
   Rx<DateTime?> selectedDob = Rx<DateTime?>(null);
 
@@ -443,6 +445,7 @@ class FamilyMemberController extends GetxController {
     profileImage.value = null;
 
     fullNameCtrl.clear();
+    mobileNumberCtrl.clear();
     dobCtrl.clear();
     selectedDob.value = null;
     selectedGender.value = '';
@@ -599,6 +602,9 @@ class FamilyMemberController extends GetxController {
 
   void _populateFields(FamilyMember member) {
     fullNameCtrl.text = member.fullName ?? '';
+    final mobileDigits = (member.mobileNumber ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+    mobileNumberCtrl.text =
+        mobileDigits.length > 10 ? mobileDigits.substring(mobileDigits.length - 10) : mobileDigits;
     if (member.dateOfBirth != null) {
       selectedDob.value = DateFormat('yyyy-MM-dd').parse(member.dateOfBirth!);
       dobCtrl.text = DateFormat('dd/MM/yyyy').format(selectedDob.value!);
@@ -665,6 +671,15 @@ class FamilyMemberController extends GetxController {
       Fluttertoast.showToast(msg: 'Please enter full name');
       return false;
     }
+    final mobile = mobileNumberCtrl.text.trim();
+    if (mobile.isEmpty) {
+      Fluttertoast.showToast(msg: 'Please enter mobile number');
+      return false;
+    }
+    if (mobile.length != 10 || !RegExp(r'^[0-9]{10}$').hasMatch(mobile)) {
+      Fluttertoast.showToast(msg: 'Mobile number must be exactly 10 digits');
+      return false;
+    }
     if (selectedDob.value == null) {
       Fluttertoast.showToast(msg: 'Please select date of birth');
       return false;
@@ -675,6 +690,12 @@ class FamilyMemberController extends GetxController {
     }
     if (selectedRelationModel.value == null) {
       Fluttertoast.showToast(msg: 'Please select relation');
+      return false;
+    }
+    final contactMobile = contactMobileCtrl.text.trim();
+    if (contactMobile.isNotEmpty &&
+        (contactMobile.length != 10 || !RegExp(r'^[0-9]{10}$').hasMatch(contactMobile))) {
+      Fluttertoast.showToast(msg: 'Emergency mobile must be exactly 10 digits');
       return false;
     }
     return true;
@@ -714,6 +735,7 @@ class FamilyMemberController extends GetxController {
 
       final Map<String, dynamic> dictParameter = {
         "full_name": fullNameCtrl.text.trim(),
+        "mobile_number": mobileNumberCtrl.text.trim(),
         "date_of_birth": DateFormat('yyyy-MM-dd').format(selectedDob.value!),
         "gender": selectedGender.value.toLowerCase(),
         "nationality": selectedCountry.value?.id,
@@ -733,8 +755,9 @@ class FamilyMemberController extends GetxController {
         "contact_mobile": contactMobileCtrl.text.trim(),
         "insurance_provider": insuranceProviderCtrl.text.trim(),
         "policy_number": policyNumberCtrl.text.trim(),
-        "allergies": selectedAllergies.toList(),
-        "medications": selectedMedications.toList(),
+        // Backend JSONField expects a JSON string (esp. multipart / form updates)
+        "allergies": jsonEncode(selectedAllergies.toList()),
+        "medications": jsonEncode(selectedMedications.toList()),
       };
 
       dynamic response;
@@ -815,6 +838,7 @@ class FamilyMemberController extends GetxController {
       final Map<String, dynamic> dictParameter = {
         "patient_id": currentPatientId,
         "full_name": fullNameCtrl.text.trim(),
+        "mobile_number": mobileNumberCtrl.text.trim(),
         "date_of_birth": DateFormat('yyyy-MM-dd').format(selectedDob.value!),
         "gender": selectedGender.value.toLowerCase(),
         "nationality": selectedCountry.value?.id,
@@ -834,8 +858,9 @@ class FamilyMemberController extends GetxController {
         "contact_mobile": contactMobileCtrl.text.trim(),
         "insurance_provider": insuranceProviderCtrl.text.trim(),
         "policy_number": policyNumberCtrl.text.trim(),
-        "allergies": selectedAllergies.toList(),
-        "medications": selectedMedications.toList(),
+        // Backend JSONField expects a JSON string (esp. multipart / form updates)
+        "allergies": jsonEncode(selectedAllergies.toList()),
+        "medications": jsonEncode(selectedMedications.toList()),
       };
 
       dynamic response;
@@ -922,6 +947,7 @@ class FamilyMemberController extends GetxController {
   @override
   void onClose() {
     fullNameCtrl.dispose();
+    mobileNumberCtrl.dispose();
     dobCtrl.dispose();
     heightCtrl.dispose();
     weightCtrl.dispose();

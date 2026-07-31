@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "digitalhealth" "\0"
+            VALUE "CompanyName", "HealAura" "\0"
+            VALUE "FileDescription", "HealAura" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "digitalhealth" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "digitalhealth.exe" "\0"
-            VALUE "ProductName", "digitalhealth" "\0"
+            VALUE "InternalName", "HealAura" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 HealAura. All rights reserved." "\0"
+            VALUE "OriginalFilename", "healaura.exe" "\0"
+            VALUE "ProductName", "HealAura" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
