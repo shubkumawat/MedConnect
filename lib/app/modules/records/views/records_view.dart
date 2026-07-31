@@ -5,9 +5,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import 'package:digitalhealth/app/core/Util/CustomButton/CustomButton.dart';
 import 'package:digitalhealth/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import '../../../data/models/disease_response_model.dart';
 import '../controllers/records_controller.dart';
 import 'add_medication_screen.dart';
-import 'add_disease_screen.dart';
+import 'add_disease_screen.dart' hide SizedBox;
 import 'disease_detail_screen.dart';
 import 'ai_prescription_screen.dart';
 
@@ -25,6 +26,7 @@ class _RecordsScreenState extends State<RecordsScreen>
   @override
   void initState() {
     super.initState();
+    controller.fetchDiseases();
     _tabController = TabController(length: 3, vsync: this);
   }
 
@@ -43,6 +45,53 @@ class _RecordsScreenState extends State<RecordsScreen>
       case 'vac': return Icons.vaccines;
       default: return Icons.circle;
     }
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 80, color: AppColors.primary),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              title,
+              style: AppTextStyles.heading2.copyWith(color: AppColors.primary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              subtitle,
+              style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: 200,
+              child: CustomPrimaryButton(
+                text: "Add Now",
+                onTap: onTap,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -69,13 +118,13 @@ class _RecordsScreenState extends State<RecordsScreen>
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
         ),
         actions: [
-          CustomIconButton(
-            icon: Icons.add,
-            onTap: () => _showAddDiseaseSheet(context),
-            bgColor: Colors.white.withOpacity(0.2),
-            iconColor: Colors.white,
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+            onPressed: () {
+              // TODO: Show patient QR or Scan
+            },
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -97,25 +146,54 @@ class _RecordsScreenState extends State<RecordsScreen>
           // ── Diseases Tab ──────────────────────────────────────
           Obx(() => controller.isLoading.value 
             ? const Center(child: CircularProgressIndicator())
-            : ListView.builder(
+            : controller.diseases.isEmpty 
+              ? _buildEmptyState(
+                  icon: Icons.sick_outlined,
+                  title: "No Diseases Added Yet",
+                  subtitle: "Add your health conditions to keep track of your medical history.",
+                  onTap: () => Get.to(AddDiseaseScreen()),
+                )
+              : ListView.builder(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
                 itemCount: controller.diseases.length,
                 itemBuilder: (context, index) {
                   final d = controller.diseases[index];
-                  final heroTag = 'disease_${d.id}';
-                  return DiseaseCard(
-                    name: d.name,
-                    status: d.status,
-                    diagnosed: d.diagnosedDate,
-                    doctor: d.doctorName,
-                    heroTag: heroTag,
-                    onTap: () {
-                      Get.to(DiseaseDetailScreen(
-                        diseaseName: d.name,
-                        status: d.status,
-                        heroTag: heroTag,
-                      ));
+                  final heroTag = 'disease_${d.uuid}';
+                  return Dismissible(
+                    key: Key(d.uuid!),
+                    direction: DismissDirection.endToStart,
+                    confirmDismiss: (direction) async {
+                      if (direction == DismissDirection.endToStart) {
+                        return await _showDeleteConfirmation(context, d);
+                      }
+                      return false;
                     },
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.statusActive,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 28),
+                    ),
+                    child: DiseaseCard(
+                      name: d.name ?? '',
+                      status: d.status ?? '',
+                      diagnosed: d.diagnosedOn ?? '',
+                      doctor: d.category ?? 'Primary Care',
+                      type: d.conditionType,
+                      heroTag: heroTag,
+                      onTap: () {
+                        Get.to(DiseaseDetailScreen(
+                          diseaseName: d.name ?? '',
+                          status: d.status ?? '',
+                          uuid: d.uuid!,
+                          heroTag: heroTag,
+                        ));
+                      },
+                    ),
                   );
                 },
               )),
@@ -123,7 +201,14 @@ class _RecordsScreenState extends State<RecordsScreen>
           // ── Medications Tab ───────────────────────────────────
           Obx(() => controller.isLoading.value 
             ? const Center(child: CircularProgressIndicator())
-            : ListView.builder(
+            : controller.medications.isEmpty
+              ? _buildEmptyState(
+                  icon: Icons.medication_outlined,
+                  title: "No Medications",
+                  subtitle: "Add your current medications to get timely reminders.",
+                  onTap: () => Get.to(AddMedicationScreen()),
+                )
+              : ListView.builder(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
                 itemCount: controller.medications.length,
                 itemBuilder: (context, index) {
@@ -208,7 +293,14 @@ class _RecordsScreenState extends State<RecordsScreen>
               Expanded(
                 child: controller.isLoading.value 
                   ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
+                  : controller.timelineEvents.isEmpty
+                    ? _buildEmptyState(
+                        icon: Icons.timeline,
+                        title: "Timeline Empty",
+                        subtitle: "Your health journey events will appear here.",
+                        onTap: () => _showAddDiseaseSheet(context),
+                      )
+                    : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                       itemCount: controller.timelineEvents.length,
                       itemBuilder: (_, i) {
@@ -230,6 +322,31 @@ class _RecordsScreenState extends State<RecordsScreen>
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 90),
         child: CustomFab(onTap: () => _showAddDiseaseSheet(context)),
+      ),
+    );
+  }
+
+  Future<bool?> _showDeleteConfirmation(BuildContext context, DiseaseResult d) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgCardNavy,
+        title: Text('Delete Disease?', style: AppTextStyles.heading3),
+        content: Text('Are you sure you want to delete ${d.name}? This action cannot be undone.', 
+          style: AppTextStyles.body.copyWith(color: AppColors.textMuted)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('CANCEL', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          TextButton(
+            onPressed: () {
+              controller.deleteDisease(d.uuid!);
+              Navigator.pop(context, true);
+            },
+            child: const Text('DELETE', style: TextStyle(color: AppColors.statusActive)),
+          ),
+        ],
       ),
     );
   }
@@ -275,6 +392,53 @@ class _SheetOption extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   const _SheetOption({required this.icon, required this.label, required this.color, required this.onTap});
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 80, color: AppColors.primary),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              title,
+              style: AppTextStyles.heading2.copyWith(color: AppColors.primary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              subtitle,
+              style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: 200,
+              child: CustomPrimaryButton(
+                text: "Add Now",
+                onTap: onTap,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(

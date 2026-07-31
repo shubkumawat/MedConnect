@@ -94,6 +94,7 @@ class DiseaseCard extends StatelessWidget {
   final String status;
   final String diagnosed;
   final String doctor;
+  final String? type;
   final VoidCallback? onTap;
   final String? heroTag;
 
@@ -103,6 +104,7 @@ class DiseaseCard extends StatelessWidget {
     required this.status,
     required this.diagnosed,
     required this.doctor,
+    this.type,
     this.onTap,
     this.heroTag,
   });
@@ -110,9 +112,9 @@ class DiseaseCard extends StatelessWidget {
   Color get _statusColor {
     switch (status.toLowerCase()) {
       case 'active':
-        return AppColors.teal;
+        return AppColors.statusActive;
       case 'monitoring':
-        return AppColors.teal;
+        return AppColors.orange;
       case 'resolved':
         return AppColors.teal;
       default:
@@ -146,53 +148,75 @@ class DiseaseCard extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.teal, width: 4),
+                  border: Border.all(color: _statusColor.withOpacity(0.5), width: 4),
                 ),
               ),
             ),
-            // Status color overlay for top part (starts after curve)
+            // Status color overlay for top part
             Positioned(
               left: 20,
               top: 0,
               right: 0,
               child: Container(height: 4, color: _statusColor),
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 14, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name, style: AppTextStyles.bodyBold.copyWith(fontSize: 16)),
-                        const SizedBox(height: 6),
-                        Text(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 14, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(name, style: AppTextStyles.bodyBold.copyWith(fontSize: 16)),
+                      ),
+                      if (type != null && type!.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            type!.toUpperCase(),
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
                           'Diagnosed: $diagnosed · $doctor',
                           style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
                         ),
-                      ],
-                    ),
+                      ),
+                      // Status badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _statusColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          status,
+                          style: AppTextStyles.caption.copyWith(
+                            color: _statusColor,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                // Status badge
-                Container(
-                  margin: const EdgeInsets.only(right: 14),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _statusColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    status,
-                    style: AppTextStyles.caption.copyWith(
-                      color: _statusColor,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

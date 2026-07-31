@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 import 'package:digitalhealth/app/core/Util/CustomLoading/custom_loading.dart';
 import 'package:digitalhealth/app/core/Util/Print/print_log.dart';
+import '../app/data/models/disease_response_model.dart';
 import 'web_api_constant.dart';
 
 
@@ -45,32 +47,103 @@ class ApiProvider {
   // }
 
 
-    Future<Map<String, dynamic>?> loginApi(context, String url, Map<String, dynamic> dictParameter, String token) async {
+  Future<Map<String, dynamic>?> loginApi(context, String url, Map<String, dynamic> dictParameter, String token) async {
     Map<String, dynamic>? result;
-    // if(await ConnectionValidator().check()){
-      try{
-       CustomLoading().show(context);
-        final Response? response = await requestPostForApi(context, url, dictParameter, token);
+    try{
+      CustomLoading().show(context);
+      final Response? response = await requestPostForApi(context, url, dictParameter, token);
 
-        if(response != null && response.statusCode == 200){
+      if(response != null && response.statusCode == 200){
+        if (response.data is Map) {
           result = Map<String, dynamic>.from(response.data);
+        } else if (response.data is String && response.data.toString().isNotEmpty) {
+          try {
+            var decoded = jsonDecode(response.data);
+            if (decoded is Map) {
+              result = Map<String, dynamic>.from(decoded);
+            }
+          } catch (e) {
+            PrintLog.printLog("Error decoding login response: $e");
+          }
         }
-       CustomLoading().hide(context);
-        return result;
-      }catch(e){
-        CustomLoading().hide(context);
-        PrintLog.printLog("Exception..........$e.........");
-        Fluttertoast.showToast(msg: "Something went wrong");
-        return result;
       }
-    //}
-    // else{
-    //  CustomLoading().hide(context);
-    //   // Navigator.pushNamed(context, networkErrorScreenRoute);
-    //   Fluttertoast.showToast( msg: 'Please check network connection and try again !');
-    // }
-    return null;
+      CustomLoading().hide(context);
+      return result;
+    }catch(e){
+      CustomLoading().hide(context);
+      PrintLog.printLog("Exception..........$e.........");
+      Fluttertoast.showToast(msg: "Something went wrong");
+      return result;
+    }
   }
+  Future<DiseaseResponseModel?> fetchDiseases(context, String url, Map<String, dynamic> dictParameter, String token) async {
+    DiseaseResponseModel? result;
+    try {
+      CustomLoading().show(context);
+      final Response? response = await requestGetForApi(context, url, dictParameter, token);
+
+      if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
+        result =  DiseaseResponseModel.fromJson(response.data);
+      }
+      CustomLoading().hide(context);
+      return result;
+    } catch (e) {
+      CustomLoading().hide(context);
+      PrintLog.printLog("Exception getPatientProfileAPI..........$e.........");
+      return result;
+    }
+  }
+
+  Future<Map<String, dynamic>?> addDiseaseAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
+    Map<String, dynamic>? result;
+    try {
+      CustomLoading().show(context);
+      final Response? response = await requestPostForApi(context, url, dictParameter, token);
+
+      if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
+        if (response.data is Map) {
+          result = Map<String, dynamic>.from(response.data);
+        } else if (response.data is String) {
+          try {
+            var decoded = jsonDecode(response.data);
+            if (decoded is Map) result = Map<String, dynamic>.from(decoded);
+          } catch (_) {}
+        }
+      }
+      CustomLoading().hide(context);
+      return result;
+    } catch (e) {
+      CustomLoading().hide(context);
+      PrintLog.printLog("Exception addDiseaseAPI..........$e.........");
+      return result;
+    }
+  }
+
+  Future<Map<String, dynamic>?> updateDiseaseAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
+    Map<String, dynamic>? result;
+    try {
+      CustomLoading().show(context);
+      final Response? response = await requestPatchForApi(context, url, dictParameter, token);
+
+      if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
+        if (response.data is Map) {
+          result = Map<String, dynamic>.from(response.data);
+        } else if (response.data is String) {
+          try {
+            var decoded = jsonDecode(response.data);
+            if (decoded is Map) result = Map<String, dynamic>.from(decoded);
+          } catch (_) {}
+        }
+      }
+      CustomLoading().hide(context);
+      return result;
+    } catch (e) {
+      CustomLoading().hide(context);
+      PrintLog.printLog("Exception updateDiseaseAPI: $e");
+      return result;
+    }
+  }
+
   Future<Map<String, dynamic>?> getPatientProfileAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
     Map<String, dynamic>? result;
     try {
@@ -78,7 +151,14 @@ class ApiProvider {
       final Response? response = await requestGetForApi(context, url, dictParameter, token);
 
       if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
-        result = Map<String, dynamic>.from(response.data);
+        if (response.data is Map) {
+          result = Map<String, dynamic>.from(response.data);
+        } else if (response.data is String) {
+          try {
+            var decoded = jsonDecode(response.data);
+            if (decoded is Map) result = Map<String, dynamic>.from(decoded);
+          } catch (_) {}
+        }
       }
       CustomLoading().hide(context);
       return result;
@@ -835,9 +915,22 @@ class ApiProvider {
       );
       
       PrintLog.printLog("Response Status Code: ${response.statusCode}");
-      Map<String, dynamic>? result = Map<String, dynamic>.from(response.data);
       
-      if(response.statusCode == 401 || result["errorCode"] == 7){
+      Map<String, dynamic>? result;
+      if (response.data is Map) {
+        result = Map<String, dynamic>.from(response.data);
+      } else if (response.data is String && response.data.toString().isNotEmpty) {
+        try {
+          var decoded = jsonDecode(response.data);
+          if (decoded is Map) {
+            result = Map<String, dynamic>.from(decoded);
+          }
+        } catch (e) {
+          PrintLog.printLog("Error decoding JSON string: $e");
+        }
+      }
+      
+      if(response.statusCode == 401 || (result != null && result["errorCode"] == 7)){
         PrintLog.printLog("Session Expired or Unauthorized");
         return response;
       } else {
@@ -877,8 +970,21 @@ class ApiProvider {
       PrintLog.printLog("Response111: $response");
       PrintLog.printLog("Response_headers1: ${response.headers}");
 
-      Map<String, dynamic>? result = Map<String, dynamic>.from(response.data);
-      if(result["errorCode"] == 7){
+      Map<String, dynamic>? result;
+      if (response.data is Map) {
+        result = Map<String, dynamic>.from(response.data);
+      } else if (response.data is String && response.data.toString().isNotEmpty) {
+        try {
+          var decoded = jsonDecode(response.data);
+          if (decoded is Map) {
+            result = Map<String, dynamic>.from(decoded);
+          }
+        } catch (e) {
+          PrintLog.printLog("Error decoding JSON string: $e");
+        }
+      }
+
+      if(result != null && result["errorCode"] == 7){
         PrintLog.printLog("authentication failed");
         return response;
       } else {
@@ -917,16 +1023,29 @@ class ApiProvider {
           headers: headers
       ));
       PrintLog.printLog("Response21: ${response.data}");
-      PrintLog.printLog("Response1: ${response.data["errorCode"]}");
+      
+      Map<String, dynamic>? result;
+      if (response.data is Map) {
+        result = Map<String, dynamic>.from(response.data);
+      } else if (response.data is String && response.data.toString().isNotEmpty) {
+        try {
+          var decoded = jsonDecode(response.data);
+          if (decoded is Map) {
+            result = Map<String, dynamic>.from(decoded);
+          }
+        } catch (e) {
+          PrintLog.printLog("Error decoding JSON string: $e");
+        }
+      }
+
+      if (result != null) {
+        PrintLog.printLog("Response1: ${result["errorCode"]}");
+      }
+      
       PrintLog.printLog("Response_headers: ${response.headers}");
       PrintLog.printLog("Response_realuri: ${response.realUri}");
-      // if(response.data != null && response.data["status"] == "error"){
-      //   response.data["data"] = null;
-      //   return response;
-      // }else {
 
-      Map<String, dynamic>? result  = Map<String, dynamic>.from(response.data);
-      if(result["errorCode"] == 7){
+      if(result != null && result["errorCode"] == 7){
         PrintLog.printLog("authintacktion fiald");
         // onLogout();
         return response;
@@ -975,6 +1094,39 @@ class ApiProvider {
 
     }catch(error){
       PrintLog.printLog("Exception_Main: $error");
+      return null;
+    }
+  }
+
+  Future<Response?> requestPatchForApi(context, String url, Map<String, dynamic> dictParameter, String token) async {
+    try {
+      Map<String, String> headers = {
+        "Content-type": "application/json",
+        "Authkey": authKey
+      };
+      if (token.isNotEmpty) {
+        headers["Authorization"] = "Bearer $token";
+      }
+
+      BaseOptions options = BaseOptions(
+          baseUrl: WebApiConstant.BASE_URL,
+          receiveTimeout: Duration(seconds: 30),
+          connectTimeout: Duration(seconds: 30),
+          headers: headers);
+      _dio.options = options;
+
+      Response response = await _dio.patch(
+        url,
+        data: dictParameter,
+        options: Options(
+          followRedirects: false,
+          validateStatus: (status) => (status ?? 0) < 500,
+          headers: headers,
+        ),
+      );
+      return response;
+    } catch (e) {
+      PrintLog.printLog("Exception_Patch: $e");
       return null;
     }
   }
