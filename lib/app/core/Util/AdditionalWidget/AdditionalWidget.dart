@@ -151,9 +151,9 @@ class _PhoneInputWithCountryState<T> extends State<PhoneInputWithCountry<T>> {
       child: Container(
         key: _fieldKey,
         decoration: BoxDecoration(
-          color: AppColors.bgCardNavy,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.teal, width: 1.0),
+          color: AppColors.textFieldColor.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.transparent, width: 1.4),
         ),
         child: Row(
           children: [

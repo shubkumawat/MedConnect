@@ -48,42 +48,43 @@ class _OtpInputRowState extends State<OtpInputRow> {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(6, (i) {
-        return SizedBox(
-          width: 46,
-          height: 54,
-          child: TextField(
-            controller: _controllers[i],
-            focusNode: _focusNodes[i],
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            maxLength: 1,
-            style: AppTextStyles.heading2.copyWith(color: AppColors.accentTeal),
-            decoration: InputDecoration(
-              counterText: '',
-              filled: true,
-              fillColor: AppColors.bgCardNavy,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.primary),
+        return Expanded(
+          child: Container(
+            height: 54,
+            margin: EdgeInsets.only(right: i == 5 ? 0 : 8),
+            child: TextField(
+              controller: _controllers[i],
+              focusNode: _focusNodes[i],
+              textAlign: TextAlign.center,
+              keyboardType: TextInputType.number,
+              maxLength: 1,
+              style: AppTextStyles.heading2.copyWith(color: AppColors.textDark, fontSize: 20),
+              decoration: InputDecoration(
+                counterText: '',
+                filled: true,
+                fillColor: AppColors.textFieldColor.withOpacity(0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
+                ),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.primary),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.teal, width: 2),
-              ),
+              onChanged: (val) {
+                if (val.isNotEmpty && i < 5) {
+                  _focusNodes[i + 1].requestFocus();
+                }
+                final otp = _controllers.map((c) => c.text).join();
+                if (otp.length == 6) widget.onCompleted(otp);
+              },
             ),
-            onChanged: (val) {
-              if (val.isNotEmpty && i < 5) {
-                _focusNodes[i + 1].requestFocus();
-              }
-              final otp = _controllers.map((c) => c.text).join();
-              if (otp.length == 6) widget.onCompleted(otp);
-            },
           ),
         );
       }),
