@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StorageService {
+
   static const isLogin = "isLogin";
   static const isIntro = "isIntro";
   static const usertype = "usertype";
@@ -16,6 +17,8 @@ class StorageService {
   static const userProfile = "userProfile";
   static const kycStatus = "kycStatus";
   static const walletBalance = "walletBalance";
+
+
 
   // Reminder settings
   static const medReminders = "medReminders";
