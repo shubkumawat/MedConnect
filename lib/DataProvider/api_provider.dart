@@ -75,6 +75,7 @@ class ApiProvider {
       Fluttertoast.showToast(msg: "Something went wrong");
       return result;
     }
+
   }
   Future<DiseaseResponseModel?> fetchDiseases(context, String url, Map<String, dynamic> dictParameter, String token) async {
     DiseaseResponseModel? result;
