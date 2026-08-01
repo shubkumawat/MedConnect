@@ -125,100 +125,135 @@ class DiseaseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget card = Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.bgCardNavy,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE3EBE7)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 6),
+            color: AppColors.tealDark.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Stack(
-          children: [
-            // Left & Top accent with proper rounding
-            Positioned.fill(
-              bottom: -20,
-              right: -20,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _statusColor.withOpacity(0.5), width: 4),
-                ),
-              ),
-            ),
-            // Status color overlay for top part
-            Positioned(
-              left: 20,
-              top: 0,
-              right: 0,
-              child: Container(height: 4, color: _statusColor),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 14, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        borderRadius: BorderRadius.circular(18),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(width: 4, color: _statusColor),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(name, style: AppTextStyles.bodyBold.copyWith(fontSize: 16)),
-                      ),
-                      if (type != null && type!.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            type!.toUpperCase(),
-                            style: AppTextStyles.caption.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 9,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textDark,
+                                letterSpacing: -0.2,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Diagnosed: $diagnosed · $doctor',
-                          style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
-                        ),
-                      ),
-                      // Status badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _statusColor.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          status,
-                          style: AppTextStyles.caption.copyWith(
-                            color: _statusColor,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 10,
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              status,
+                              style: TextStyle(
+                                color: _statusColor,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 10.5,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined,
+                              size: 12,
+                              color: AppColors.textGray.withValues(alpha: 0.9)),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              diagnosed.isNotEmpty
+                                  ? 'Diagnosed $diagnosed'
+                                  : 'Diagnosis date not set',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption.copyWith(
+                                color: AppColors.textGray,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (type != null && type!.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.teal.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                type!.toUpperCase(),
+                                style: const TextStyle(
+                                  color: AppColors.tealDark,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          if (type != null && type!.isNotEmpty)
+                            const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              doctor,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption.copyWith(
+                                color: AppColors.textMuted,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 20,
+                            color: AppColors.teal.withValues(alpha: 0.45),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

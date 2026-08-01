@@ -1,7 +1,11 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart' as dio;
 import 'package:healaura/app/data/services/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,6 +13,7 @@ import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
+import '../../../core/theme/app_colors.dart';
 
 /// Master relation list ka model
 class RelationModel {
@@ -110,6 +115,123 @@ class ProfileController extends GetxController {
   }
 
   final genders = ['Male', 'Female', 'Other'];
+
+  // ------------------ Profile photo ------------------
+  final ImagePicker _imagePicker = ImagePicker();
+  Rx<File?> profileImage = Rx<File?>(null);
+  RxString profilePhotoUrl = ''.obs;
+
+  Future<void> pickProfileImage(ImageSource source) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 70,
+      );
+      if (image != null) {
+        profileImage.value = File(image.path);
+      }
+    } catch (e) {
+      PrintLog.printLog('Pick profile image error: $e');
+      Fluttertoast.showToast(msg: 'Could not pick image');
+    }
+  }
+
+  void showProfilePhotoSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Choose photo',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.teal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded,
+                      color: AppColors.teal),
+                ),
+                title: const Text('Camera',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(context);
+                  pickProfileImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.teal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded,
+                      color: AppColors.teal),
+                ),
+                title: const Text('Gallery',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(context);
+                  pickProfileImage(ImageSource.gallery);
+                },
+              ),
+              if (profileImage.value != null ||
+                  profilePhotoUrl.value.isNotEmpty)
+                ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.statusRed.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded,
+                        color: AppColors.statusRed),
+                  ),
+                  title: const Text('Remove photo',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.statusRed)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    profileImage.value = null;
+                    profilePhotoUrl.value = '';
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   // ------------------ Master Relation List (API se) ------------------
   RxBool isRelationLoading = false.obs;
@@ -527,6 +649,13 @@ class ProfileController extends GetxController {
             emailCtrl.text = data['email']?.toString() ?? '';
             mobileNumber.value = data['mobile_number']?.toString() ?? '';
             age.value = data['age'] ?? 0;
+            final photo = data['profile_photo']?.toString() ??
+                data['profile_picture']?.toString() ??
+                data['photo']?.toString() ??
+                '';
+            if (profileImage.value == null) {
+              profilePhotoUrl.value = photo;
+            }
             if (data['date_of_birth'] != null) {
               selectedDob.value = DateTime.tryParse(data['date_of_birth'].toString());
               if (selectedDob.value != null) {
@@ -716,14 +845,35 @@ class ProfileController extends GetxController {
         "gender": selectedGender.value.toLowerCase(),
         "nationality": selectedNationalityId.value,
       };
-      final token= await StorageService().getString(StorageService.token);
+      final token = await StorageService().getString(StorageService.token);
 
-      final response = await ApiProvider().updateProfileApi(
-        context,
-        WebApiConstant.API_URL_VERIFY_UPDATE_PROFILE,
-        dictParameter,
-        token!,
-      );
+      Map<String, dynamic>? response;
+      if (profileImage.value != null) {
+        final formData = dio.FormData.fromMap(dictParameter);
+        formData.files.add(MapEntry(
+          'profile_photo',
+          await dio.MultipartFile.fromFile(
+            profileImage.value!.path,
+            filename: 'profile.jpg',
+          ),
+        ));
+        final raw = await ApiProvider().requestMultipartApi(
+          context,
+          WebApiConstant.API_URL_VERIFY_UPDATE_PROFILE,
+          formData,
+          token ?? '',
+        );
+        if (raw != null && raw.data is Map) {
+          response = Map<String, dynamic>.from(raw.data as Map);
+        }
+      } else {
+        response = await ApiProvider().updateProfileApi(
+          context,
+          WebApiConstant.API_URL_VERIFY_UPDATE_PROFILE,
+          dictParameter,
+          token!,
+        );
+      }
 
       isLoading.value = false;
       if (_isDisposed) return;
@@ -735,13 +885,25 @@ class ProfileController extends GetxController {
           // Keep Profile screen name in sync after edit
           profileDisplayName.value = fullNameCtrl.text.trim();
 
-          // response me jo updated user data aaya usse local prefs bhi update kar do
-          final userData = response['data']?['user'];
-          if (userData != null) {
+          final data = response['data'];
+          final userData = data is Map ? data['user'] : null;
+          if (userData is Map) {
             final storage = StorageService();
             await storage.setString(StorageService.userName, userData['full_name']?.toString() ?? '');
             await storage.setString(StorageService.email, userData['email']?.toString() ?? '');
           }
+
+          final photoFromRes = data is Map
+              ? (data['profile_photo'] ??
+                      data['profile_picture'] ??
+                      (userData is Map ? userData['profile_photo'] : null))
+                  ?.toString()
+              : null;
+          if (photoFromRes != null && photoFromRes.isNotEmpty) {
+            profilePhotoUrl.value = photoFromRes;
+            profileImage.value = null;
+          }
+          // Else keep local File so the avatar still shows until next fetch.
 
           onSuccess();
         } else {

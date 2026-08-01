@@ -51,43 +51,87 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       children: [
         ProfileSectionCard(
           title: 'Profile photo',
-          caption: 'Optional — you can add this later',
+          caption: 'Tap photo to upload from camera or gallery',
           icon: Icons.camera_alt_outlined,
           children: [
             Center(
-              child: Stack(
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFE8F5F1),
-                      border: Border.all(
-                        color: AppColors.teal.withValues(alpha: 0.35),
-                        width: 3,
+              child: Obx(() {
+                final file = controller.profileImage.value;
+                final url = controller.profilePhotoUrl.value;
+                final hasLocal = file != null;
+                final hasNetwork = url.isNotEmpty &&
+                    (url.startsWith('http://') || url.startsWith('https://'));
+
+                return Column(
+                  children: [
+                    GestureDetector(
+                      onTap: () => controller.showProfilePhotoSheet(context),
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFE8F5F1),
+                              border: Border.all(
+                                color: AppColors.teal.withValues(alpha: 0.35),
+                                width: 3,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: hasLocal
+                                ? Image.file(file, fit: BoxFit.cover)
+                                : hasNetwork
+                                    ? Image.network(
+                                        url,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, _, _) => const Icon(
+                                          Icons.person_rounded,
+                                          color: AppColors.teal,
+                                          size: 48,
+                                        ),
+                                      )
+                                    : const Icon(Icons.person_rounded,
+                                        color: AppColors.teal, size: 48),
+                          ),
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: AppColors.tealDark,
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(Icons.camera_alt_rounded,
+                                  color: Colors.white, size: 15),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: const Icon(Icons.person_rounded,
-                        color: AppColors.teal, size: 48),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.tealDark,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+                    const SizedBox(height: 10),
+                    TextButton.icon(
+                      onPressed: () =>
+                          controller.showProfilePhotoSheet(context),
+                      icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                      label: Text(
+                        hasLocal || hasNetwork
+                            ? 'Change photo'
+                            : 'Upload photo',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      child: const Icon(Icons.camera_alt_rounded,
-                          color: Colors.white, size: 15),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.tealDark,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                );
+              }),
             ),
           ],
         ),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:healaura/app/modules/home/controllers/home_controller.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
@@ -26,7 +27,8 @@ class LoginController extends GetxController {
   RxBool showOtp = false.obs;
   RxBool isLoading = false.obs;
   RxString receivedOtp = "".obs;
-  Rx<TextEditingController> phoneController = TextEditingController().obs;
+  /// Plain controller — never wrap TextEditingController in .obs (breaks live typing UI).
+  final TextEditingController phoneController = TextEditingController();
 
   // Resend cooldown
   RxInt resendSecondsLeft = 0.obs;
@@ -55,6 +57,7 @@ class LoginController extends GetxController {
   void onClose() {
     _resendTimer?.cancel();
     _lockoutTimer?.cancel();
+    phoneController.dispose();
     super.onClose();
   }
 
@@ -122,7 +125,7 @@ class LoginController extends GetxController {
 
   Future<void> getSendOtpAPI(BuildContext context) async {
     try {
-      if (phoneController.value.text.isEmpty || phoneController.value.text.length != 10) {
+      if (phoneController.text.isEmpty || phoneController.text.length != 10) {
         Fluttertoast.showToast(msg: "Please enter valid mobile number");
         return;
       }
@@ -140,7 +143,7 @@ class LoginController extends GetxController {
         context,
         WebApiConstant.API_URL_SEND_OTP,
         {
-          "mobile_number": phoneController.value.text.toString(),
+          "mobile_number": phoneController.text.toString(),
         },
         userAccessToken ?? "",
       );
@@ -152,14 +155,9 @@ class LoginController extends GetxController {
         if (response['error'] == false) {
           showOtp.value = true;
           otpAttempts.value = 0;
+          receivedOtp.value = "";
           otpRebuildKey.value++;
           _startResendCooldown();
-          // Extract OTP from data object as seen in logs
-          // if (response['data'] != null && response['data']['otp'] != null) {
-          //   receivedOtp.value = response['data']['otp'].toString();
-          // } else if (response['otp'] != null) {
-          //   receivedOtp.value = response['otp'].toString();
-          // }
           PrintLog.printLog("Received OTP Set: ${receivedOtp.value}");
         } else {
           Fluttertoast.showToast(msg: response['message'] ?? 'Error sending OTP');
@@ -168,8 +166,7 @@ class LoginController extends GetxController {
     } catch (e) {
       PrintLog.printLog("Exception: $e");
       Fluttertoast.showToast(msg: WebApiConstant.ApiError);
-    } finally {
-      update();
+      isLoading.value = false;
     }
   }
 
@@ -195,7 +192,7 @@ class LoginController extends GetxController {
         context,
         WebApiConstant.API_URL_VERIFY_OTP,
         {
-          "mobile_number": phoneController.value.text.toString(),
+          "mobile_number": phoneController.text.toString(),
           "otp": otp.toString(),
         },
         userAccessToken ?? "",
@@ -258,8 +255,7 @@ class LoginController extends GetxController {
     } catch (e) {
       PrintLog.printLog("Exception: $e");
       Fluttertoast.showToast(msg: WebApiConstant.ApiError);
-    } finally {
-      update();
+      isLoading.value = false;
     }
   }
 }

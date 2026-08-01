@@ -268,12 +268,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 10),
                       _InsetGroup(
                         children: [
-                          _LinkTile(
-                            icon: Icons.person_off_outlined,
-                            title: 'Delete account',
-                            danger: true,
-                            onTap: () {},
-                          ),
+                          // _LinkTile(
+                          //   icon: Icons.person_off_outlined,
+                          //   title: 'Delete account',
+                          //   danger: true,
+                          //   onTap: () {},
+                          // ),
                           _LinkTile(
                             icon: Icons.logout_rounded,
                             title: 'Sign out',

@@ -7,13 +7,28 @@ import '../../../data/models/family_member_model.dart';
 import '../../../data/models/video_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/storage_service.dart';
-int access_type=0;
+import '../../dashboard/controllers/dashboard_controller.dart';
+import '../../records/controllers/records_controller.dart';
+
+int access_type = 0;
 class HomeController extends GetxController {
   
   var activePatientIndex = 0.obs;
   var isLoading = false.obs;
 
   RxList<FamilyMember> patients = <FamilyMember>[].obs;
+
+  FamilyMember? get selectedPatient {
+    if (patients.isEmpty) return null;
+    final i = activePatientIndex.value.clamp(0, patients.length - 1);
+    return patients[i];
+  }
+
+  String? get selectedPatientId {
+    final id = selectedPatient?.patientId?.trim();
+    if (id == null || id.isEmpty) return null;
+    return id;
+  }
 
   // Reminders Visibility
   RxBool showMedReminders = true.obs;
@@ -66,7 +81,31 @@ class HomeController extends GetxController {
   Future<void> fetchFamilyMembers() async {
     try {
       isLoading.value = true;
-      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      // Own profile first (patients/profile/), then family members.
+      FamilyMember? self;
+      try {
+        final profileRes = await ApiProvider().requestGetForApi(
+          Get.context,
+          WebApiConstant.API_URL_PATIENT_PROFILE,
+          {},
+          token ?? '',
+        );
+        if (profileRes != null &&
+            profileRes.statusCode == 200 &&
+            profileRes.data is Map) {
+          final body = Map<String, dynamic>.from(profileRes.data as Map);
+          if (body['error'] != true && body['data'] is Map) {
+            self = FamilyMember.fromProfileJson(
+              Map<String, dynamic>.from(body['data'] as Map),
+            );
+          }
+        }
+      } catch (e) {
+        print('Home self profile error: $e');
+      }
 
       final response = await ApiProvider().getFamilyMemberListAPI(
         Get.context,
@@ -75,11 +114,27 @@ class HomeController extends GetxController {
         token ?? '',
       );
 
+      // Family members — same list parsing as before.
+      final family = <FamilyMember>[];
       if (response != null && response['error'] != true) {
         final List list = response['data']?['family_members'] ?? [];
-        patients.value = list.map((e) => FamilyMember.fromJson(e)).toList();
-        patients.refresh();
+        family.addAll(list.map((e) => FamilyMember.fromJson(e)).toList());
       }
+
+      // Passport order: Me (profile API) first, then family as-is.
+      final members = <FamilyMember>[];
+      if (self != null) {
+        members.add(self);
+        final selfId = self.patientId?.trim();
+        if (selfId != null && selfId.isNotEmpty) {
+          family.removeWhere((m) => m.patientId?.trim() == selfId);
+        }
+      }
+      members.addAll(family);
+
+      patients.value = members;
+      await _restoreSelectedPatient();
+      patients.refresh();
     } catch (e) {
       print("Home Fetch Error: $e");
     } finally {
@@ -87,8 +142,74 @@ class HomeController extends GetxController {
     }
   }
 
+  Future<void> _restoreSelectedPatient() async {
+    if (patients.isEmpty) {
+      activePatientIndex.value = 0;
+      return;
+    }
+    final saved =
+        await StorageService().getString(StorageService.selectedPatientId);
+    if (saved.trim().isNotEmpty) {
+      final i = patients.indexWhere(
+        (p) => (p.patientId?.trim() ?? '') == saved.trim(),
+      );
+      activePatientIndex.value = i >= 0 ? i : 0;
+    } else {
+      activePatientIndex.value = 0;
+    }
+    final id = selectedPatientId ?? '';
+    if (id.isNotEmpty) {
+      await StorageService().setString(StorageService.selectedPatientId, id);
+    }
+  }
+
   void changePatient(int index) {
-    activePatientIndex.value = index;
+    if (patients.isEmpty) return;
+    final i = index.clamp(0, patients.length - 1);
+    activePatientIndex.value = i;
+    final id = patients[i].patientId?.trim() ?? '';
+    StorageService().setString(StorageService.selectedPatientId, id);
+  }
+
+  void selectPatientById(String? patientId) {
+    if (patientId == null || patientId.trim().isEmpty || patients.isEmpty) {
+      return;
+    }
+    final i = patients.indexWhere(
+      (p) => (p.patientId?.trim() ?? '') == patientId.trim(),
+    );
+    if (i >= 0) changePatient(i);
+  }
+
+  /// Select member (by index or id) and open Records for that patient.
+  Future<void> openRecordsForSelected({
+    int? index,
+    String? patientId,
+    FamilyMember? member,
+  }) async {
+    if (index != null) {
+      changePatient(index);
+      member ??=
+          (index >= 0 && index < patients.length) ? patients[index] : null;
+    } else if (patientId != null && patientId.trim().isNotEmpty) {
+      final id = patientId.trim();
+      await StorageService().setString(StorageService.selectedPatientId, id);
+      if (patients.isEmpty) {
+        await fetchFamilyMembers();
+      }
+      selectPatientById(id);
+      member ??= patients.firstWhereOrNull(
+        (p) => (p.patientId?.trim() ?? '') == id,
+      );
+    }
+
+    if (member != null && Get.isRegistered<RecordsController>()) {
+      Get.find<RecordsController>().applySelectedMember(member);
+    }
+
+    if (Get.isRegistered<DashboardController>()) {
+      Get.find<DashboardController>().changeIndex(1);
+    }
   }
 
   // ----------------------- Video APIs -----------------------

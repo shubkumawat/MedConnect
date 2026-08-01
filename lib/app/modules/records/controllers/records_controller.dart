@@ -4,6 +4,8 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:healaura/app/data/models/medical_record_model.dart';
 import 'package:healaura/app/data/models/disease_response_model.dart';
+import 'package:healaura/app/data/models/disease_document_model.dart';
+import 'package:healaura/app/data/models/family_member_model.dart';
 import 'package:healaura/DataProvider/api_provider.dart';
 import 'package:healaura/DataProvider/app_shared_preferences.dart';
 import 'package:healaura/DataProvider/web_api_constant.dart';
@@ -11,6 +13,7 @@ import 'package:healaura/app/modules/records/controllers/pdf_generator.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../home/controllers/home_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../views/disease_pdf_preview_screen.dart';
 
@@ -21,15 +24,28 @@ class RecordsController extends GetxController {
   var diseaseTimeline = <TimelineEvent>[].obs;
   var diseaseMedications = <Medication>[].obs;
   var selectedMedication = Rxn<Medication>();
-  var diseaseDocuments = <Map<String, dynamic>>[].obs;
+  var diseaseDocuments = <DiseaseDocument>[].obs;
   var diseaseBills = <Map<String, dynamic>>[].obs;
   var isDocumentsLoading = false.obs;
   var isBillsLoading = false.obs;
+  var isDocumentUploading = false.obs;
   var isMedicationsLoading = false.obs;
   var isCurrentMedicationsLoading = false.obs;
   var isMedicationDetailLoading = false.obs;
   var medicineSearchResults = <Map<String, dynamic>>[].obs;
   var selectedDisease = Rxn<DiseaseResult>();
+
+  /// Active Health Passport member — records APIs send this `patient_id`.
+  final selectedPatientId = ''.obs;
+  final selectedPatientName = 'Patient'.obs;
+  final selectedPatientRelation = 'Me'.obs;
+  final selectedPatientPhoto = ''.obs;
+  final selectedIsSelf = true.obs;
+
+  /// '' | prescription | report
+  var documentTypeFilter = 'prescription'.obs;
+  var documentTypes = <DocumentTypeOption>[].obs;
+  var reportTypes = <ReportTypeInfo>[].obs;
   
   var isLoading = false.obs;
   var isTimelineLoading = false.obs;
@@ -42,12 +58,104 @@ class RecordsController extends GetxController {
   var hereditaryOptions = <Map<String, String>>[].obs;
   var bodyPartsOptions = <Map<String, String>>[].obs;
 
+  Map<String, dynamic> patientQuery([Map<String, dynamic>? extra]) {
+    final q = <String, dynamic>{if (extra != null) ...extra};
+    final id = selectedPatientId.value.trim();
+    if (id.isNotEmpty) q['patient_id'] = id;
+    return q;
+  }
+
+  void attachPatientId(Map<String, dynamic> body) {
+    final id = selectedPatientId.value.trim();
+    if (id.isNotEmpty) body['patient_id'] = id;
+  }
+
+  void applySelectedMember(FamilyMember p) => _applySelectedMember(p);
+
+  void _applySelectedMember(FamilyMember p) {
+    selectedPatientId.value = p.patientId?.trim() ?? '';
+    selectedPatientName.value = (p.fullName?.trim().isNotEmpty == true)
+        ? p.fullName!.trim()
+        : (p.isSelf ? 'You' : 'Patient');
+    selectedPatientRelation.value =
+        p.isSelf ? 'Me' : (p.relation?.name ?? 'Member');
+    selectedPatientPhoto.value = p.profilePhoto?.trim() ?? '';
+    selectedIsSelf.value = p.isSelf;
+  }
+
+  Future<void> syncSelectedPatientFromHome() async {
+    final saved =
+        (await StorageService().getString(StorageService.selectedPatientId))
+            .trim();
+
+    if (Get.isRegistered<HomeController>()) {
+      final home = Get.find<HomeController>();
+      if (home.patients.isEmpty) {
+        await home.fetchFamilyMembers();
+      }
+      // Prefer stored patient_id (source of truth after tap/select).
+      if (saved.isNotEmpty) {
+        final match = home.patients.firstWhereOrNull(
+          (p) => (p.patientId?.trim() ?? '') == saved,
+        );
+        if (match != null) {
+          _applySelectedMember(match);
+          return;
+        }
+        selectedPatientId.value = saved;
+        return;
+      }
+      final p = home.selectedPatient;
+      if (p != null) {
+        _applySelectedMember(p);
+        return;
+      }
+    }
+
+    if (saved.isNotEmpty) {
+      selectedPatientId.value = saved;
+    }
+  }
+
+  Future<void> selectMember(FamilyMember member, {int? index}) async {
+    _applySelectedMember(member);
+    final id = member.patientId?.trim() ?? '';
+    await StorageService().setString(StorageService.selectedPatientId, id);
+    if (Get.isRegistered<HomeController>()) {
+      final home = Get.find<HomeController>();
+      if (index != null) {
+        home.changePatient(index);
+      } else {
+        home.selectPatientById(id);
+      }
+    }
+    await refreshForSelectedPatient();
+  }
+
+  Future<void> refreshForSelectedPatient() async {
+    diseases.clear();
+    medications.clear();
+    timelineEvents.clear();
+    await Future.wait([
+      fetchDiseases(),
+      fetchCurrentMedications(),
+      fetchGlobalTimeline(),
+    ]);
+  }
+
   @override
   void onInit() {
     super.onInit();
-    fetchDiseases();
     fetchDiseaseMeta();
-    fetchGlobalTimeline();
+    _bootstrapRecords();
+  }
+
+  Future<void> _bootstrapRecords() async {
+    await syncSelectedPatientFromHome();
+    await Future.wait([
+      fetchDiseases(),
+      fetchGlobalTimeline(),
+    ]);
   }
 
   Future<void> fetchDiseaseMeta() async {
@@ -83,7 +191,7 @@ class RecordsController extends GetxController {
       var response = await ApiProvider().fetchDiseases(
         Get.context,
         WebApiConstant.API_URL_RECORDS_DISEASES,
-        {},
+        patientQuery(),
         token ?? "",
       );
 
@@ -109,8 +217,8 @@ class RecordsController extends GetxController {
       
       var response = await ApiProvider().requestGetForApi(
         Get.context,
-        "${WebApiConstant.API_URL_RECORDS_DISEASES}$uuid/",
-        {},
+        "${WebApiConstant.API_URL_RECORDS_DISEASES_Details}",
+        patientQuery({"disease_uuid": uuid}),
         token ?? "",
       );
 
@@ -122,7 +230,7 @@ class RecordsController extends GetxController {
           // Fetch related data (medications load on Medications tab)
           fetchDiseaseTimeline(uuid);
           fetchDiseaseDocuments(uuid);
-          fetchDiseaseBills(uuid);
+          fetchReportTypesMeta();
         }
       }
     } catch (e) {
@@ -143,7 +251,7 @@ class RecordsController extends GetxController {
       var response = await ApiProvider().requestGetForApi(
         Get.context,
         WebApiConstant.API_URL_RECORDS_MEDICATIONS,
-        {"active": 1},
+        patientQuery({"active": 1}),
         token ?? "",
       );
 
@@ -162,6 +270,7 @@ class RecordsController extends GetxController {
       isLoading.value = true;
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
 
+      attachPatientId(body);
       // POST /health-records/diseases/?active=1/medications
       var response = await ApiProvider().requestPostForApi(
         Get.context,
@@ -187,13 +296,12 @@ class RecordsController extends GetxController {
   Future<Medication?> fetchMedicationDetail(String medicationUuid) async {
     try {
       isMedicationDetailLoading.value = true;
-      selectedMedication.value = null;
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
 
       var response = await ApiProvider().requestGetForApi(
         Get.context,
-        "${WebApiConstant.API_URL_RECORDS_MEDICATIONS}$medicationUuid/",
-        {},
+        "${WebApiConstant.API_URL_RECORDS_MEDICATIONS}",
+        patientQuery({"medication_uuid": medicationUuid}),
         token ?? "",
       );
 
@@ -249,7 +357,7 @@ class RecordsController extends GetxController {
       var response = await ApiProvider().requestGetForApi(
         Get.context,
         "${WebApiConstant.API_URL_RECORDS_DISEASES}$diseaseUuid/medications/",
-        {},
+        patientQuery(),
         token ?? "",
       );
 
@@ -271,6 +379,7 @@ class RecordsController extends GetxController {
       isLoading.value = true;
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
 
+      attachPatientId(body);
       var response = await ApiProvider().requestPostForApi(
         Get.context,
         "${WebApiConstant.API_URL_RECORDS_DISEASES}$diseaseUuid/medications/",
@@ -309,6 +418,7 @@ class RecordsController extends GetxController {
       isLoading.value = true;
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
 
+      attachPatientId(body);
       var response = await ApiProvider().requestPatchForApi(
         Get.context,
         "${WebApiConstant.API_URL_RECORDS_MEDICATIONS}$medicationUuid/",
@@ -321,6 +431,11 @@ class RecordsController extends GetxController {
           await fetchCurrentMedications();
         } else {
           await fetchDiseaseMedications(diseaseUuid);
+        }
+        // Keep open detail screen in sync without manual refresh.
+        if (selectedMedication.value?.id == medicationUuid ||
+            selectedMedication.value == null) {
+          await fetchMedicationDetail(medicationUuid);
         }
         return true;
       }
@@ -414,7 +529,7 @@ class RecordsController extends GetxController {
       var response = await ApiProvider().requestGetForApi(
         Get.context,
         "${WebApiConstant.API_URL_RECORDS_DISEASES}$uuid/timeline/",
-        {},
+        patientQuery(),
         token ?? "",
       );
 
@@ -435,27 +550,83 @@ class RecordsController extends GetxController {
     }
   }
 
-  Future<void> fetchDiseaseDocuments(String uuid) async {
+  Future<void> fetchDiseaseDocuments(String uuid, {String? docType}) async {
     try {
       isDocumentsLoading.value = true;
-      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
+      final cleanUuid = uuid.trim();
+      final type = (docType ?? documentTypeFilter.value).trim();
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      final query = patientQuery({
+        'disease_uuid': cleanUuid,
+        if (type.isNotEmpty) 'doc_type': type,
+      });
+
       var response = await ApiProvider().requestGetForApi(
         Get.context,
-        "${WebApiConstant.API_URL_RECORDS_DISEASES}$uuid/documents/",
-        {},
+        WebApiConstant.API_URL_RECORDS_DISEASE_DOCUMENTS,
+        query,
         token ?? "",
       );
 
       if (response != null && response.statusCode == 200) {
         var data = response.data['data'];
         if (data != null && data['results'] != null) {
-          diseaseDocuments.value = List<Map<String, dynamic>>.from(data['results']);
+          diseaseDocuments.value = (data['results'] as List)
+              .map((e) =>
+                  DiseaseDocument.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
+        } else {
+          diseaseDocuments.clear();
         }
       }
     } catch (e) {
       debugPrint("Error fetching disease documents: $e");
     } finally {
       isDocumentsLoading.value = false;
+    }
+  }
+
+  Future<void> setDocumentTypeFilter(String diseaseUuid, String type) async {
+    documentTypeFilter.value = type;
+    await fetchDiseaseDocuments(diseaseUuid, docType: type);
+  }
+
+  Future<void> fetchReportTypesMeta() async {
+    try {
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+      var response = await ApiProvider().requestGetForApi(
+        Get.context,
+        WebApiConstant.API_URL_MASTER_REPORT_TYPES,
+        {},
+        token ?? "",
+      );
+
+      if (response != null && response.statusCode == 200) {
+        final data = response.data['data'];
+        if (data is Map) {
+          final docs = data['document_types'];
+          if (docs is List) {
+            documentTypes.value = docs
+                .map((e) => DocumentTypeOption.fromJson(
+                    Map<String, dynamic>.from(e)))
+                .where((e) => e.value.isNotEmpty)
+                .toList();
+          }
+          final reports = data['report_types'];
+          if (reports is List) {
+            reportTypes.value = reports
+                .map((e) =>
+                    ReportTypeInfo.fromJson(Map<String, dynamic>.from(e)))
+                .where((e) => (e.code ?? '').isNotEmpty)
+                .toList();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching report types: $e");
     }
   }
 
@@ -483,32 +654,82 @@ class RecordsController extends GetxController {
     }
   }
 
-  Future<bool> uploadDiseaseDocument(String uuid, String filePath, String type) async {
+  /// Upload prescription/report with up to 3 files.
+  Future<bool> uploadDiseaseDocumentFull({
+    required String diseaseUuid,
+    required String title,
+    required String docType,
+    required List<String> filePaths,
+    String summary = '',
+    String notes = '',
+    String? reportTypeCode,
+    String? documentDate,
+  }) async {
     try {
-      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
-      
-      var formData = dio.FormData.fromMap({
-        'file': await dio.MultipartFile.fromFile(filePath),
-        'document_type': type, // 'slip' or 'bill'
-      });
+      if (filePaths.isEmpty) return false;
+      isDocumentUploading.value = true;
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      final formMap = <String, dynamic>{
+        'disease_uuid': diseaseUuid.trim(),
+        'title': title.trim(),
+        'summary': summary.trim(),
+        'doc_type': docType.trim(),
+        'notes': notes.trim(),
+        if (documentDate != null && documentDate.trim().isNotEmpty)
+          'document_date': documentDate.trim(),
+        if (docType == 'report' &&
+            reportTypeCode != null &&
+            reportTypeCode.trim().isNotEmpty)
+          'report_type_code': reportTypeCode.trim(),
+      };
+      attachPatientId(formMap);
+
+      final formData = dio.FormData.fromMap(formMap);
+      final limited = filePaths.take(3).toList();
+      for (final path in limited) {
+        formData.files.add(MapEntry(
+          'file',
+          await dio.MultipartFile.fromFile(path),
+        ));
+      }
 
       var response = await ApiProvider().requestMultipartApi(
         Get.context,
-        "${WebApiConstant.API_URL_RECORDS_DISEASES}$uuid/documents/",
+        WebApiConstant.API_URL_RECORDS_DISEASE_DOCUMENTS,
         formData,
         token ?? "",
       );
 
-      if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
-        if (type == 'slip') fetchDiseaseDocuments(uuid);
-        else fetchDiseaseBills(uuid);
+      final ok = response != null &&
+          (response.statusCode == 200 || response.statusCode == 201) &&
+          (response.data is! Map || response.data['error'] != true);
+
+      if (ok) {
+        documentTypeFilter.value = docType;
+        await fetchDiseaseDocuments(diseaseUuid, docType: docType);
         return true;
       }
       return false;
     } catch (e) {
       debugPrint("Error uploading document: $e");
       return false;
+    } finally {
+      isDocumentUploading.value = false;
     }
+  }
+
+  /// Legacy helper used by older callers.
+  Future<bool> uploadDiseaseDocument(
+      String uuid, String filePath, String type) async {
+    final docType = type == 'bill' ? 'report' : 'prescription';
+    return uploadDiseaseDocumentFull(
+      diseaseUuid: uuid,
+      title: docType == 'prescription' ? 'Prescription' : 'Report',
+      docType: docType,
+      filePaths: [filePath],
+    );
   }
 
   Future<Map<String, dynamic>?> scanPrescription(String filePath, {String? diseaseUuid}) async {
@@ -524,6 +745,10 @@ class RecordsController extends GetxController {
         formData.fields.add(MapEntry('disease', diseaseUuid));
       } else {
         formData.fields.add(const MapEntry('new_disease_name', 'General Health'));
+      }
+      final pid = selectedPatientId.value.trim();
+      if (pid.isNotEmpty) {
+        formData.fields.add(MapEntry('patient_id', pid));
       }
 
       var response = await ApiProvider().requestMultipartApi(
@@ -555,6 +780,7 @@ class RecordsController extends GetxController {
       } else if (!data.containsKey('disease') && !data.containsKey('new_disease_name')) {
         data['new_disease_name'] = 'General Health';
       }
+      attachPatientId(data);
 
       var response = await ApiProvider().requestPostForApi(
         Get.context,
@@ -580,25 +806,39 @@ class RecordsController extends GetxController {
   }
 
   Future<void> deleteDisease(String uuid) async {
+    // Remove from UI immediately so Dismissible can leave the tree.
+    final removedIndex = diseases.indexWhere((e) => e.uuid == uuid);
+    final removed = removedIndex >= 0 ? diseases[removedIndex] : null;
+    if (removedIndex >= 0) {
+      diseases.removeAt(removedIndex);
+    }
+
     try {
-      isLoading.value = true;
-      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
-      
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+
       var response = await ApiProvider().requestDeleteForApi(
         Get.context,
         "${WebApiConstant.API_URL_RECORDS_DISEASES}$uuid/",
         token ?? "",
       );
 
-      if (response != null && (response.statusCode == 200 || response.statusCode == 204)) {
-        diseases.removeWhere((element) => element.uuid == uuid);
-        Get.back();
+      if (response != null &&
+          (response.statusCode == 200 || response.statusCode == 204)) {
         Fluttertoast.showToast(msg: "Disease deleted successfully");
+      } else if (removed != null) {
+        // API failed — restore item in list.
+        final insertAt = removedIndex.clamp(0, diseases.length);
+        diseases.insert(insertAt, removed);
+        Fluttertoast.showToast(msg: "Failed to delete disease");
       }
     } catch (e) {
       debugPrint("Error deleting disease: $e");
-    } finally {
-      isLoading(false);
+      if (removed != null) {
+        final insertAt = removedIndex.clamp(0, diseases.length);
+        diseases.insert(insertAt, removed);
+        Fluttertoast.showToast(msg: "Failed to delete disease");
+      }
     }
   }
 
@@ -644,6 +884,7 @@ class RecordsController extends GetxController {
         "notes": notes,
         "color_code": colorCode,
       };
+      attachPatientId(body);
 
       var response = await ApiProvider().requestPostForApi(
         Get.context,
@@ -702,12 +943,12 @@ class RecordsController extends GetxController {
       isTimelineLoading(true);
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
       
-      Map<String, dynamic> query = {
+      Map<String, dynamic> query = patientQuery({
         "event_type": eventType,
         "disease": disease,
         "date_from": dateFrom,
         "date_to": dateTo,
-      };
+      });
 
       var response = await ApiProvider().requestGetForApi(
         Get.context,
@@ -769,6 +1010,7 @@ class RecordsController extends GetxController {
         "notes": notes,
         "category": category,
       };
+      attachPatientId(body);
 
       var response = await ApiProvider().addDiseaseAPI(
         Get.context,
@@ -829,6 +1071,7 @@ class RecordsController extends GetxController {
         "notes": notes,
         "category": category,
       };
+      attachPatientId(body);
 
       var response = await ApiProvider().updateDiseaseAPI(
         Get.context,

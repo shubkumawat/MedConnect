@@ -12,6 +12,8 @@ class StorageService {
   static const email = "email";
   static const userName = "userName";
   static const accessType = "accessType";
+  /// Currently selected Health Passport patient (self or family member).
+  static const selectedPatientId = "selectedPatientId";
   static const otpToken = "otpToken";
   static const userData = "userData";
   static const userProfile = "userProfile";

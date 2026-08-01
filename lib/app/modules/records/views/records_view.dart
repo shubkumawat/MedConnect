@@ -3,16 +3,16 @@ import 'package:get/get.dart';
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
 import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
 import '../../../data/models/disease_response_model.dart';
 import '../../../data/models/medical_record_model.dart';
 import '../controllers/records_controller.dart';
 import 'add_medication_screen.dart';
-import 'add_disease_screen.dart' hide SizedBox;
+import 'add_disease_screen.dart';
 import 'disease_detail_screen.dart';
 import 'ai_prescription_screen.dart';
 import 'medication_detail_screen.dart';
+import '../../../data/models/family_member_model.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../home/views/qr_view.dart';
 
@@ -30,14 +30,13 @@ class _RecordsScreenState extends State<RecordsScreen>
   @override
   void initState() {
     super.initState();
-    controller.fetchDiseases();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
   }
 
   void _onTabChanged() {
     if (_tabController.indexIsChanging) return;
-    // Medications tab (index 1) — current medications only
+    setState(() {});
     if (_tabController.index == 1) {
       controller.fetchCurrentMedications();
     }
@@ -50,339 +49,112 @@ class _RecordsScreenState extends State<RecordsScreen>
     super.dispose();
   }
 
-  IconData _eventIcon(String type) {
-    switch (type) {
-      case 'med': return Icons.medication;
-      case 'qr': return Icons.qr_code;
-      case 'doc': return Icons.description;
-      case 'hosp': return Icons.local_hospital;
-      case 'vac': return Icons.vaccines;
-      default: return Icons.circle;
-    }
+  void _openQr() {
+    Get.to(() => QrScreen(
+          patientName: controller.selectedPatientName.value,
+          patientId: controller.selectedPatientId.value.isEmpty
+              ? null
+              : controller.selectedPatientId.value,
+          profilePhoto: controller.selectedPatientPhoto.value.isEmpty
+              ? null
+              : controller.selectedPatientPhoto.value,
+        ));
   }
 
-  Widget _buildEmptyState({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 80, color: AppColors.primary),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: AppTextStyles.heading2.copyWith(color: AppColors.primary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              subtitle,
-              style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: 200,
-              child: CustomPrimaryButton(
-                text: "Add Now",
-                onTap: onTap,
-                color: AppColors.primary,
-              ),
-            ),
-          ],
-        ),
+  void _showMemberSwitcher() {
+    final members = Get.isRegistered<HomeController>()
+        ? Get.find<HomeController>().patients.toList()
+        : <FamilyMember>[];
+    if (members.isEmpty) {
+      Get.snackbar(
+        'Members',
+        'No members found. Open Home to load Health Passport.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _MemberSwitcherSheet(
+        members: members,
+        selectedPatientId: controller.selectedPatientId.value,
+        onSelect: (member, index) async {
+          Navigator.pop(context);
+          await controller.selectMember(member, index: index);
+        },
       ),
     );
   }
 
+  IconData _eventIcon(String type) {
+    switch (type) {
+      case 'med':
+        return Icons.medication_rounded;
+      case 'qr':
+        return Icons.qr_code_rounded;
+      case 'doc':
+        return Icons.description_rounded;
+      case 'hosp':
+        return Icons.local_hospital_rounded;
+      case 'vac':
+        return Icons.vaccines_rounded;
+      default:
+        return Icons.circle;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top;
+
     return Scaffold(
-      backgroundColor: AppColors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.primary,
-                AppColors.tealDark,
+      backgroundColor: const Color(0xFFF3F7F5),
+      body: Column(
+        children: [
+          Obx(() => _RecordsHeader(
+                topPad: top,
+                patientName: controller.selectedPatientName.value,
+                patientRelation: controller.selectedPatientRelation.value,
+                patientPhoto: controller.selectedPatientPhoto.value,
+                isSelf: controller.selectedIsSelf.value,
+                diseaseCount: controller.diseases.length,
+                medCount: controller.medications.length,
+                eventCount: controller.timelineEvents.length,
+                tabIndex: _tabController.index,
+                onTabSelected: (i) {
+                  _tabController.animateTo(i);
+                  setState(() {});
+                },
+                onSwitchMember: _showMemberSwitcher,
+                onAdd: () => _showAddSheet(context),
+              )),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _DiseasesTab(controller: controller),
+                _MedicationsTab(
+                  controller: controller,
+                  onConfirmDelete: _confirmDeleteCurrentMedication,
+                ),
+                _TimelineTab(
+                  controller: controller,
+                  eventIcon: _eventIcon,
+                  onEmptyAdd: () => _showAddSheet(context),
+                ),
               ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
             ),
           ),
-        ),
-        title: const Text(
-          'Ravi\'s Records',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_2_rounded, color: Colors.white),
-            onPressed: () {
-              String name = "Patient";
-              String? photo;
-              String? patientId;
-              if (Get.isRegistered<HomeController>()) {
-                final home = Get.find<HomeController>();
-                if (home.patients.isNotEmpty) {
-                  final i = home.activePatientIndex.value.clamp(0, home.patients.length - 1);
-                  final p = home.patients[i];
-                  name = p.fullName ?? name;
-                  photo = p.profilePhoto;
-                  patientId = p.patientId;
-                }
-              }
-              Get.to(() => QrScreen(
-                    patientName: name,
-                    patientId: patientId,
-                    profilePhoto: photo,
-                  ));
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.6),
-          labelStyle: AppTextStyles.captionBold,
-          tabs: const [
-            Tab(text: 'Diseases'),
-            Tab(text: 'Medications'),
-            Tab(text: 'Timeline'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // ── Diseases Tab ──────────────────────────────────────
-          Obx(() => controller.isLoading.value 
-            ? const Center(child: CircularProgressIndicator())
-            : controller.diseases.isEmpty 
-              ? _buildEmptyState(
-                  icon: Icons.sick_outlined,
-                  title: "No Diseases Added Yet",
-                  subtitle: "Add your health conditions to keep track of your medical history.",
-                  onTap: () => Get.to(AddDiseaseScreen()),
-                )
-              : ListView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-                itemCount: controller.diseases.length,
-                itemBuilder: (context, index) {
-                  final d = controller.diseases[index];
-                  final heroTag = 'disease_${d.uuid}';
-                  return Dismissible(
-                    key: Key(d.uuid!),
-                    direction: DismissDirection.endToStart,
-                    confirmDismiss: (direction) async {
-                      if (direction == DismissDirection.endToStart) {
-                        return await _showDeleteConfirmation(context, d);
-                      }
-                      return false;
-                    },
-                    background: Container(
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 20),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: AppColors.statusActive,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 28),
-                    ),
-                    child: DiseaseCard(
-                      name: d.name ?? '',
-                      status: d.status ?? '',
-                      diagnosed: d.diagnosedOn ?? '',
-                      doctor: d.category ?? 'Primary Care',
-                      type: d.conditionType,
-                      heroTag: heroTag,
-                      onTap: () {
-                        Get.to(DiseaseDetailScreen(
-                          diseaseName: d.name ?? '',
-                          status: d.status ?? '',
-                          uuid: d.uuid!,
-                          heroTag: heroTag,
-                        ));
-                      },
-                    ),
-                  );
-                },
-              )),
-
-          // ── Medications Tab (Current Medications only) ─────────
-          Obx(() {
-            if (controller.isCurrentMedicationsLoading.value) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (controller.medications.isEmpty) {
-              return _buildEmptyState(
-                icon: Icons.medication_outlined,
-                title: "No Current Medications",
-                subtitle: "Add your current medications to get timely reminders.",
-                onTap: () async {
-                  // await Get.to(() => const AddMedicationScreen(isCurrentMedication: true));
-                },
-              );
-            }
-            return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-              itemCount: controller.medications.length,
-              itemBuilder: (context, index) {
-                final m = controller.medications[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: GestureDetector(
-                    onTap: () {
-                      if (m.id.isEmpty) return;
-                      Get.to(() => MedicationDetailScreen(medicationUuid: m.id));
-                    },
-                    child: McCard(
-                      padding: const EdgeInsets.all(18),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: AppColors.teal.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(Icons.medication_rounded,
-                                color: AppColors.teal, size: 28),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(m.name,
-                                    style: AppTextStyles.bodyBold.copyWith(fontSize: 16)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  m.subtitle.isNotEmpty
-                                      ? m.subtitle
-                                      : '${m.frequencyDisplay} · ${m.timing}',
-                                  style: AppTextStyles.caption,
-                                ),
-                                if (m.diseaseName.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.teal.withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      m.diseaseName,
-                                      style: AppTextStyles.caption.copyWith(
-                                        color: AppColors.teal,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert, color: AppColors.textTail),
-                            onSelected: (value) async {
-                              if (value == 'delete') {
-                                await _confirmDeleteCurrentMedication(m);
-                              }
-                            },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Text('Delete',
-                                    style: TextStyle(color: AppColors.statusRed)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          }),
-
-          // ── Timeline Tab ──────────────────────────────────────
-          Obx(() => Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: ['All', 'Diseases', 'Meds', 'Vaccines', 'QR']
-                        .asMap()
-                        .entries
-                        .map((e) {
-                      return McFilterChip(
-                        label: e.value,
-                        isSelected: controller.timelineFilter.value == e.key,
-                        onTap: () => controller.updateTimelineFilter(e.key),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: controller.isLoading.value 
-                  ? const Center(child: CircularProgressIndicator())
-                  : controller.timelineEvents.isEmpty
-                    ? _buildEmptyState(
-                        icon: Icons.timeline,
-                        title: "Timeline Empty",
-                        subtitle: "Your health journey events will appear here.",
-                        onTap: () => _showAddDiseaseSheet(context),
-                      )
-                    : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-                      itemCount: controller.timelineEvents.length,
-                      itemBuilder: (_, i) {
-                        final e = controller.timelineEvents[i];
-                        return TimelineEventRow(
-                          title: e.title,
-                          time: e.time,
-                          icon: _eventIcon(e.type),
-                          iconColor: Color(int.parse(e.colorCode.replaceAll('#', '0xFF'))),
-                          isLast: i == controller.timelineEvents.length - 1,
-                        );
-                      },
-                    ),
-              ),
-            ],
-          )),
         ],
       ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 90),
-        child: CustomFab(onTap: () => _showAddDiseaseSheet(context)),
+        child: _RecordsFab(onTap: () => _showAddSheet(context)),
       ),
     );
   }
@@ -390,13 +162,18 @@ class _RecordsScreenState extends State<RecordsScreen>
   Future<void> _confirmDeleteCurrentMedication(Medication med) async {
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Medication'),
         content: Text('Remove "${med.name}" from current medications?'),
         actions: [
-          TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Get.back(result: true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete',
+                style: TextStyle(color: AppColors.statusRed)),
           ),
         ],
       ),
@@ -410,65 +187,1089 @@ class _RecordsScreenState extends State<RecordsScreen>
         ok ? 'Success' : 'Error',
         ok ? 'Medication deleted' : 'Failed to delete medication',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: ok ? Colors.green : Colors.red,
+        backgroundColor: ok ? AppColors.teal : AppColors.statusRed,
         colorText: Colors.white,
       );
     }
   }
 
-  Future<bool?> _showDeleteConfirmation(BuildContext context, DiseaseResult d) async {
-    return await showDialog<bool>(
+  void _showAddSheet(BuildContext context) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgCardNavy,
-        title: Text('Delete Disease?', style: AppTextStyles.heading3),
-        content: Text('Are you sure you want to delete ${d.name}? This action cannot be undone.', 
-          style: AppTextStyles.body.copyWith(color: AppColors.textMuted)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('CANCEL', style: TextStyle(color: AppColors.textMuted)),
-          ),
-          TextButton(
-            onPressed: () {
-              controller.deleteDisease(d.uuid!);
-              Navigator.pop(context, true);
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (_) => _PremiumActionSheet(
+        title: 'Add to records',
+        subtitle: 'Build a complete, clinic-ready health history',
+        options: [
+          _SheetAction(
+            step: '01',
+            icon: Icons.monitor_heart_outlined,
+            label: 'Add Disease',
+            subtitle: 'Condition, status & diagnosis details',
+            color: AppColors.orange,
+            onTap: () {
+              Navigator.pop(context);
+              Get.to(() => AddDiseaseScreen());
             },
-            child: const Text('DELETE', style: TextStyle(color: AppColors.statusActive)),
+          ),
+          // _SheetAction(
+          //   step: '02',
+          //   icon: Icons.medication_outlined,
+          //   label: 'Add Medication',
+          //   subtitle: 'Current medicines, dosage & reminders',
+          //   color: AppColors.tealDark,
+          //   onTap: () {
+          //     Navigator.pop(context);
+          //     Get.to(() =>
+          //         const AddMedicationScreen(isCurrentMedication: true));
+          //   },
+          // ),
+          _SheetAction(
+            step: '03',
+            icon: Icons.document_scanner_outlined,
+            label: 'Scan Prescription (AI)',
+            subtitle: 'Extract medicines from a photo instantly',
+            color: AppColors.primary,
+            onTap: () {
+              Navigator.pop(context);
+              Get.to(() => AiPrescriptionScreen());
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Header ───────────────────────────────────────────────────────────────────
+
+class _RecordsHeader extends StatelessWidget {
+  final double topPad;
+  final String patientName;
+  final String patientRelation;
+  final String patientPhoto;
+  final bool isSelf;
+  final int diseaseCount;
+  final int medCount;
+  final int eventCount;
+  final int tabIndex;
+  final ValueChanged<int> onTabSelected;
+  final VoidCallback onSwitchMember;
+  final VoidCallback onAdd;
+
+  const _RecordsHeader({
+    required this.topPad,
+    required this.patientName,
+    required this.patientRelation,
+    required this.patientPhoto,
+    required this.isSelf,
+    required this.diseaseCount,
+    required this.medCount,
+    required this.eventCount,
+    required this.tabIndex,
+    required this.onTabSelected,
+    required this.onSwitchMember,
+    required this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = patientPhoto.isNotEmpty;
+    final initials = patientName.trim().isEmpty
+        ? '?'
+        : patientName
+            .trim()
+            .split(RegExp(r'\s+'))
+            .where((e) => e.isNotEmpty)
+            .take(2)
+            .map((e) => e[0].toUpperCase())
+            .join();
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(16, topPad + 10, 16, 16),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF0A5C45), Color(0xFF147A68), Color(0xFF1B9E8E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Image.asset(
+                  'assets/logo/ic_logo_icon.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Health Records',
+                      style: AppTextStyles.heading3.copyWith(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Viewing selected member',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(
+                        color: Colors.white.withValues(alpha: 0.78),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _HeaderIconBtn(
+                icon: Icons.add_rounded,
+                onTap: onAdd,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onSwitchMember,
+              borderRadius: BorderRadius.circular(16),
+              child: Ink(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    width: 1.4,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.2),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          width: 2,
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: hasPhoto
+                          ? Image.network(patientPhoto, fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Center(
+                                    child: Text(initials,
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800)),
+                                  ))
+                          : Center(
+                              child: Text(initials,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800)),
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            patientName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15.5,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.22),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  patientRelation.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFC857)
+                                      .withValues(alpha: 0.95),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  isSelf ? 'YOU · SELECTED' : 'SELECTED',
+                                  style: const TextStyle(
+                                    color: Color(0xFF0A5C45),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.swap_horiz_rounded,
+                        color: Colors.white.withValues(alpha: 0.9)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+            child: Row(
+              children: [
+                _Stat(value: '$diseaseCount', label: 'Diseases'),
+                _vDiv(),
+                _Stat(value: '$medCount', label: 'Medicines'),
+                _vDiv(),
+                _Stat(value: '$eventCount', label: 'Events'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                _TabPill(
+                  label: 'Diseases',
+                  selected: tabIndex == 0,
+                  onTap: () => onTabSelected(0),
+                ),
+                _TabPill(
+                  label: 'Medications',
+                  selected: tabIndex == 1,
+                  onTap: () => onTabSelected(1),
+                ),
+                _TabPill(
+                  label: 'Timeline',
+                  selected: tabIndex == 2,
+                  onTap: () => onTabSelected(2),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _showAddDiseaseSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.bgCardNavy,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
+  Widget _vDiv() => Container(
+        width: 1,
+        height: 28,
+        color: Colors.white.withValues(alpha: 0.2),
+      );
+}
+
+class _HeaderIconBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _HeaderIconBtn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.16),
+      borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(icon, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+class _MemberSwitcherSheet extends StatelessWidget {
+  final List<FamilyMember> members;
+  final String selectedPatientId;
+  final void Function(FamilyMember member, int index) onSelect;
+
+  const _MemberSwitcherSheet({
+    required this.members,
+    required this.selectedPatientId,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Select member',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Records will load for the selected person',
+            style: AppTextStyles.caption.copyWith(color: AppColors.textGray),
+          ),
+          const SizedBox(height: 14),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.5,
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: members.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (_, i) {
+                final m = members[i];
+                final id = m.patientId?.trim() ?? '';
+                final selected = id.isNotEmpty && id == selectedPatientId;
+                final relation =
+                    m.isSelf ? 'Me' : (m.relation?.name ?? 'Member');
+                final photo = m.profilePhoto?.trim() ?? '';
+                final name = m.fullName?.trim().isNotEmpty == true
+                    ? m.fullName!.trim()
+                    : (m.isSelf ? 'You' : 'Member');
+                final initials = name
+                    .split(RegExp(r'\s+'))
+                    .where((e) => e.isNotEmpty)
+                    .take(2)
+                    .map((e) => e[0].toUpperCase())
+                    .join();
+
+                return Material(
+                  color: selected
+                      ? const Color(0xFFE8F2EE)
+                      : const Color(0xFFF7FAF8),
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    onTap: () => onSelect(m, i),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: selected
+                              ? AppColors.tealDark
+                              : const Color(0xFFE3EBE7),
+                          width: selected ? 1.6 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.teal.withValues(alpha: 0.12),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: photo.isNotEmpty
+                                ? Image.network(photo, fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => Center(
+                                          child: Text(initials,
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                  color: AppColors.tealDark)),
+                                        ))
+                                : Center(
+                                    child: Text(initials,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.tealDark)),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                        color: AppColors.textDark)),
+                                const SizedBox(height: 2),
+                                Text(relation,
+                                    style: AppTextStyles.caption.copyWith(
+                                        color: AppColors.textMuted,
+                                        fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                          if (selected)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.tealDark,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                'SELECTED',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            )
+                          else
+                            const Icon(Icons.chevron_right_rounded,
+                                color: AppColors.textMuted),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final String value;
+  final String label;
+  const _Stat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.72),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabPill extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _TabPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: selected ? AppColors.tealDark : Colors.white.withValues(alpha: 0.85),
+              fontWeight: FontWeight.w800,
+              fontSize: 12.5,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+
+class _DiseasesTab extends StatelessWidget {
+  final RecordsController controller;
+  const _DiseasesTab({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (controller.isLoading.value && controller.diseases.isEmpty) {
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.teal),
+        );
+      }
+      if (controller.diseases.isEmpty) {
+        return _EmptyState(
+          icon: Icons.monitor_heart_outlined,
+          title: 'No conditions yet',
+          subtitle:
+              'Add diseases and health conditions to build a complete medical history.',
+          cta: 'Add Disease',
+          onTap: () => Get.to(() => AddDiseaseScreen()),
+        );
+      }
+      return RefreshIndicator(
+        color: AppColors.teal,
+        onRefresh: () => controller.fetchDiseases(),
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+          itemCount: controller.diseases.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(left: 4, right: 4, bottom: 12),
+                child: Row(
+                  children: [
+                    Text(
+                      'Your conditions',
+                      style: AppTextStyles.heading3.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${controller.diseases.length} recorded',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textGray,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            final d = controller.diseases[index - 1];
+            final heroTag = 'disease_${d.uuid}';
+            return Dismissible(
+              key: Key(d.uuid!),
+              direction: DismissDirection.endToStart,
+              confirmDismiss: (_) => _showDeleteConfirmation(context, d),
+              onDismissed: (_) {
+                // Must remove immediately so Dismissible leaves the tree.
+                controller.deleteDisease(d.uuid!);
+              },
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.statusRed.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(Icons.delete_outline_rounded,
+                    color: Colors.white, size: 26),
+              ),
+              child: DiseaseCard(
+                name: d.name ?? '',
+                status: d.status ?? '',
+                diagnosed: d.diagnosedOn ?? '',
+                doctor: d.category ?? 'Primary Care',
+                type: d.conditionType,
+                heroTag: heroTag,
+                onTap: () {
+                  Get.to(() => DiseaseDetailScreen(
+                        diseaseName: d.name ?? '',
+                        status: d.status ?? '',
+                        uuid: d.uuid!,
+                        heroTag: heroTag,
+                      ));
+                },
+              ),
+            );
+          },
+        ),
+      );
+    });
+  }
+}
+
+Future<bool?> _showDeleteConfirmation(
+  BuildContext context,
+  DiseaseResult d,
+) {
+  return showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: Colors.white,
+      title: Text('Delete disease?',
+          style: AppTextStyles.heading3.copyWith(fontWeight: FontWeight.w800)),
+      content: Text(
+        'Are you sure you want to delete ${d.name}? This cannot be undone.',
+        style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: Text('Cancel',
+              style: TextStyle(color: AppColors.textGray)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Delete',
+              style: TextStyle(color: AppColors.statusRed)),
+        ),
+      ],
+    ),
+  );
+}
+
+class _MedicationsTab extends StatelessWidget {
+  final RecordsController controller;
+  final Future<void> Function(Medication) onConfirmDelete;
+
+  const _MedicationsTab({
+    required this.controller,
+    required this.onConfirmDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (controller.isCurrentMedicationsLoading.value &&
+          controller.medications.isEmpty) {
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.teal),
+        );
+      }
+      if (controller.medications.isEmpty) {
+        return _EmptyState(
+          icon: Icons.medication_outlined,
+          title: 'No current medications',
+          subtitle:
+              'Add medicines you take regularly to track dosage, timing and reminders.',
+          cta: 'Add Medication',
+          onTap: () => Get.to(
+              () => const AddMedicationScreen(isCurrentMedication: true)),
+        );
+      }
+      return RefreshIndicator(
+        color: AppColors.teal,
+        onRefresh: () => controller.fetchCurrentMedications(),
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+          itemCount: controller.medications.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(left: 4, right: 4, bottom: 12),
+                child: Row(
+                  children: [
+                    Text(
+                      'Active medicines',
+                      style: AppTextStyles.heading3.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${controller.medications.length} active',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textGray,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            final m = controller.medications[index - 1];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _MedicationCard(
+                medication: m,
+                onTap: () {
+                  if (m.id.isEmpty) return;
+                  Get.to(() => MedicationDetailScreen(medicationUuid: m.id));
+                },
+                onDelete: () => onConfirmDelete(m),
+              ),
+            );
+          },
+        ),
+      );
+    });
+  }
+}
+
+class _MedicationCard extends StatelessWidget {
+  final Medication medication;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _MedicationCard({
+    required this.medication,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final m = medication;
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE3EBE7)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.tealDark.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F2EE),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.medication_rounded,
+                    color: AppColors.tealDark, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      m.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textDark,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      m.subtitle.isNotEmpty
+                          ? m.subtitle
+                          : '${m.frequencyDisplay} · ${m.timing}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textGray,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (m.diseaseName.isNotEmpty) ...[
+                      const SizedBox(height: 7),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.teal.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          m.diseaseName,
+                          style: const TextStyle(
+                            color: AppColors.tealDark,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert_rounded,
+                    color: AppColors.teal.withValues(alpha: 0.55)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                onSelected: (value) {
+                  if (value == 'delete') onDelete();
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Delete',
+                        style: TextStyle(color: AppColors.statusRed)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineTab extends StatelessWidget {
+  final RecordsController controller;
+  final IconData Function(String) eventIcon;
+  final VoidCallback onEmptyAdd;
+
+  const _TimelineTab({
+    required this.controller,
+    required this.eventIcon,
+    required this.onEmptyAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: ['All', 'Diseases', 'Meds', 'Vaccines', 'QR']
+                    .asMap()
+                    .entries
+                    .map((e) {
+                  return McFilterChip(
+                    label: e.value,
+                    isSelected: controller.timelineFilter.value == e.key,
+                    onTap: () => controller.updateTimelineFilter(e.key),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          Expanded(
+            child: controller.isLoading.value &&
+                    controller.timelineEvents.isEmpty
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.teal),
+                  )
+                : controller.timelineEvents.isEmpty
+                    ? _EmptyState(
+                        icon: Icons.timeline_rounded,
+                        title: 'Timeline is empty',
+                        subtitle:
+                            'Diseases, medicines and health events will appear here as a journey.',
+                        cta: 'Add Record',
+                        onTap: onEmptyAdd,
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+                        itemCount: controller.timelineEvents.length,
+                        itemBuilder: (_, i) {
+                          final e = controller.timelineEvents[i];
+                          return TimelineEventRow(
+                            title: e.title,
+                            time: e.time,
+                            icon: eventIcon(e.type),
+                            iconColor: Color(int.parse(
+                                e.colorCode.replaceAll('#', '0xFF'))),
+                            isLast: i == controller.timelineEvents.length - 1,
+                          );
+                        },
+                      ),
+          ),
+        ],
+      );
+    });
+  }
+}
+
+// ── Shared chrome ────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String cta;
+  final VoidCallback onTap;
+
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.cta,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 36),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Add New', style: AppTextStyles.heading2),
-            const SizedBox(height: 16),
-            _SheetOption(icon: Icons.sick, label: 'Add Disease', color: AppColors.statusActive, onTap: () { 
-              Navigator.pop(context);
-              Get.to(AddDiseaseScreen());
-            }),
-            const SizedBox(height: 10),
-            _SheetOption(icon: Icons.medication, label: 'Add Medication', color: AppColors.teal, onTap: () { 
-              Navigator.pop(context);
-              Get.to(() => const AddMedicationScreen(isCurrentMedication: true));
-            }),
-            const SizedBox(height: 10),
-            _SheetOption(icon: Icons.camera_alt, label: 'Scan Prescription (AI)', color: AppColors.primary, onTap: () { 
-              Navigator.pop(context);
-              Get.to(AiPrescriptionScreen());
-            }),
-            const SizedBox(height: 20),
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: AppColors.teal.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 44, color: AppColors.tealDark),
+            ),
+            const SizedBox(height: 22),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.heading3.copyWith(
+                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textGray,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: onTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.tealDark,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                ),
+                child: Text(
+                  cta,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -476,51 +1277,168 @@ class _RecordsScreenState extends State<RecordsScreen>
   }
 }
 
-class _SheetOption extends StatelessWidget {
+class _RecordsFab extends StatelessWidget {
+  final VoidCallback onTap;
+  const _RecordsFab({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.tealDark,
+      borderRadius: BorderRadius.circular(18),
+      elevation: 6,
+      shadowColor: AppColors.tealDark.withValues(alpha: 0.35),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: const SizedBox(
+          width: 56,
+          height: 56,
+          child: Icon(Icons.add_rounded, color: Colors.white, size: 28),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetAction {
+  final String step;
   final IconData icon;
   final String label;
+  final String subtitle;
   final Color color;
   final VoidCallback onTap;
-  const _SheetOption({required this.icon, required this.label, required this.color, required this.onTap});
-  Widget _buildEmptyState({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
+
+  const _SheetAction({
+    required this.step,
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+}
+
+class _PremiumActionSheet extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final List<_SheetAction> options;
+
+  const _PremiumActionSheet({
+    required this.title,
+    required this.subtitle,
+    required this.options,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF2F6F4),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        top: false,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(18, 12, 14, 18),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xFF0A5C45),
+                    Color(0xFF147A68),
+                    Color(0xFF1B9E8E)
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(28)),
               ),
-              child: Icon(icon, size: 80, color: AppColors.primary),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        child: Image.asset(
+                          'assets/logo/ic_logo_icon.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 20,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.78),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Material(
+                        color: Colors.white.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: () => Navigator.pop(context),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: Icon(Icons.close_rounded,
+                                color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: AppTextStyles.heading2.copyWith(color: AppColors.primary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              subtitle,
-              style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: 200,
-              child: CustomPrimaryButton(
-                text: "Add Now",
-                onTap: onTap,
-                color: AppColors.primary,
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 12 + bottom),
+              child: Column(
+                children: [
+                  for (int i = 0; i < options.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 10),
+                    _PremiumSheetOption(action: options[i]),
+                  ],
+                ],
               ),
             ),
           ],
@@ -528,24 +1446,107 @@ class _SheetOption extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PremiumSheetOption extends StatelessWidget {
+  final _SheetAction action;
+  const _PremiumSheetOption({required this.action});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(width: 14),
-            Text(label, style: AppTextStyles.bodyBold),
-          ],
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      elevation: 0,
+      child: InkWell(
+        onTap: action.onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE3EBE7)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.tealDark.withValues(alpha: 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: action.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(action.icon, color: action.color, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            action.label,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15.5,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F7F5),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            action.step,
+                            style: TextStyle(
+                              color: action.color,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      action.subtitle,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textGray,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F7F5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 16,
+                  color: action.color.withValues(alpha: 0.85),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -108,6 +108,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 controller: controller,
                 pageController: _passportPage,
                 onAdd: _addMember,
+                onSelectMember: (index) async {
+                  if (_passportPage.hasClients) {
+                    await _passportPage.animateToPage(
+                      index,
+                      duration: 280.ms,
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
+                  await controller.openRecordsForSelected(index: index);
+                },
               ),
             ),
             SliverToBoxAdapter(
@@ -248,11 +258,13 @@ class _PassportSection extends StatelessWidget {
   final HomeController controller;
   final PageController pageController;
   final VoidCallback onAdd;
+  final ValueChanged<int> onSelectMember;
 
   const _PassportSection({
     required this.controller,
     required this.pageController,
     required this.onAdd,
+    required this.onSelectMember,
   });
 
   @override
@@ -266,20 +278,20 @@ class _PassportSection extends StatelessWidget {
             children: [
               Text('Health Passport', style: AppTextStyles.heading3),
               const Spacer(),
-              GestureDetector(
-                onTap: onAdd,
-                child: Row(
-                  children: [
-                    Icon(Icons.person_add_alt_1_rounded,
-                        size: 16, color: AppColors.teal),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Add member',
-                      style: AppTextStyles.tealLabel.copyWith(fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
+              // GestureDetector(
+              //   onTap: onAdd,
+              //   child: Row(
+              //     children: [
+              //       Icon(Icons.person_add_alt_1_rounded,
+              //           size: 16, color: AppColors.teal),
+              //       const SizedBox(width: 4),
+              //       Text(
+              //         'Add member',
+              //         style: AppTextStyles.tealLabel.copyWith(fontSize: 12),
+              //       ),
+              //     ],
+              //   ),
+              // ),
             ],
           ),
         ),
@@ -311,12 +323,14 @@ class _PassportSection extends StatelessWidget {
                     }
                     return Transform.scale(scale: scale, child: child);
                   },
-                  child: _PassportCard(
+                  child: Obx(() => _PassportCard(
                     patient: controller.patients[index],
                     initials: controller.getInitials(
                       controller.patients[index].fullName ?? '',
                     ),
-                  ),
+                    isSelected: controller.activePatientIndex.value == index,
+                    onTap: () => onSelectMember(index),
+                  )),
                 );
               },
             );
@@ -402,8 +416,15 @@ class _EmptyPassport extends StatelessWidget {
 class _PassportCard extends StatelessWidget {
   final FamilyMember patient;
   final String initials;
+  final bool isSelected;
+  final VoidCallback? onTap;
 
-  const _PassportCard({required this.patient, required this.initials});
+  const _PassportCard({
+    required this.patient,
+    required this.initials,
+    this.isSelected = false,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -416,11 +437,20 @@ class _PassportCard extends StatelessWidget {
         : '--';
     final meds = patient.medical?.currentMedications?.length ?? 0;
     final diseases = patient.medical?.chronicDisease == true ? 1 : 0;
-    final relation = patient.relation?.name ?? 'Member';
+    final isMe = patient.isSelf;
+    // Me from profile; others keep API relation (Son / Daughter / …) like before.
+    final relation = isMe
+        ? 'Me'
+        : (patient.relation?.name ?? 'Member');
+    final photo = patient.profilePhoto?.trim();
+    final hasPhoto = photo != null && photo.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      child: Container(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
@@ -484,18 +514,35 @@ class _PassportCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.white.withValues(alpha: 0.18),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.35)),
                           ),
-                          child: Center(
-                            child: Text(
-                              initials,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: hasPhoto
+                              ? Image.network(
+                                  photo,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Center(
+                                    child: Text(
+                                      initials,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    initials,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -503,7 +550,7 @@ class _PassportCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                patient.fullName ?? 'Guest',
+                                patient.fullName ?? (isMe ? 'You' : 'Guest'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: AppTextStyles.heading2.copyWith(
@@ -513,24 +560,57 @@ class _PassportCard extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 9,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.16),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  relation.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.6,
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 9,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isMe
+                                          ? Colors.white.withValues(alpha: 0.28)
+                                          : Colors.white.withValues(alpha: 0.16),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: isMe
+                                          ? Border.all(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.45))
+                                          : null,
+                                    ),
+                                    child: Text(
+                                      relation.toUpperCase(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.6,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  if (isSelected)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 9,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFC857),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: const Text(
+                                        'SELECTED',
+                                        style: TextStyle(
+                                          color: Color(0xFF0A5C45),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.4,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ],
                           ),
@@ -554,7 +634,8 @@ class _PassportCard extends StatelessWidget {
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 8),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(16),
@@ -565,10 +646,15 @@ class _PassportCard extends StatelessWidget {
                           child: Row(
                             children: [
                               _PassportMetric(label: 'Blood', value: blood),
-                              _PassportMetric(label: 'Age', value: age == '--' ? '--' : '$age yrs'),
+                              _PassportMetric(
+                                  label: 'Age',
+                                  value: age == '--' ? '--' : '$age yrs'),
                               _PassportMetric(label: 'Gender', value: gender),
                               _PassportMetric(label: 'Meds', value: '$meds'),
-                              _PassportMetric(label: 'Conditions', value: '$diseases', last: true),
+                              _PassportMetric(
+                                  label: 'Conditions',
+                                  value: '$diseases',
+                                  last: true),
                             ],
                           ),
                         ),
@@ -584,7 +670,9 @@ class _PassportCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'Swipe to switch family member',
+                          isSelected
+                              ? 'Tap card → open records'
+                              : 'Tap to select & open records',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.55),
                             fontSize: 11,
@@ -612,6 +700,7 @@ class _PassportCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

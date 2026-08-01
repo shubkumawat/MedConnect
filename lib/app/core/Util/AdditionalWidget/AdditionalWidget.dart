@@ -507,6 +507,7 @@ class McDropdown<T> extends StatelessWidget {
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
+          barrierColor: Colors.black.withValues(alpha: 0.45),
           builder: (context) => _DropdownBottomSheet<T>(
             title: hint,
             items: items,
@@ -519,11 +520,14 @@ class McDropdown<T> extends StatelessWidget {
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.bgCardNavy,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor ?? AppColors.teal, width: 1.0),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: borderColor ?? const Color(0xFFE3EBE7),
+            width: 1.0,
+          ),
         ),
         child: Row(
           children: [
@@ -536,15 +540,33 @@ class McDropdown<T> extends StatelessWidget {
                   ? selectedItemBuilder!(value!)
                   : Text(
                       value != null
-                          ? (itemLabel != null ? itemLabel!(value!) : value.toString())
+                          ? (itemLabel != null
+                              ? itemLabel!(value!)
+                              : value.toString())
                           : hint,
                       style: TextStyle(
-                        color: value != null ? AppColors.primary : AppColors.textMuted,
+                        color: value != null
+                            ? AppColors.textDark
+                            : AppColors.textMuted,
                         fontSize: 15,
+                        fontWeight:
+                            value != null ? FontWeight.w700 : FontWeight.w500,
                       ),
                     ),
             ),
-            const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textMuted),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F7F5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: AppColors.tealDark,
+                size: 20,
+              ),
+            ),
           ],
         ),
       ),
@@ -579,6 +601,12 @@ class _DropdownBottomSheetState<T> extends State<_DropdownBottomSheet<T>> {
     filteredItems = widget.items;
   }
 
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
   void _filterItems(String query) {
     setState(() {
       if (query.isEmpty) {
@@ -594,82 +622,236 @@ class _DropdownBottomSheetState<T> extends State<_DropdownBottomSheet<T>> {
     });
   }
 
+  String _labelOf(T item) =>
+      widget.itemLabel != null ? widget.itemLabel!(item) : item.toString();
+
   @override
   Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+    final showSearch = widget.items.length > 6;
+
     return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
+      height: MediaQuery.of(context).size.height * 0.72,
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        color: Color(0xFFF2F6F4),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         children: [
-          const SizedBox(height: 12),
           Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(18, 12, 14, 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF0A5C45),
+                  Color(0xFF147A68),
+                  Color(0xFF1B9E8E)
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                Text(widget.title, style: AppTextStyles.heading3),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.checklist_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                            ),
+                          ),
+                          Text(
+                            '${widget.items.length} options · tap to select',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Material(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: const SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: Icon(Icons.close_rounded,
+                              color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: TextField(
-              controller: searchController,
-              onChanged: _filterItems,
-              decoration: InputDecoration(
-                hintText: 'Search...',
-                prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
-                filled: true,
-                fillColor: AppColors.bgNavy,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+          if (showSearch)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: TextField(
+                controller: searchController,
+                onChanged: _filterItems,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textDark,
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                decoration: InputDecoration(
+                  hintText: 'Search ${widget.title.toLowerCase()}…',
+                  hintStyle: TextStyle(
+                    color: AppColors.textGray.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  prefixIcon: const Icon(Icons.search_rounded,
+                      color: AppColors.tealDark),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE3EBE7)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE3EBE7)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                        color: AppColors.tealDark, width: 1.2),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                ),
               ),
             ),
-          ),
           Expanded(
-            child: ListView.builder(
-              itemCount: filteredItems.length,
-              itemBuilder: (context, index) {
-                final item = filteredItems[index];
-                final label = widget.itemLabel != null
-                    ? widget.itemLabel!(item)
-                    : item.toString();
-                final isSelected = widget.selectedValue == item;
-
-                return ListTile(
-                  title: Text(
-                    label,
-                    style: TextStyle(
-                      color: isSelected ? AppColors.teal : AppColors.textTail,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            child: filteredItems.isEmpty
+                ? Center(
+                    child: Text(
+                      'No matches found',
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.textGray,
+                      ),
                     ),
+                  )
+                : ListView.separated(
+                    padding: EdgeInsets.fromLTRB(16, 14, 16, 16 + bottom),
+                    itemCount: filteredItems.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final item = filteredItems[index];
+                      final label = _labelOf(item);
+                      final isSelected = widget.selectedValue == item;
+
+                      return Material(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          onTap: () => Navigator.pop(context, item),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 13),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.tealDark
+                                        .withValues(alpha: 0.45)
+                                    : const Color(0xFFE3EBE7),
+                              ),
+                              color: isSelected
+                                  ? AppColors.teal.withValues(alpha: 0.06)
+                                  : Colors.white,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppColors.tealDark
+                                        : const Color(0xFFF3F7F5),
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  child: Icon(
+                                    isSelected
+                                        ? Icons.check_rounded
+                                        : Icons.circle_outlined,
+                                    size: 18,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : AppColors.textGray,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      color: AppColors.textDark,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                      fontSize: 14.5,
+                                    ),
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Text(
+                                    'Selected',
+                                    style: TextStyle(
+                                      color: AppColors.tealDark
+                                          .withValues(alpha: 0.9),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11.5,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  trailing: isSelected
-                      ? const Icon(Icons.check_circle, color: AppColors.teal)
-                      : null,
-                  onTap: () => Navigator.pop(context, item),
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -830,23 +1012,34 @@ class McFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ac = activeColor ?? AppColors.teal;
+    final ac = activeColor ?? AppColors.tealDark;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
         margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? ac : AppColors.bgCardNavy,
+          color: isSelected ? ac : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? ac : AppColors.border,
+            color: isSelected ? ac : const Color(0xFFE3EBE7),
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: ac.withValues(alpha: 0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: AppTextStyles.captionBold.copyWith(
             color: isSelected ? Colors.white : AppColors.textMuted,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -964,38 +1157,67 @@ class TimelineEventRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: iconColor, size: 18),
-            ),
-            if (!isLast)
-              Container(width: 2, height: 40, color: AppColors.border),
-          ],
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
             children: [
-              Text(title,
-                  style: AppTextStyles.body.copyWith(color: AppColors.textTail)),
-              const SizedBox(height: 3),
-              Text(time, style: AppTextStyles.caption),
-              SizedBox(height: isLast ? 0 : 20),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: iconColor.withValues(alpha: 0.22)),
+                ),
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+              if (!isLast)
+                Container(
+                  width: 2,
+                  height: 36,
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  color: const Color(0xFFE3EBE7),
+                ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE3EBE7)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14.5,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    time,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textGray,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

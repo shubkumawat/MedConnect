@@ -57,6 +57,9 @@ class FamilyMember {
   bool? fullAccess;
   bool? emergencyOnly;
 
+  /// True when this card is the logged-in user's own profile.
+  bool isSelf = false;
+
   FamilyMember({
     this.patientId,
     this.fullName,
@@ -80,9 +83,29 @@ class FamilyMember {
     this.vitals,
     this.fullAccess,
     this.emergencyOnly,
+    this.isSelf = false,
   });
 
+  /// Build "Me" passport card from `patients/profile/` response.
+  factory FamilyMember.fromProfileJson(Map<String, dynamic> json) {
+    final member = FamilyMember.fromJson(json);
+    member.isSelf = true;
+    member.relation = Relation(name: 'Me', code: 'self');
+    member.patientId = json['patient_id']?.toString() ??
+        json['id']?.toString() ??
+        member.patientId;
+    member.fullName = json['full_name']?.toString() ??
+        json['name']?.toString() ??
+        member.fullName;
+    member.profilePhoto = json['profile_photo']?.toString() ??
+        json['profile_picture']?.toString() ??
+        json['photo']?.toString() ??
+        member.profilePhoto;
+    return member;
+  }
+
   FamilyMember.fromJson(Map<String, dynamic> json) {
+    isSelf = false;
     patientId = json['patient_id'];
     fullName = json['full_name'];
     profilePhoto = json['profile_photo'];
