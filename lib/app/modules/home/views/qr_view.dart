@@ -110,7 +110,7 @@ class QrScreen extends StatelessWidget {
                     _InfoCard(
                       title: 'How to use',
                       body:
-                          'Show this QR to your doctor or clinic. It stays valid for ${QrController.qrExpiryMinutes} minutes, then refresh for a new code.',
+                          'Show this QR to your doctor or clinic. It stays valid for ${controller.activeExpiryMinutes} minutes, then tap New QR for a fresh code.',
                     ),
                     const SizedBox(height: 10),
                     _MetaRow(

@@ -21,7 +21,7 @@ class QrController extends GetxController {
   final String? profilePhoto;
   final String? initials;
 
-  /// Health QR is always valid for 10 minutes.
+  /// Default QR validity — also overridden by API `expiry_minutes`.
   static const int qrExpiryMinutes = 10;
 
   QrController({
@@ -40,6 +40,11 @@ class QrController extends GetxController {
 
   bool get isExpired => secondsLeft.value <= 0;
 
+  int get activeExpiryMinutes =>
+      qrData.value?.qr?.expiryMinutes ??
+      qrData.value?.options?.defaultExpiryMinutes ??
+      qrExpiryMinutes;
+
   Color get timerColor {
     if (isExpired) return const Color(0xFFE03A3A);
     if (secondsLeft.value <= 60) return const Color(0xFFE03A3A);
@@ -48,7 +53,7 @@ class QrController extends GetxController {
   }
 
   double get progress {
-    final total = qrExpiryMinutes * 60;
+    final total = activeExpiryMinutes * 60;
     if (total <= 0) return 0;
     return (secondsLeft.value / total).clamp(0.0, 1.0);
   }
@@ -62,7 +67,7 @@ class QrController extends GetxController {
   String get timerSubtitle {
     if (isExpired) return 'QR expired — generate a new one';
     if (secondsLeft.value <= 60) return 'Expiring soon';
-    return 'Valid for $qrExpiryMinutes minutes';
+    return 'Valid for $activeExpiryMinutes minutes';
   }
 
   String get lastScannedLabel {
@@ -91,43 +96,22 @@ class QrController extends GetxController {
     super.onClose();
   }
 
+  /// Opens screen → call generate API for a fresh QR.
   Future<void> loadQr() async {
     try {
       isLoading.value = true;
-      final token =
-          await AppSharedPreferences().getString(AppSharedPreferences.token);
-
-      final response = await ApiProvider().requestGetForApi(
-        Get.context,
-        WebApiConstant.API_URL_QR_CURRENT,
-        {
-          if (patientId != null && patientId!.trim().isNotEmpty)
-            'patient_id': patientId!.trim(),
-        },
-        token ?? '',
-      );
-
-      if (response != null &&
-          response.statusCode == 200 &&
-          response.data is Map &&
-          response.data['error'] != true) {
-        _applyResponse(Map<String, dynamic>.from(response.data));
-        // Always refresh to a fresh 10‑minute QR if current is expired/missing.
-        if (isExpired || qrData.value?.qr?.resolvedImageUrl == null) {
-          await regenerateQr(silent: true);
-        }
-      } else {
-        await regenerateQr(silent: true);
-      }
-    } catch (e) {
-      debugPrint('QR load error: $e');
-      await regenerateQr(silent: true);
+      await generateQr(silent: true);
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> regenerateQr({bool silent = false}) async {
+  /// "New QR" button — same generate API.
+  Future<void> regenerateQr({bool silent = false}) =>
+      generateQr(silent: silent);
+
+  /// POST /api/v1/qr-codes/generate/
+  Future<void> generateQr({bool silent = false}) async {
     try {
       if (!silent) isRegenerating.value = true;
       final token =
@@ -136,36 +120,41 @@ class QrController extends GetxController {
       final body = <String, dynamic>{
         'expiry_minutes': qrExpiryMinutes,
       };
-      if (patientId != null && patientId!.isNotEmpty) {
-        body['patient_id'] = patientId;
+      if (patientId != null && patientId!.trim().isNotEmpty) {
+        body['patient_id'] = patientId!.trim();
       }
 
       final response = await ApiProvider().requestPostForApi(
         Get.context,
-        WebApiConstant.API_URL_QR_REGENERATE,
+        '${WebApiConstant.API_URL_QR_CODES}generate/',
         body,
-        token ?? '',
+        token,
       );
 
       if (response != null &&
+          (response.statusCode == 200 || response.statusCode == 201) &&
           response.data is Map &&
           response.data['error'] != true) {
-        _applyResponse(Map<String, dynamic>.from(response.data));
+        _applyResponse(Map<String, dynamic>.from(response.data as Map));
         if (!silent) {
           Fluttertoast.showToast(
             msg: response.data['message']?.toString() ??
-                'New QR generated (valid 10 min)',
+                'QR generated successfully',
           );
         }
       } else {
         final msg = response?.data is Map
             ? response!.data['message']?.toString()
             : null;
-        Fluttertoast.showToast(msg: msg ?? 'Failed to regenerate QR');
+        if (!silent) {
+          Fluttertoast.showToast(msg: msg ?? 'Failed to generate QR');
+        }
       }
     } catch (e) {
-      debugPrint('QR regenerate error: $e');
-      Fluttertoast.showToast(msg: 'Failed to regenerate QR');
+      debugPrint('QR generate error: $e');
+      if (!silent) {
+        Fluttertoast.showToast(msg: 'Failed to generate QR');
+      }
     } finally {
       isRegenerating.value = false;
     }
@@ -183,8 +172,8 @@ class QrController extends GetxController {
   void _startCountdown(DateTime? expiresAt) {
     _timer?.cancel();
     if (expiresAt == null) {
-      // Fallback: 10 minutes from now if API omitted expiry.
-      final fallback = DateTime.now().add(const Duration(minutes: qrExpiryMinutes));
+      final fallback =
+          DateTime.now().add(Duration(minutes: activeExpiryMinutes));
       _startCountdown(fallback);
       return;
     }
@@ -224,7 +213,7 @@ class QrController extends GetxController {
       await Share.shareXFiles(
         [XFile(file.path)],
         text:
-            "${patientName}'s HealAura Health QR — valid for $qrExpiryMinutes minutes",
+            "${patientName}'s HealAura Health QR — valid for $activeExpiryMinutes minutes",
       );
     } catch (e) {
       debugPrint('Share QR error: $e');

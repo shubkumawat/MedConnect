@@ -152,10 +152,7 @@ class RecordsController extends GetxController {
 
   Future<void> _bootstrapRecords() async {
     await syncSelectedPatientFromHome();
-    await Future.wait([
-      fetchDiseases(),
-      fetchGlobalTimeline(),
-    ]);
+    await refreshForSelectedPatient();
   }
 
   Future<void> fetchDiseaseMeta() async {
@@ -924,29 +921,41 @@ class RecordsController extends GetxController {
   }
 
   Future<void> exportDiseasePdf(String uuid) async {
-    if (selectedDisease.value == null) {
-      Fluttertoast.showToast(msg: "No disease data available to export");
-      return;
-    }
-
     try {
       isLoading.value = true;
+      final cleanUuid = uuid.trim();
 
-      // Ensure medications are loaded for PDF (active only)
-      if (diseaseMedications.isEmpty) {
-        await fetchDiseaseMedications(uuid);
+      // Always ensure disease + meds are ready before opening preview
+      // (first visit often has empty lists because tabs weren't opened yet).
+      if (selectedDisease.value == null ||
+          selectedDisease.value?.uuid != cleanUuid) {
+        await fetchDiseaseDetail(cleanUuid);
+      }
+      await Future.wait([
+        fetchDiseaseMedications(cleanUuid),
+        fetchDiseaseTimeline(cleanUuid),
+      ]);
+
+      if (selectedDisease.value == null) {
+        Fluttertoast.showToast(msg: "No disease data available to export");
+        return;
       }
 
-      // Ensure ProfileController is available for the PDF report
       if (!Get.isRegistered<ProfileController>()) {
         Get.put(ProfileController());
       }
+      final profile = Get.find<ProfileController>();
+      final ctx = Get.context;
+      // Wait for patient profile so PDF patient section isn't blank on first open.
+      if (ctx != null && profile.fullNameCtrl.text.trim().isEmpty) {
+        await profile.getPatientProfileAPI(ctx);
+      }
 
-      Get.to(() => DiseasePdfPreviewScreen(
-        disease: selectedDisease.value!,
-        medications: diseaseMedications.toList(),
-        timeline: diseaseTimeline.toList(),
-      ));
+      await Get.to(() => DiseasePdfPreviewScreen(
+            disease: selectedDisease.value!,
+            medications: List<Medication>.from(diseaseMedications),
+            timeline: List<TimelineEvent>.from(diseaseTimeline),
+          ));
     } catch (e) {
       debugPrint("Error generating PDF: $e");
       Fluttertoast.showToast(msg: "Error generating PDF");

@@ -12,6 +12,7 @@ import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../family/controllers/family_member_controller.dart';
 import '../../family/views/add_family_member_screen.dart';
 import '../controllers/home_controller.dart';
+import 'bmi_calculator_screen.dart';
 import 'notifications_screen.dart';
 import 'qr_view.dart';
 import 'video_series_screen.dart';
@@ -31,16 +32,25 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final HomeController controller;
   late final PageController _passportPage;
+  Worker? _passportIndexWorker;
 
   @override
   void initState() {
     super.initState();
     controller = Get.put(HomeController());
     _passportPage = PageController(viewportFraction: 0.88);
+    // Keep PageView on the selected passport card (restore / programmatic select).
+    _passportIndexWorker = ever<int>(controller.activePatientIndex, (i) {
+      if (!_passportPage.hasClients) return;
+      final page = _passportPage.page?.round();
+      if (page == i) return;
+      _passportPage.jumpToPage(i);
+    });
   }
 
   @override
   void dispose() {
+    _passportIndexWorker?.dispose();
     _passportPage.dispose();
     super.dispose();
   }
@@ -129,6 +139,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     _TodaysCare(controller: controller)
                         .animate()
                         .fadeIn(delay: 120.ms, duration: 420.ms)
+                        .slideY(begin: 0.06, end: 0),
+                    const SizedBox(height: 18),
+                    _BmiCalculatorCard(
+                      onTap: () => Get.to(() => const BmiCalculatorScreen()),
+                    )
+                        .animate()
+                        .fadeIn(delay: 150.ms, duration: 420.ms)
                         .slideY(begin: 0.06, end: 0),
                     const SizedBox(height: 22),
                     _QuickJump(
@@ -1058,6 +1075,95 @@ class _JumpTile extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   fontSize: 11,
                   color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BMI CALCULATOR ENTRY
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _BmiCalculatorCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _BmiCalculatorCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE3EBE7)),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.teal.withValues(alpha: 0.08),
+                Colors.white,
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.tealDark.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.monitor_weight_outlined,
+                    color: AppColors.tealDark, size: 26),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'BMI Calculator',
+                      style: AppTextStyles.heading3.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Check your body mass index in seconds',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textGray,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.tealDark,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Calculate',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12.5,
+                  ),
                 ),
               ),
             ],

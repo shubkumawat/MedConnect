@@ -118,14 +118,18 @@ class QrInfo {
     );
   }
 
-  /// Resolve localhost media URLs to production host.
+  /// Media URL for Image.network — keep http (cleartext) as returned by API.
   String? get resolvedImageUrl {
-    if (imageUrl == null || imageUrl!.isEmpty) return null;
-    var url = imageUrl!;
+    if (imageUrl == null || imageUrl!.trim().isEmpty) return null;
+    var url = imageUrl!.trim();
+    if (url.startsWith('//')) url = 'http:$url';
+    if (url.startsWith('/')) {
+      url = 'http://medconnect.airainnovations.com$url';
+    }
     if (url.contains('localhost') || url.contains('127.0.0.1')) {
       final uri = Uri.tryParse(url);
       if (uri != null) {
-        url = 'https://medconnect.airainnovations.com${uri.path}';
+        url = 'http://medconnect.airainnovations.com${uri.path}';
         if (uri.hasQuery) url = '$url?${uri.query}';
       }
     }

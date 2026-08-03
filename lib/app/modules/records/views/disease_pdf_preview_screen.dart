@@ -33,6 +33,7 @@ class _DiseasePdfPreviewScreenState extends State<DiseasePdfPreviewScreen> {
   late ProfileController profileCtrl;
   bool _isPrinting = false;
   bool _isSharing = false;
+  bool _profileReady = false;
   final GlobalKey _receiptKey = GlobalKey();
 
   @override
@@ -41,6 +42,16 @@ class _DiseasePdfPreviewScreenState extends State<DiseasePdfPreviewScreen> {
     profileCtrl = Get.isRegistered<ProfileController>()
         ? Get.find<ProfileController>()
         : Get.put(ProfileController());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+  }
+
+  Future<void> _loadProfile() async {
+    // First open often lands before ProfileController finished fetching.
+    if (profileCtrl.fullNameCtrl.text.trim().isEmpty && mounted) {
+      await profileCtrl.getPatientProfileAPI(context);
+    }
+    if (!mounted) return;
+    setState(() => _profileReady = true);
   }
 
   String get _patientName {
@@ -159,7 +170,7 @@ class _DiseasePdfPreviewScreenState extends State<DiseasePdfPreviewScreen> {
     final top = MediaQuery.of(context).padding.top;
     final bottom = MediaQuery.of(context).padding.bottom;
     final d = widget.disease;
-    final busy = _isPrinting || _isSharing;
+    final busy = !_profileReady || _isPrinting || _isSharing;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F6F4),
@@ -171,37 +182,41 @@ class _DiseasePdfPreviewScreenState extends State<DiseasePdfPreviewScreen> {
             onBack: () => Get.back(),
           ),
           Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-              child: Column(
-                children: [
-                  _TipBanner(),
-                  const SizedBox(height: 12),
-                  RepaintBoundary(
-                    key: _receiptKey,
-                    child: _ReportDocument(
-                      disease: d,
-                      medications: widget.medications,
-                      patientName: _patientName,
-                      patientId: _patientId,
-                      reportId: _reportId,
-                      gender: profileCtrl.selectedGender.value.isEmpty
-                          ? '—'
-                          : profileCtrl.selectedGender.value,
-                      dob: profileCtrl.dobCtrl.text.isEmpty
-                          ? '—'
-                          : profileCtrl.dobCtrl.text,
-                      bloodGroup: profileCtrl.bloodGroup.value.isEmpty
-                          ? '—'
-                          : profileCtrl.bloodGroup.value,
-                      statusColor: _statusColor(d.status),
-                      formatDate: _fmt,
+            child: !_profileReady
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.teal),
+                  )
+                : SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                    child: Column(
+                      children: [
+                        _TipBanner(),
+                        const SizedBox(height: 12),
+                        RepaintBoundary(
+                          key: _receiptKey,
+                          child: _ReportDocument(
+                            disease: d,
+                            medications: widget.medications,
+                            patientName: _patientName,
+                            patientId: _patientId,
+                            reportId: _reportId,
+                            gender: profileCtrl.selectedGender.value.isEmpty
+                                ? '—'
+                                : profileCtrl.selectedGender.value,
+                            dob: profileCtrl.dobCtrl.text.isEmpty
+                                ? '—'
+                                : profileCtrl.dobCtrl.text,
+                            bloodGroup: profileCtrl.bloodGroup.value.isEmpty
+                                ? '—'
+                                : profileCtrl.bloodGroup.value,
+                            statusColor: _statusColor(d.status),
+                            formatDate: _fmt,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
           ),
           Container(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottom),

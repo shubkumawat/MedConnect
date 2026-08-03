@@ -157,18 +157,43 @@ class HomeController extends GetxController {
     } else {
       activePatientIndex.value = 0;
     }
-    final id = selectedPatientId ?? '';
+    final member = selectedPatient;
+    final id = member?.patientId?.trim() ?? '';
     if (id.isNotEmpty) {
       await StorageService().setString(StorageService.selectedPatientId, id);
     }
+    // Keep Records in sync with the passport card that is selected.
+    _syncRecordsSelection(member, refreshIfChanged: true);
   }
 
   void changePatient(int index) {
     if (patients.isEmpty) return;
     final i = index.clamp(0, patients.length - 1);
     activePatientIndex.value = i;
-    final id = patients[i].patientId?.trim() ?? '';
+    final member = patients[i];
+    final id = member.patientId?.trim() ?? '';
     StorageService().setString(StorageService.selectedPatientId, id);
+    // Scrolling a passport card selects that member for Records.
+    _syncRecordsSelection(member, refreshIfChanged: true);
+  }
+
+  void _syncRecordsSelection(
+    FamilyMember? member, {
+    bool refreshIfChanged = false,
+  }) {
+    if (member == null || !Get.isRegistered<RecordsController>()) return;
+    final records = Get.find<RecordsController>();
+    final nextId = member.patientId?.trim() ?? '';
+    final changed = records.selectedPatientId.value.trim() != nextId;
+    records.applySelectedMember(member);
+    if (!refreshIfChanged || !changed) return;
+
+    // Refresh immediately if Records tab is open; otherwise next open will refresh.
+    final onRecords = Get.isRegistered<DashboardController>() &&
+        Get.find<DashboardController>().currentIndex.value == 1;
+    if (onRecords) {
+      records.refreshForSelectedPatient();
+    }
   }
 
   void selectPatientById(String? patientId) {
