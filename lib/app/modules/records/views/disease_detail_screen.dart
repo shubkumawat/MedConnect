@@ -1,9 +1,9 @@
-import 'add_timeline_event_screen.dart';
 import 'package:healaura/app/modules/records/views/ai_prescription_screen.dart';
 import 'add_disease_screen.dart';
 import 'add_disease_document_screen.dart';
 import 'add_medication_screen.dart';
 import 'document_viewer_screen.dart';
+import 'medication_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
@@ -77,6 +77,8 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
     } else if (_tabCtrl.index == 2) {
       controller.fetchDiseaseDocuments(widget.uuid);
       controller.fetchReportTypesMeta();
+    } else if (_tabCtrl.index == 3) {
+      controller.fetchDiseaseTimeline(widget.uuid);
     }
   }
 
@@ -169,17 +171,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
                   label: 'Upload',
                   onTap: _openUploadDocument,
                 )
-              : _tabCtrl.index == 3
-                  ? _Fab(
-                      icon: Icons.add_task_rounded,
-                      label: 'Add Event',
-                      onTap: () async {
-                        await Get.to(() =>
-                            AddTimelineEventScreen(diseaseUuid: widget.uuid));
-                        await controller.fetchDiseaseDetail(widget.uuid);
-                      },
-                    )
-                  : null,
+              : null,
     );
   }
 
@@ -214,75 +206,104 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
             );
           }
           final med = controller.diseaseMedications[i - 1];
+          final next = med.nextDoseTime;
+          final times = med.reminderTimes;
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: _WhiteCard(
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F2EE),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.medication_rounded,
-                        color: AppColors.tealDark, size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          med.name.isNotEmpty
-                              ? med.name
-                              : 'Unknown Medication',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: AppColors.textDark,
-                          ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: med.id.isEmpty
+                    ? null
+                    : () async {
+                        await Get.to(() =>
+                            MedicationDetailScreen(medicationUuid: med.id));
+                        await controller.fetchDiseaseMedications(widget.uuid);
+                      },
+                child: _WhiteCard(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F2EE),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          med.subtitle.isNotEmpty
-                              ? med.subtitle
-                              : 'No details',
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.textGray,
-                          ),
+                        child: const Icon(Icons.medication_rounded,
+                            color: AppColors.tealDark, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              med.name.isNotEmpty
+                                  ? med.name
+                                  : 'Unknown Medication',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              med.subtitle.isNotEmpty
+                                  ? med.subtitle
+                                  : 'No details',
+                              style: AppTextStyles.caption.copyWith(
+                                color: AppColors.textGray,
+                              ),
+                            ),
+                            if (med.isReminderEnabled &&
+                                (next != null || times.isNotEmpty)) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                next != null && next.isNotEmpty
+                                    ? 'Next dose · $next'
+                                    : 'Reminders · ${times.join(' · ')}',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.tealDark,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert_rounded,
-                        color: AppColors.teal.withValues(alpha: 0.55)),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        await Get.to(() => AddMedicationScreen(
-                              diseaseUuid: widget.uuid,
-                              medication: med,
-                            ));
-                        await controller
-                            .fetchDiseaseMedications(widget.uuid);
-                      } else if (value == 'delete') {
-                        _confirmDeleteMedication(med);
-                      }
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Delete',
-                            style: TextStyle(color: AppColors.statusRed)),
+                      ),
+                      PopupMenuButton<String>(
+                        icon: Icon(Icons.more_vert_rounded,
+                            color: AppColors.teal.withValues(alpha: 0.55)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        onSelected: (value) async {
+                          if (value == 'edit') {
+                            await Get.to(() => AddMedicationScreen(
+                                  diseaseUuid: widget.uuid,
+                                  medication: med,
+                                ));
+                            await controller
+                                .fetchDiseaseMedications(widget.uuid);
+                          } else if (value == 'delete') {
+                            _confirmDeleteMedication(med);
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: 'edit', child: Text('Edit')),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Delete',
+                                style:
+                                    TextStyle(color: AppColors.statusRed)),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
           );
@@ -433,11 +454,11 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
         return const _TabEmpty(
           icon: Icons.timeline_rounded,
           title: 'No timeline events',
-          subtitle: 'Track visits, procedures and milestones here.',
+          subtitle: 'Activity for this disease will appear here automatically.',
         );
       }
       return ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         itemCount: controller.diseaseTimeline.length,
         itemBuilder: (_, i) {
           final e = controller.diseaseTimeline[i];
@@ -445,8 +466,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
             title: e.title,
             time: e.time,
             icon: _eventIcon(e.type),
-            iconColor:
-                Color(int.parse(e.colorCode.replaceAll('#', '0xFF'))),
+            iconColor: _eventColor(e.colorCode),
             isLast: i == controller.diseaseTimeline.length - 1,
           );
         },
@@ -454,20 +474,38 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
     });
   }
 
+  Color _eventColor(String colorCode) {
+    try {
+      final hex = colorCode.replaceAll('#', '').trim();
+      if (hex.length == 6) {
+        return Color(int.parse('FF$hex', radix: 16));
+      }
+      if (hex.length == 8) {
+        return Color(int.parse(hex, radix: 16));
+      }
+    } catch (_) {}
+    return AppColors.teal;
+  }
+
   IconData _eventIcon(String type) {
     switch (type) {
+      case 'medication_added':
       case 'med':
         return Icons.medication_rounded;
-      case 'qr':
-        return Icons.qr_code_rounded;
+      case 'document_added':
       case 'doc':
         return Icons.description_rounded;
+      case 'disease_created':
+      case 'disease_updated':
+        return Icons.medical_information_rounded;
+      case 'qr':
+        return Icons.qr_code_rounded;
       case 'hosp':
         return Icons.local_hospital_rounded;
       case 'vac':
         return Icons.vaccines_rounded;
       default:
-        return Icons.circle;
+        return Icons.timeline_rounded;
     }
   }
 }

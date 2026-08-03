@@ -1018,9 +1018,35 @@ class _MedicationCard extends StatelessWidget {
     required this.onDelete,
   });
 
+  String _fmtTime(String raw) {
+    final parts = raw.split(':');
+    if (parts.length < 2) return raw;
+    final h24 = int.tryParse(parts[0]) ?? 0;
+    final m = parts[1].padLeft(2, '0');
+    final ampm = h24 >= 12 ? 'PM' : 'AM';
+    final h12 = h24 % 12 == 0 ? 12 : h24 % 12;
+    return '$h12:$m $ampm';
+  }
+
+  Color _doseColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'taken':
+      case 'completed':
+        return AppColors.statusResolved;
+      case 'missed':
+        return AppColors.statusRed;
+      default:
+        return AppColors.orange;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final m = medication;
+    final reminderTimes = m.reminderTimes;
+    final next = m.nextDoseTime;
+    final doses = m.dosesToday;
+
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(18),
@@ -1040,84 +1066,160 @@ class _MedicationCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F2EE),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.medication_rounded,
-                    color: AppColors.tealDark, size: 26),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      m.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
-                        letterSpacing: -0.2,
-                      ),
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F2EE),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      m.subtitle.isNotEmpty
-                          ? m.subtitle
-                          : '${m.frequencyDisplay} · ${m.timing}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.textGray,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    if (m.diseaseName.isNotEmpty) ...[
-                      const SizedBox(height: 7),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.teal.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          m.diseaseName,
+                    child: const Icon(Icons.medication_rounded,
+                        color: AppColors.tealDark, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          m.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: AppColors.tealDark,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 10.5,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textDark,
+                            letterSpacing: -0.2,
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          m.subtitle.isNotEmpty
+                              ? m.subtitle
+                              : '${m.frequencyDisplay} · ${m.timing}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.textGray,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (m.diseaseName.isNotEmpty) ...[
+                          const SizedBox(height: 7),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.teal.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              m.diseaseName,
+                              style: const TextStyle(
+                                color: AppColors.tealDark,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert_rounded,
+                        color: AppColors.teal.withValues(alpha: 0.55)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    onSelected: (value) {
+                      if (value == 'delete') onDelete();
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Delete',
+                            style: TextStyle(color: AppColors.statusRed)),
                       ),
                     ],
-                  ],
-                ),
-              ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert_rounded,
-                    color: AppColors.teal.withValues(alpha: 0.55)),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                onSelected: (value) {
-                  if (value == 'delete') onDelete();
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete',
-                        style: TextStyle(color: AppColors.statusRed)),
                   ),
                 ],
               ),
+              if (m.isReminderEnabled &&
+                  (reminderTimes.isNotEmpty || doses.isNotEmpty)) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F7F5),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.notifications_active_rounded,
+                              size: 16, color: AppColors.tealDark),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              next != null && next.isNotEmpty
+                                  ? 'Next dose · ${_fmtTime(next)}'
+                                  : 'Reminder times',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12.5,
+                                color: AppColors.tealDark,
+                              ),
+                            ),
+                          ),
+                          if (reminderTimes.isNotEmpty)
+                            Text(
+                              reminderTimes.map(_fmtTime).join(' · '),
+                              style: AppTextStyles.caption.copyWith(
+                                color: AppColors.textGray,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (doses.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: doses.map((d) {
+                            final color = _doseColor(d.status);
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${_fmtTime(d.time)} · ${d.status}',
+                                style: TextStyle(
+                                  color: color,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 10.5,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1142,24 +1244,18 @@ class _TimelineTab extends StatelessWidget {
     return Obx(() {
       return Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: ['All', 'Diseases', 'Meds', 'Vaccines', 'QR']
-                    .asMap()
-                    .entries
-                    .map((e) {
-                  return McFilterChip(
-                    label: e.value,
-                    isSelected: controller.timelineFilter.value == e.key,
-                    onTap: () => controller.updateTimelineFilter(e.key),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
+          // const Padding(
+          //   padding: EdgeInsets.symmetric(horizontal: 16),
+          //   child: Text(
+          //     'Timeline',
+          //     style: TextStyle(
+          //       fontSize: 18,
+          //       fontWeight: FontWeight.bold,
+          //     ),
+          //   ),
+          // ),
+          const SizedBox(height: 11),
+          // const Divider(height: 1),
           Expanded(
             child: controller.isLoading.value &&
                     controller.timelineEvents.isEmpty

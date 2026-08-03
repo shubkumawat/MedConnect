@@ -24,9 +24,13 @@ class WebApiConstant {
   static const String API_URL_RECORDS_DISEASES_Details             = BASE_URL + "health-records/diseases/detail/";
   static const String API_URL_RECORDS_DISEASES_META        = BASE_URL + "health-records/diseases/meta";
   static const String API_URL_RECORDS_DISEASE_DOCUMENTS    = BASE_URL + "health-records/diseases/documents/";
+  static const String API_URL_RECORDS_DISEASE_TIMELINE     = BASE_URL + "health-records/diseases/timeline/";
   static const String API_URL_MASTER_REPORT_TYPES         = BASE_URL + "master/report-types/";
   static const String API_URL_RECORDS_PRESCRIPTIONS        = BASE_URL + "health-records/prescriptions/";
   static const String API_URL_RECORDS_MEDICATIONS          = BASE_URL + "health-records/medications/";
+  /// Mark a scheduled dose as taken.
+  /// POST /health-records/medications/taken/?medication_uuid=...
+  static const String API_URL_RECORDS_MEDICATION_TAKEN     = BASE_URL + "health-records/medications/taken/";
   /// Current-medication add (global active meds — not disease-scoped).
   /// Matches backend path: /health-records/diseases/?active=1/medications
   static const String API_URL_RECORDS_CURRENT_MEDICATIONS_ADD = BASE_URL + "health-records/diseases/?active=1/medications";

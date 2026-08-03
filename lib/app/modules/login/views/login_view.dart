@@ -69,6 +69,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                   ),
                   const SizedBox(height: 36),
+                  // Keep phone / OTP in separate Obx branches so OTP timers
+                  // never rebuild (and remount) the phone TextField.
                   Obx(() {
                     if (controller.showOtp.value) {
                       return Column(
@@ -76,8 +78,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: _buildOtpStep(),
                       );
                     }
-                    // Phone step is a separate widget so Obx rebuilds don't
-                    // remount the TextField while the user is typing.
                     return const _PhoneStep();
                   }),
                   const SizedBox(height: 40),
@@ -208,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
               )
             : GestureDetector(
                 onTap: () => controller.getSendOtpAPI(context),
-                child: const Text(
+                child: Text(
                   "Didn't receive the code? Resend",
                   style: AppTextStyles.orangeLabel,
                 ),
@@ -264,6 +264,7 @@ class _PhoneStep extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.textFieldColor.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE3EBE7)),
           ),
           child: Row(
             children: [
@@ -277,7 +278,6 @@ class _PhoneStep extends StatelessWidget {
                   onTap: loading
                       ? null
                       : () {
-                          // Reuse existing dropdown sheet via PhoneInput helper pattern.
                           showModalBottomSheet<CountryModel>(
                             context: context,
                             isScrollControlled: true,
@@ -304,7 +304,10 @@ class _PhoneStep extends StatelessWidget {
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.teal,
+                            ),
                           )
                         : Row(
                             mainAxisSize: MainAxisSize.min,
@@ -314,11 +317,14 @@ class _PhoneStep extends StatelessWidget {
                                     ? '${selected.flagEmoji} ${selected.phoneCode}'
                                     : '🌐',
                                 style: const TextStyle(
-                                    fontSize: 15, color: Colors.black87),
+                                  fontSize: 15,
+                                  color: AppColors.textDark,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               const SizedBox(width: 4),
                               const Icon(Icons.keyboard_arrow_down_rounded,
-                                  size: 16, color: Colors.black87),
+                                  size: 16, color: AppColors.textDark),
                             ],
                           ),
                   ),
@@ -331,22 +337,36 @@ class _PhoneStep extends StatelessWidget {
               ),
               Expanded(
                 child: TextField(
+                  key: const ValueKey('login_mobile_field'),
                   controller: controller.phoneController,
                   keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.done,
+                  enableSuggestions: false,
+                  autocorrect: false,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(10),
                   ],
-                  cursorColor: AppColors.teal,
-                  style: const TextStyle(fontSize: 15, color: Colors.black87),
-                  decoration: InputDecoration(
+                  cursorColor: AppColors.tealDark,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    color: Color(0xFF111111),
+                    fontWeight: FontWeight.w600,
+                    // No custom fontFamily — inherit loaded Poppins / platform default.
+                  ),
+                  decoration: const InputDecoration(
                     hintText: 'Mobile number',
                     hintStyle: TextStyle(
-                        color: Colors.black.withValues(alpha: 0.25)),
+                      color: Color(0x99111111),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                    ),
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 14),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                   ),
                 ),
               ),

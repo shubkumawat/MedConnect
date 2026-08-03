@@ -93,27 +93,37 @@ class LoginController extends GetxController {
       isCountryLoading.value = true;
       userAccessToken = await StorageService().getString(StorageService.token);
 
-      final response = await ApiProvider().getAllMasterDataAPI(
+      // Silent fetch — avoid CustomLoading dialog (it steals focus and
+      // breaks live typing display on the phone TextField).
+      final raw = await ApiProvider().requestGetForApi(
         context,
         WebApiConstant.API_URL_MASTER_ALL,
         {},
         userAccessToken ?? '',
       );
 
+      Map<String, dynamic>? response;
+      if (raw != null &&
+          (raw.statusCode == 200 || raw.statusCode == 201) &&
+          raw.data is Map) {
+        response = Map<String, dynamic>.from(raw.data as Map);
+      }
+
       isCountryLoading.value = false;
       PrintLog.printLog(response);
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          // API structure: response['data']['countries'] is the list
           final List list = response['data']?['countries'] ?? [];
-          countryList.value = list.map((e) => CountryModel.fromJson(e)).toList();
+          countryList.value =
+              list.map((e) => CountryModel.fromJson(e)).toList();
 
-          // Set India as default if found
           if (selectedCountry.value == null && countryList.isNotEmpty) {
             selectedCountry.value = countryList.firstWhereOrNull(
-              (c) => c.name.toLowerCase() == 'india' || c.phoneCode == '91'
-            ) ?? countryList.first;
+                  (c) =>
+                      c.name.toLowerCase() == 'india' || c.phoneCode == '91',
+                ) ??
+                countryList.first;
           }
         }
       }

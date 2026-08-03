@@ -20,6 +20,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
   final RecordsController controller = Get.find<RecordsController>();
   Medication? _med;
   bool _loading = true;
+  String? _markingKey;
 
   @override
   void initState() {
@@ -44,8 +45,29 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
           medication: med,
           isCurrentMedication: true,
         ));
-    // Always refresh after returning from edit/add screen.
     if (mounted) await _load();
+  }
+
+  Future<void> _markTaken(MedicationDoseToday dose) async {
+    final med = _med;
+    if (med == null || !dose.canMarkTaken) return;
+
+    final reminderUuid = (dose.reminderUuid?.isNotEmpty == true)
+        ? dose.reminderUuid!
+        : (med.primaryReminder?.id ??
+            (med.reminders.isNotEmpty ? med.reminders.first.id : ''));
+    if (reminderUuid.isEmpty) return;
+
+    final key = '$reminderUuid|${dose.time}';
+    setState(() => _markingKey = key);
+    final ok = await controller.markMedicationTaken(
+      medicationUuid: med.id,
+      reminderUuid: reminderUuid,
+      time: dose.time,
+    );
+    if (!mounted) return;
+    setState(() => _markingKey = null);
+    if (ok) await _load();
   }
 
   @override
@@ -73,7 +95,11 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                     : RefreshIndicator(
                         color: AppColors.teal,
                         onRefresh: _load,
-                        child: _Body(med: med),
+                        child: _Body(
+                          med: med,
+                          markingKey: _markingKey,
+                          onMarkTaken: _markTaken,
+                        ),
                       ),
           ),
         ],
@@ -191,7 +217,14 @@ class _IconBtn extends StatelessWidget {
 
 class _Body extends StatelessWidget {
   final Medication med;
-  const _Body({required this.med});
+  final String? markingKey;
+  final Future<void> Function(MedicationDoseToday dose) onMarkTaken;
+
+  const _Body({
+    required this.med,
+    required this.markingKey,
+    required this.onMarkTaken,
+  });
 
   String _foodLabel(String? value) {
     if (value == null || value.trim().isEmpty) return '—';
@@ -202,11 +235,39 @@ class _Body extends StatelessWidget {
         .join(' ');
   }
 
+  String _fmtTime(String raw) {
+    final parts = raw.split(':');
+    if (parts.length < 2) return raw;
+    final h24 = int.tryParse(parts[0]) ?? 0;
+    final m = parts[1].padLeft(2, '0');
+    final ampm = h24 >= 12 ? 'PM' : 'AM';
+    final h12 = h24 % 12 == 0 ? 12 : h24 % 12;
+    return '$h12:$m $ampm';
+  }
+
+  Color _doseColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'taken':
+      case 'completed':
+        return AppColors.statusResolved;
+      case 'missed':
+        return AppColors.statusRed;
+      default:
+        return AppColors.orange;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = med.name.isNotEmpty ? med.name : 'Medication';
     final statusColor =
         med.isActive ? AppColors.statusResolved : AppColors.textGray;
+    final reminders = med.reminders.isNotEmpty
+        ? med.reminders
+        : (med.primaryReminder != null
+            ? <MedicationReminder>[med.primaryReminder!]
+            : const <MedicationReminder>[]);
+    final doses = med.dosesToday;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(
@@ -285,6 +346,12 @@ class _Body extends StatelessWidget {
                             color: AppColors.tealDark,
                             soft: true,
                           ),
+                        if (med.isReminderEnabled)
+                          const _Badge(
+                            label: 'REMINDER ON',
+                            color: AppColors.orange,
+                            soft: true,
+                          ),
                         if (med.diseaseName.isNotEmpty)
                           _Badge(
                             label: med.diseaseName.toUpperCase(),
@@ -299,6 +366,46 @@ class _Body extends StatelessWidget {
             ],
           ),
         ),
+        if (doses.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _SectionCard(
+            title: "Today's doses",
+            icon: Icons.event_available_outlined,
+            child: Column(
+              children: [
+                for (int i = 0; i < doses.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  _DoseRow(
+                    dose: doses[i],
+                    timeLabel: _fmtTime(doses[i].time),
+                    statusColor: _doseColor(doses[i].status),
+                    marking: markingKey ==
+                        '${doses[i].reminderUuid ?? med.primaryReminder?.id ?? (med.reminders.isNotEmpty ? med.reminders.first.id : '')}|${doses[i].time}',
+                    onTaken: () => onMarkTaken(doses[i]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+        if (reminders.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _SectionCard(
+            title: 'Reminders',
+            icon: Icons.notifications_active_outlined,
+            child: Column(
+              children: [
+                for (int i = 0; i < reminders.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 10),
+                  _ReminderCard(
+                    reminder: reminders[i],
+                    formatTime: _fmtTime,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         _SectionCard(
           title: 'Dosage schedule',
@@ -366,42 +473,204 @@ class _Body extends StatelessWidget {
             ),
           ),
         ],
-        if (med.subtitle.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.teal.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.teal.withValues(alpha: 0.18),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline_rounded,
-                    color: AppColors.tealDark, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    med.subtitle,
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.tealDark,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
     );
   }
 
   String _v(String? value) =>
       (value != null && value.trim().isNotEmpty) ? value.trim() : '—';
+}
+
+class _DoseRow extends StatelessWidget {
+  final MedicationDoseToday dose;
+  final String timeLabel;
+  final Color statusColor;
+  final bool marking;
+  final VoidCallback onTaken;
+
+  const _DoseRow({
+    required this.dose,
+    required this.timeLabel,
+    required this.statusColor,
+    required this.marking,
+    required this.onTaken,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F7F5),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              dose.isTaken
+                  ? Icons.check_circle_rounded
+                  : Icons.access_time_rounded,
+              color: statusColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  timeLabel,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  dose.status.toUpperCase(),
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (dose.isTaken)
+            const _Badge(label: 'TAKEN', color: AppColors.statusResolved)
+          else
+            TextButton(
+              onPressed: marking ? null : onTaken,
+              style: TextButton.styleFrom(
+                backgroundColor: AppColors.tealDark,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor:
+                    AppColors.tealDark.withValues(alpha: 0.45),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: marking
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Taken',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderCard extends StatelessWidget {
+  final MedicationReminder reminder;
+  final String Function(String) formatTime;
+
+  const _ReminderCard({
+    required this.reminder,
+    required this.formatTime,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final times = reminder.displayTimes;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F7F5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE3EBE7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  reminder.displayId.isNotEmpty
+                      ? reminder.displayId
+                      : 'Reminder',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                    color: AppColors.textDark,
+                  ),
+                ),
+              ),
+              _Badge(
+                label: reminder.isEnabled ? 'ON' : 'OFF',
+                color: reminder.isEnabled
+                    ? AppColors.statusResolved
+                    : AppColors.textGray,
+                soft: true,
+              ),
+            ],
+          ),
+          if (times.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: times
+                  .map(
+                    (t) => Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.teal.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        formatTime(t),
+                        style: const TextStyle(
+                          color: AppColors.tealDark,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          if (reminder.startDate != null &&
+              reminder.startDate!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'From ${reminder.startDate}'
+              '${reminder.endDate != null && reminder.endDate!.isNotEmpty ? ' · Until ${reminder.endDate}' : ''}',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textGray,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _SectionCard extends StatelessWidget {

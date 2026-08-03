@@ -121,6 +121,19 @@ class ProfileController extends GetxController {
   Rx<File?> profileImage = Rx<File?>(null);
   RxString profilePhotoUrl = ''.obs;
 
+  static String _normalizePhotoUrl(String? raw) {
+    var url = (raw ?? '').trim();
+    if (url.isEmpty || url.toLowerCase() == 'null') return '';
+    if (url.startsWith('//')) {
+      url = 'http:$url';
+    }
+    if (url.startsWith('/')) {
+      url = 'http://medconnect.airainnovations.com$url';
+    }
+    // Keep server URL as-is (media is served over http).
+    return url;
+  }
+
   Future<void> pickProfileImage(ImageSource source) async {
     try {
       final XFile? image = await _imagePicker.pickImage(
@@ -143,7 +156,19 @@ class ProfileController extends GetxController {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
-      builder: (_) => SafeArea(
+      builder: (_) => Theme(
+        data: Theme.of(context).copyWith(
+          listTileTheme: const ListTileThemeData(
+            textColor: Colors.black,
+            iconColor: Colors.black,
+            titleTextStyle: TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: Column(
@@ -163,11 +188,13 @@ class ProfileController extends GetxController {
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: Colors.black,
                 ),
               ),
               const SizedBox(height: 16),
               ListTile(
+                textColor: Colors.black,
+                iconColor: Colors.black,
                 leading: Container(
                   width: 40,
                   height: 40,
@@ -178,14 +205,22 @@ class ProfileController extends GetxController {
                   child: const Icon(Icons.camera_alt_rounded,
                       color: AppColors.teal),
                 ),
-                title: const Text('Camera',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                title: const Text(
+                  'Camera',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                    fontSize: 16,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   pickProfileImage(ImageSource.camera);
                 },
               ),
               ListTile(
+                textColor: Colors.black,
+                iconColor: Colors.black,
                 leading: Container(
                   width: 40,
                   height: 40,
@@ -196,8 +231,14 @@ class ProfileController extends GetxController {
                   child: const Icon(Icons.photo_library_rounded,
                       color: AppColors.teal),
                 ),
-                title: const Text('Gallery',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                title: const Text(
+                  'Gallery',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                    fontSize: 16,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   pickProfileImage(ImageSource.gallery);
@@ -228,6 +269,7 @@ class ProfileController extends GetxController {
                 ),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -649,10 +691,12 @@ class ProfileController extends GetxController {
             emailCtrl.text = data['email']?.toString() ?? '';
             mobileNumber.value = data['mobile_number']?.toString() ?? '';
             age.value = data['age'] ?? 0;
-            final photo = data['profile_photo']?.toString() ??
-                data['profile_picture']?.toString() ??
-                data['photo']?.toString() ??
-                '';
+            final photo = _normalizePhotoUrl(
+              data['profile_photo']?.toString() ??
+                  data['profile_picture']?.toString() ??
+                  data['photo']?.toString() ??
+                  '',
+            );
             if (profileImage.value == null) {
               profilePhotoUrl.value = photo;
             }
@@ -894,12 +938,14 @@ class ProfileController extends GetxController {
           }
 
           final photoFromRes = data is Map
-              ? (data['profile_photo'] ??
-                      data['profile_picture'] ??
-                      (userData is Map ? userData['profile_photo'] : null))
-                  ?.toString()
-              : null;
-          if (photoFromRes != null && photoFromRes.isNotEmpty) {
+              ? _normalizePhotoUrl(
+                  (data['profile_photo'] ??
+                          data['profile_picture'] ??
+                          (userData is Map ? userData['profile_photo'] : null))
+                      ?.toString(),
+                )
+              : '';
+          if (photoFromRes.isNotEmpty) {
             profilePhotoUrl.value = photoFromRes;
             profileImage.value = null;
           }

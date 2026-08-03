@@ -515,6 +515,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
   Map<String, dynamic> _buildBody() {
     final body = <String, dynamic>{
+      'disease_uuid':_diseaseUuid,
       'name': _medNameCtrl.text.trim(),
       'strength': _strengthCtrl.text.trim(),
       'dosage': _dosageCtrl.text.trim(),
@@ -593,7 +594,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       success = await controller.addCurrentMedication(body);
     } else {
       success = await controller.addDiseaseMedication(
-        diseaseUuid: _diseaseUuid!,
+        // diseaseUuid: _diseaseUuid!,
         body: body,
       );
     }
@@ -611,7 +612,8 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
         backgroundColor: AppColors.teal,
         colorText: Colors.white,
       );
-    } else {
+    }
+    else {
       Get.snackbar(
         'Error',
         'Failed to save medication. Please try again.',

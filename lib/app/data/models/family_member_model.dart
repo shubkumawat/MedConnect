@@ -97,18 +97,30 @@ class FamilyMember {
     member.fullName = json['full_name']?.toString() ??
         json['name']?.toString() ??
         member.fullName;
-    member.profilePhoto = json['profile_photo']?.toString() ??
-        json['profile_picture']?.toString() ??
-        json['photo']?.toString() ??
-        member.profilePhoto;
+    member.profilePhoto = _normalizeMediaUrl(
+      json['profile_photo']?.toString() ??
+          json['profile_picture']?.toString() ??
+          json['photo']?.toString() ??
+          member.profilePhoto,
+    );
     return member;
+  }
+
+  static String? _normalizeMediaUrl(String? raw) {
+    var url = (raw ?? '').trim();
+    if (url.isEmpty || url.toLowerCase() == 'null') return null;
+    if (url.startsWith('//')) url = 'http:$url';
+    if (url.startsWith('/')) {
+      url = 'http://medconnect.airainnovations.com$url';
+    }
+    return url;
   }
 
   FamilyMember.fromJson(Map<String, dynamic> json) {
     isSelf = false;
     patientId = json['patient_id'];
     fullName = json['full_name'];
-    profilePhoto = json['profile_photo'];
+    profilePhoto = _normalizeMediaUrl(json['profile_photo']?.toString());
     dateOfBirth = json['date_of_birth'];
     age = json['age'];
     if ((age == null || age == 0) && dateOfBirth != null) {

@@ -30,7 +30,7 @@ class LogoutDialog {
                   child: const Icon(Icons.logout_rounded, color: AppColors.statusRed, size: 32),
                 ),
                 const SizedBox(height: 20),
-                const Text('Log Out?', style: AppTextStyles.heading2),
+                Text('Log Out?', style: AppTextStyles.heading2),
                 const SizedBox(height: 8),
                 Text(
                   'Are you sure you want to log out of your account?',

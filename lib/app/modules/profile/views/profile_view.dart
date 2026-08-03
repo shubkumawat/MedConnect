@@ -150,6 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _MemberCard(
                         name: name,
                         initials: _initials(name),
+                        photoUrl: controller.profilePhotoUrl.value,
                         mobile: mobile,
                         email: email,
                         age: age,
@@ -158,8 +159,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         progress: progress,
                         percent: pct,
                         loading: loading,
-                        onEdit: () =>
-                            Get.to(() => const PersonalInfoScreen(null)),
+                        onEdit: () async {
+                          await Get.to(() => const PersonalInfoScreen(null));
+                          if (context.mounted) {
+                            await controller.getPatientProfileAPI(context);
+                          }
+                        },
                       )
                           .animate()
                           .fadeIn(delay: 60.ms, duration: 420.ms)
@@ -410,6 +415,7 @@ class _SectionLabel extends StatelessWidget {
 class _MemberCard extends StatelessWidget {
   final String name;
   final String initials;
+  final String photoUrl;
   final String mobile;
   final String email;
   final int age;
@@ -423,6 +429,7 @@ class _MemberCard extends StatelessWidget {
   const _MemberCard({
     required this.name,
     required this.initials,
+    required this.photoUrl,
     required this.mobile,
     required this.email,
     required this.age,
@@ -442,8 +449,35 @@ class _MemberCard extends StatelessWidget {
     return parts.isEmpty ? 'Add your phone or email' : parts.join('  ·  ');
   }
 
+  String? get _resolvedPhoto {
+    var raw = photoUrl.trim();
+    if (raw.isEmpty || raw.toLowerCase() == 'null') return null;
+    if (raw.startsWith('//')) raw = 'http:$raw';
+    if (raw.startsWith('/')) {
+      raw = 'http://medconnect.airainnovations.com$raw';
+    }
+    return raw;
+  }
+
+  Widget _avatarFallback() {
+    return Center(
+      child: Text(
+        initials,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 28,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final photo = _resolvedPhoto;
+    final hasPhoto = photo != null && photo.isNotEmpty;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -478,27 +512,62 @@ class _MemberCard extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.45),
                       width: 2.5,
                     ),
-                  ),
-                  child: Center(
-                    child: loading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.4,
-                              color: Colors.white,
-                            ),
+                    image: hasPhoto
+                        ? DecorationImage(
+                            image: NetworkImage(photo),
+                            fit: BoxFit.cover,
+                            onError: (_, _) {},
                           )
-                        : Text(
-                            initials,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
+                        : null,
                   ),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasPhoto
+                      ? Image.network(
+                          photo,
+                          key: ValueKey(photo),
+                          fit: BoxFit.cover,
+                          width: 86,
+                          height: 86,
+                          gaplessPlayback: true,
+                          headers: const {'Accept': 'image/*'},
+                          loadingBuilder: (_, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (_, _, _) => loading
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.4,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : _avatarFallback(),
+                        )
+                      : (loading
+                          ? const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          : _avatarFallback()),
                 ),
                 Positioned(
                   right: -2,
