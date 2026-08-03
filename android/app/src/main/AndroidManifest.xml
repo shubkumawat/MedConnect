@@ -8,7 +8,8 @@
     <application
         android:label="HealAura"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
 
         <!-- Add your Google Maps API Key here -->
         <meta-data
