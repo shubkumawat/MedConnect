@@ -1,14 +1,19 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app/core/theme/app_colors.dart';
 import 'app/core/theme/app_text_theme.dart';
+import 'app/data/services/notification_service.dart';
 import 'app/modules/splash/views/splash_view.dart';
+import 'firebase_options.dart';
 import 'package:get/get.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await NotificationService.instance.init();
   // Poppins was referenced in Theme/AppTextStyles but never bundled — missing
   // font families make TextField glyphs invisible until the field is re-tapped.
   GoogleFonts.config.allowRuntimeFetching = true;

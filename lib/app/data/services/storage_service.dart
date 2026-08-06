@@ -19,6 +19,7 @@ class StorageService {
   static const userProfile = "userProfile";
   static const kycStatus = "kycStatus";
   static const walletBalance = "walletBalance";
+  static const fcmToken = "fcmToken";
 
 
 

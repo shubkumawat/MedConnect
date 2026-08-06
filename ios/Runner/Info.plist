@@ -6,6 +6,12 @@
 	<string>Camera access is required to scan medication strips, boxes, and prescriptions.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Photo library access is required to select medication images for scanning.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

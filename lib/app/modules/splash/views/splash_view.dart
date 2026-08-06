@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/services/app_update_service.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../login/views/login_view.dart';
@@ -59,6 +60,11 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     } else {
       Get.offAll(() => const LoginScreen());
     }
+
+    // Runs after navigation so the "Update Available" dialog (a Get overlay)
+    // shows on top of whichever screen the user lands on. Not awaited —
+    // a slow/offline store check should never hold up app entry.
+    AppUpdateService.instance.checkForUpdate();
   }
 
   @override

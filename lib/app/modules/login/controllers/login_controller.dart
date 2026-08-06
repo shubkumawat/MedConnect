@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:healaura/app/modules/home/controllers/home_controller.dart';
 import 'package:flutter/cupertino.dart';
@@ -13,6 +14,7 @@ import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
+import '../../../data/services/notification_service.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../profile/views/personal_info_view.dart';
@@ -198,12 +200,16 @@ class LoginController extends GetxController {
           .then((value) => userAccessToken = value);
       isLoading.value = true;
 
+      final fcmToken = await NotificationService.instance.currentToken();
+
       final response = await ApiProvider().loginApi(
         context,
         WebApiConstant.API_URL_VERIFY_OTP,
         {
           "mobile_number": phoneController.text.toString(),
           "otp": otp.toString(),
+          "fcmToke": fcmToken,
+          "platForm": Platform.isIOS ? "ios" : "android",
         },
         userAccessToken ?? "",
       );
