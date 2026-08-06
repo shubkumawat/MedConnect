@@ -87,6 +87,8 @@ dependencies:
   printing: ^5.13.2
   path_provider: ^2.1.5
   google_mlkit_text_recognition: ^0.16.0
+  # 13.x pulls permission_handler_android 14 (needs AGP 9 / built-in Kotlin)
+  permission_handler: 12.0.1
 
 
 dev_dependencies:

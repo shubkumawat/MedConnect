@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart' as dio;
@@ -12,6 +11,7 @@ import '../../../../DataProvider/api_provider.dart';
 import 'package:healaura/DataProvider/app_shared_preferences.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
+import 'package:healaura/app/core/Util/image_pick_helper.dart';
 import 'package:healaura/app/data/services/storage_service.dart';
 import 'package:healaura/app/data/models/family_member_model.dart';
 
@@ -84,16 +84,19 @@ class FamilyMemberController extends GetxController {
 
   // ---------------- Image Picker ----------------
   Rx<File?> profileImage = Rx<File?>(null);
-  final ImagePicker _picker = ImagePicker();
 
   Future<void> pickImage(ImageSource source) async {
     try {
-      final XFile? image = await _picker.pickImage(source: source, imageQuality: 70);
-      if (image != null) {
-        profileImage.value = File(image.path);
+      final file = await ImagePickHelper.pick(
+        source: source,
+        imageQuality: 70,
+      );
+      if (file != null) {
+        profileImage.value = file;
       }
     } catch (e) {
       PrintLog.printLog("Pick Image Error: $e");
+      Fluttertoast.showToast(msg: 'Could not pick image');
     }
   }
 
@@ -755,9 +758,9 @@ class FamilyMemberController extends GetxController {
         "contact_mobile": contactMobileCtrl.text.trim(),
         "insurance_provider": insuranceProviderCtrl.text.trim(),
         "policy_number": policyNumberCtrl.text.trim(),
-        // Backend JSONField expects a JSON string (esp. multipart / form updates)
-        "allergies": jsonEncode(selectedAllergies.toList()),
-        "medications": jsonEncode(selectedMedications.toList()),
+        // API expects JSON arrays (same as Postman), not jsonEncode strings.
+        "allergies": selectedAllergies.toList(),
+        "medications": selectedMedications.toList(),
       };
 
       dynamic response;
@@ -858,9 +861,9 @@ class FamilyMemberController extends GetxController {
         "contact_mobile": contactMobileCtrl.text.trim(),
         "insurance_provider": insuranceProviderCtrl.text.trim(),
         "policy_number": policyNumberCtrl.text.trim(),
-        // Backend JSONField expects a JSON string (esp. multipart / form updates)
-        "allergies": jsonEncode(selectedAllergies.toList()),
-        "medications": jsonEncode(selectedMedications.toList()),
+        // API expects JSON arrays (same as Postman), not jsonEncode strings.
+        "allergies": selectedAllergies.toList(),
+        "medications": selectedMedications.toList(),
       };
 
       dynamic response;

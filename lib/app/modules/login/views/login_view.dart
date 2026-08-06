@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/widgets/live_text_field.dart';
 import '../../../core/widgets/otp_input_row.dart';
 import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
 import '../controllers/login_controller.dart';
@@ -336,38 +337,20 @@ class _PhoneStep extends StatelessWidget {
                 color: AppColors.teal.withValues(alpha: 0.4),
               ),
               Expanded(
-                child: TextField(
+                child: LiveTextField(
                   key: const ValueKey('login_mobile_field'),
                   controller: controller.phoneController,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.done,
-                  enableSuggestions: false,
-                  autocorrect: false,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(10),
                   ],
-                  cursorColor: AppColors.tealDark,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    color: Color(0xFF111111),
-                    fontWeight: FontWeight.w600,
-                    // No custom fontFamily — inherit loaded Poppins / platform default.
-                  ),
-                  decoration: const InputDecoration(
-                    hintText: 'Mobile number',
-                    hintStyle: TextStyle(
-                      color: Color(0x99111111),
-                      fontWeight: FontWeight.w500,
-                      fontSize: 16,
-                    ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    isDense: true,
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                  ),
+                  hintText: 'Mobile number',
+                  showClearButton: true,
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 ),
               ),
             ],

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_text_theme.dart';
+import 'live_text_field.dart';
 
 class OtpInputRow extends StatefulWidget {
   final Function(String) onCompleted;
@@ -52,7 +52,6 @@ class _OtpInputRowState extends State<OtpInputRow> {
     }
 
     // Empty box + backspace → go previous and clear that digit.
-    // (Filled box backspace is handled normally by TextField/onChanged.)
     if (_controllers[index].text.isEmpty && index > 0) {
       _controllers[index - 1].clear();
       _focusNodes[index - 1].requestFocus();
@@ -92,12 +91,18 @@ class _OtpInputRowState extends State<OtpInputRow> {
     }
 
     if (digits.isNotEmpty) {
-      _controllers[index].text = digits;
-      _controllers[index].selection =
-          const TextSelection.collapsed(offset: 1);
+      final digit = digits[digits.length - 1];
+      _controllers[index].value = TextEditingValue(
+        text: digit,
+        selection: const TextSelection.collapsed(offset: 1),
+      );
       if (index < 5) {
         _focusNodes[index + 1].requestFocus();
+      } else {
+        _focusNodes[index].unfocus();
       }
+    } else {
+      _controllers[index].clear();
     }
     _emit();
   }
@@ -108,38 +113,41 @@ class _OtpInputRowState extends State<OtpInputRow> {
       children: List.generate(6, (i) {
         return Expanded(
           child: Container(
-            height: 54,
+            height: 56,
             margin: EdgeInsets.only(right: i == 5 ? 0 : 8),
-            child: TextField(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            child: LiveTextField(
               controller: _controllers[i],
               focusNode: _focusNodes[i],
               textAlign: TextAlign.center,
+              textAlignVertical: TextAlignVertical.center,
+              fontSize: 22,
               keyboardType: TextInputType.number,
               textInputAction:
                   i == 5 ? TextInputAction.done : TextInputAction.next,
-              style: AppTextStyles.heading2
-                  .copyWith(color: AppColors.textDark, fontSize: 20),
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(1),
+                LengthLimitingTextInputFormatter(6), // allow paste into a box
               ],
-              decoration: InputDecoration(
-                counterText: '',
-                filled: true,
-                fillColor: AppColors.textFieldColor.withValues(alpha: 0.5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide:
-                      const BorderSide(color: AppColors.primary, width: 1.8),
-                ),
+              filled: true,
+              fillColor: AppColors.textFieldColor.withValues(alpha: 0.5),
+              isDense: true,
+              // Horizontal pad stops digits clipping on the left edge.
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide:
+                    const BorderSide(color: AppColors.primary, width: 1.8),
               ),
               onChanged: (val) => _onBoxChanged(i, val),
             ),

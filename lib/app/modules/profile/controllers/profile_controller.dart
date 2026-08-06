@@ -13,6 +13,7 @@ import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
+import '../../../core/Util/image_pick_helper.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// Master relation list ka model
@@ -117,7 +118,6 @@ class ProfileController extends GetxController {
   final genders = ['Male', 'Female', 'Other'];
 
   // ------------------ Profile photo ------------------
-  final ImagePicker _imagePicker = ImagePicker();
   Rx<File?> profileImage = Rx<File?>(null);
   RxString profilePhotoUrl = ''.obs;
 
@@ -136,12 +136,12 @@ class ProfileController extends GetxController {
 
   Future<void> pickProfileImage(ImageSource source) async {
     try {
-      final XFile? image = await _imagePicker.pickImage(
+      final file = await ImagePickHelper.pick(
         source: source,
         imageQuality: 70,
       );
-      if (image != null) {
-        profileImage.value = File(image.path);
+      if (file != null) {
+        profileImage.value = file;
       }
     } catch (e) {
       PrintLog.printLog('Pick profile image error: $e');

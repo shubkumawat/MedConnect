@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
@@ -468,256 +466,213 @@ class _PassportCard extends StatelessWidget {
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0B6E4F).withValues(alpha: 0.28),
-              blurRadius: 28,
-              offset: const Offset(0, 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: isSelected
+                  ? AppColors.tealDark
+                  : const Color(0xFFE3EBE7),
+              width: isSelected ? 1.8 : 1,
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: Stack(
-            children: [
-              // Base gradient
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0A5C45), Color(0xFF147A68), Color(0xFF1B9E8E)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-              ),
-              // Soft orbs
-              Positioned(
-                right: -40,
-                top: -30,
-                child: Container(
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.07),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: -50,
-                bottom: -40,
-                child: Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black.withValues(alpha: 0.08),
-                  ),
-                ),
-              ),
-              // Content
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 18, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.18),
-                            border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.35)),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: hasPhoto
-                              ? Image.network(
-                                  photo,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Center(
-                                    child: Text(
-                                      initials,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : Center(
-                                  child: Text(
-                                    initials,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                patient.fullName ?? (isMe ? 'You' : 'Guest'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTextStyles.heading2.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 9,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isMe
-                                          ? Colors.white.withValues(alpha: 0.28)
-                                          : Colors.white.withValues(alpha: 0.16),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: isMe
-                                          ? Border.all(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.45))
-                                          : null,
-                                    ),
-                                    child: Text(
-                                      relation.toUpperCase(),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.6,
-                                      ),
-                                    ),
-                                  ),
-                                  if (isSelected)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 9,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFC857),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Text(
-                                        'SELECTED',
-                                        style: TextStyle(
-                                          color: Color(0xFF0A5C45),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.4,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        _QrFab(
-                          onTap: () => Get.to(
-                            () => QrScreen(
-                              patientName: patient.fullName ?? 'Patient',
-                              patientId: patient.patientId,
-                              profilePhoto: patient.profilePhoto,
-                              initials: initials,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    // Vitals strip
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 12, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.18),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              _PassportMetric(label: 'Blood', value: blood),
-                              _PassportMetric(
-                                  label: 'Age',
-                                  value: age == '--' ? '--' : '$age yrs'),
-                              _PassportMetric(label: 'Gender', value: gender),
-                              _PassportMetric(label: 'Meds', value: '$meds'),
-                              _PassportMetric(
-                                  label: 'Conditions',
-                                  value: '$diseases',
-                                  last: true),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.swipe_rounded,
-                          size: 14,
-                          color: Colors.white.withValues(alpha: 0.55),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          isSelected
-                              ? 'Tap card → open records'
-                              : 'Tap to select & open records',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.55),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          'Show QR',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 16,
-                          color: Colors.white.withValues(alpha: 0.9),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+            // Light wash — same vibe as BMI card
+            gradient: LinearGradient(
+              colors: [
+                AppColors.teal.withValues(alpha: 0.10),
+                Colors.white,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.tealDark.withValues(alpha: 0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-        ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.tealDark.withValues(alpha: 0.12),
+                        border: Border.all(
+                          color: AppColors.teal.withValues(alpha: 0.28),
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: hasPhoto
+                          ? Image.network(
+                              photo,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Center(
+                                child: Text(
+                                  initials,
+                                  style: const TextStyle(
+                                    color: AppColors.tealDark,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Text(
+                                initials,
+                                style: const TextStyle(
+                                  color: AppColors.tealDark,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            patient.fullName ?? (isMe ? 'You' : 'Guest'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.heading2.copyWith(
+                              color: AppColors.textDark,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.teal.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  relation.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: AppColors.tealDark,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.tealDark,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Text(
+                                    'SELECTED',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    _QrFab(
+                      onTap: () => Get.to(
+                        () => QrScreen(
+                          patientName: patient.fullName ?? 'Patient',
+                          patientId: patient.patientId,
+                          profilePhoto: patient.profilePhoto,
+                          initials: initials,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F7F5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE3EBE7)),
+                  ),
+                  child: Row(
+                    children: [
+                      _PassportMetric(label: 'Blood', value: blood),
+                      _PassportMetric(
+                          label: 'Age',
+                          value: age == '--' ? '--' : '$age yrs'),
+                      _PassportMetric(label: 'Gender', value: gender),
+                      _PassportMetric(label: 'Meds', value: '$meds'),
+                      _PassportMetric(
+                          label: 'Conditions',
+                          value: '$diseases',
+                          last: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.swipe_rounded,
+                      size: 14,
+                      color: AppColors.textGray.withValues(alpha: 0.85),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isSelected
+                          ? 'Tap card → open records'
+                          : 'Tap to select & open records',
+                      style: TextStyle(
+                        color: AppColors.textGray.withValues(alpha: 0.9),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    const Text(
+                      'Show QR',
+                      style: TextStyle(
+                        color: AppColors.tealDark,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: AppColors.tealDark,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -742,7 +697,9 @@ class _PassportMetric extends StatelessWidget {
             ? null
             : BoxDecoration(
                 border: Border(
-                  right: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                  right: BorderSide(
+                    color: AppColors.border.withValues(alpha: 0.9),
+                  ),
                 ),
               ),
         child: Column(
@@ -752,7 +709,7 @@ class _PassportMetric extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Colors.white,
+                color: AppColors.textDark,
                 fontWeight: FontWeight.w800,
                 fontSize: 13,
               ),
@@ -761,7 +718,7 @@ class _PassportMetric extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
+                color: AppColors.textGray.withValues(alpha: 0.9),
                 fontSize: 9,
                 fontWeight: FontWeight.w500,
               ),
