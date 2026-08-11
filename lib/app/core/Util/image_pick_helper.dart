@@ -8,7 +8,6 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../theme/app_colors.dart';
 
-
 /// Requests camera / gallery permission, then opens the picker.
 class ImagePickHelper {
   static final ImagePicker _picker = ImagePicker();
@@ -28,23 +27,53 @@ class ImagePickHelper {
       if (image == null) return null;
       return File(image.path);
     } catch (e) {
-      final msg = e.toString();
-      if (msg.contains('camera_access_denied') ||
-          msg.contains('photo_access_denied')) {
-        await _showOpenSettingsDialog(
-          source == ImageSource.camera ? 'Camera' : 'Photos',
-        );
-      } else {
-        Fluttertoast.showToast(msg: 'Could not pick image');
-      }
+      await _handlePickError(e, source);
       return null;
     }
   }
 
-  static Future<bool> _ensurePermission(ImageSource source) async {
-    final permission =
-        source == ImageSource.camera ? Permission.camera : Permission.photos;
+  /// Multi-image gallery pick (permission-safe, no unhandled crash).
+  static Future<List<XFile>> pickMulti({
+    int imageQuality = 70,
+    int? limit,
+  }) async {
+    final allowed = await _ensurePermission(ImageSource.gallery);
+    if (!allowed) return const [];
 
+    try {
+      final images = await _picker.pickMultiImage(
+        imageQuality: imageQuality,
+        limit: limit,
+      );
+      return images;
+    } catch (e) {
+      await _handlePickError(e, ImageSource.gallery);
+      return const [];
+    }
+  }
+
+  static Future<void> _handlePickError(Object e, ImageSource source) async {
+    final msg = e.toString();
+    if (msg.contains('camera_access_denied') ||
+        msg.contains('photo_access_denied') ||
+        msg.contains('access_denied')) {
+      await _showOpenSettingsDialog(
+        source == ImageSource.camera ? 'Camera' : 'Photos',
+      );
+    } else {
+      Fluttertoast.showToast(msg: 'Could not pick image');
+    }
+  }
+
+  static Permission _permissionFor(ImageSource source) {
+    if (source == ImageSource.camera) return Permission.camera;
+    return Permission.photos;
+  }
+
+  static Future<bool> _ensurePermission(ImageSource source) async {
+    // Android system photo picker often works without a runtime grant,
+    // but camera always needs an explicit permission.
+    final permission = _permissionFor(source);
     var status = await permission.status;
 
     if (status.isGranted || status.isLimited) return true;
@@ -52,6 +81,14 @@ class ImagePickHelper {
     if (status.isDenied) {
       status = await permission.request();
       if (status.isGranted || status.isLimited) return true;
+    }
+
+    // Gallery on Android: still try the system picker if storage/photos
+    // isn't strictly granted (Photo Picker doesn't always need it).
+    if (source == ImageSource.gallery && Platform.isAndroid) {
+      if (!status.isPermanentlyDenied && !status.isRestricted) {
+        return true;
+      }
     }
 
     if (status.isPermanentlyDenied || status.isDenied || status.isRestricted) {

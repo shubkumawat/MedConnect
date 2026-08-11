@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
 import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import 'package:healaura/app/core/Util/image_pick_helper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:get/get.dart';
 import '../controllers/records_controller.dart';
@@ -45,46 +46,48 @@ class _AiPrescriptionScreenState extends State<AiPrescriptionScreen>
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source);
+    final file = await ImagePickHelper.pick(source: source);
+    if (file == null) return;
 
-    if (pickedFile != null) {
+    setState(() {
+      _image = file;
+      _step = 1;
+    });
+
+    var result = await controller.scanPrescription(_image!.path,
+        diseaseUuid: widget.diseaseUuid);
+
+    if (result != null) {
       setState(() {
-        _image = File(pickedFile.path);
-        _step = 1;
-      });
-      
-      var result = await controller.scanPrescription(_image!.path, diseaseUuid: widget.diseaseUuid);
-      
-      if (result != null) {
-        setState(() {
-          _scanResult = result;
-          _extractedData.clear();
-          _extractedData['Doctor'] = result['doctor_name'] ?? "";
-          _extractedData['Hospital'] = result['hospital_name'] ?? "";
-          _extractedData['Prescribed On'] = result['prescribed_on'] ?? "";
-          _extractedData['Notes'] = result['notes'] ?? "";
-          
-          if (result['medications'] != null && (result['medications'] as List).isNotEmpty) {
-             List meds = result['medications'] as List;
-             for (int i=0; i<meds.length; i++) {
-               var m = meds[i];
-               _extractedData['Medication ${i+1}'] = "${m['name']} (${m['dosage'] ?? ''})";
-             }
+        _scanResult = result;
+        _extractedData.clear();
+        _extractedData['Doctor'] = result['doctor_name'] ?? "";
+        _extractedData['Hospital'] = result['hospital_name'] ?? "";
+        _extractedData['Prescribed On'] = result['prescribed_on'] ?? "";
+        _extractedData['Notes'] = result['notes'] ?? "";
+
+        if (result['medications'] != null &&
+            (result['medications'] as List).isNotEmpty) {
+          List meds = result['medications'] as List;
+          for (int i = 0; i < meds.length; i++) {
+            var m = meds[i];
+            _extractedData['Medication ${i + 1}'] =
+                "${m['name']} (${m['dosage'] ?? ''})";
           }
+        }
 
-          // Confidence indicators
-          _extractedData.forEach((key, value) {
-            _confidence[key] = value.isNotEmpty;
-          });
-
-          _step = 2;
+        // Confidence indicators
+        _extractedData.forEach((key, value) {
+          _confidence[key] = value.isNotEmpty;
         });
-      } else {
-        Get.snackbar('Alert', 'Prescription uploaded but AI extraction failed. Please review and enter details manually.',
+
+        _step = 2;
+      });
+    } else {
+      Get.snackbar('Alert',
+          'Prescription uploaded but AI extraction failed. Please review and enter details manually.',
           backgroundColor: AppColors.orange, colorText: Colors.white);
-        setState(() => _step = 2);
-      }
+      setState(() => _step = 2);
     }
   }
 

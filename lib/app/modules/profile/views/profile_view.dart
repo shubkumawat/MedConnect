@@ -227,24 +227,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 10),
                       _InsetGroup(
                         children: [
-                          _LinkTile(
-                            icon: Icons.verified_user_outlined,
-                            title: 'Insurance details',
-                            onTap: () {},
-                          ),
-                          _LinkTile(
-                            icon: Icons.ios_share_rounded,
-                            title: 'Export health records',
-                            onTap: () {},
-                            showDivider: true,
-                          ),
-                          _LinkTile(
-                            icon: Icons.translate_rounded,
-                            title: 'Language',
-                            trailing: 'English',
-                            onTap: () {},
-                            showDivider: true,
-                          ),
+                          // _LinkTile(
+                          //   icon: Icons.verified_user_outlined,
+                          //   title: 'Insurance details',
+                          //   onTap: () {},
+                          // ),
+                          // _LinkTile(
+                          //   icon: Icons.ios_share_rounded,
+                          //   title: 'Export health records',
+                          //   onTap: () {},
+                          //   showDivider: true,
+                          // ),
+                          // _LinkTile(
+                          //   icon: Icons.translate_rounded,
+                          //   title: 'Language',
+                          //   trailing: 'English',
+                          //   onTap: () {},
+                          //   showDivider: true,
+                          // ),
                           _LinkTile(
                             icon: Icons.lock_outline_rounded,
                             title: 'Privacy & security',

@@ -678,7 +678,9 @@ class ProfileController extends GetxController {
         userAccessToken ?? '',
       );
 
-      if (_isDisposed) return;
+      if (_isDisposed) {
+        return;
+      }
       PrintLog.printLog(response);
 
       if (response != null) {

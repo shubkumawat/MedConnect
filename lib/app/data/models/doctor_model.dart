@@ -99,6 +99,8 @@ class HospitalDetail extends Hospital {
   final String? website;
   final List<Facility> facilities;
   final List<Department> departments;
+  /// True when the logged-in user already reviewed this place (API flag).
+  final bool hasReviewed;
 
   HospitalDetail({
     required super.hospitalId,
@@ -122,9 +124,17 @@ class HospitalDetail extends Hospital {
     this.website,
     required this.facilities,
     required this.departments,
+    this.hasReviewed = false,
   });
 
   factory HospitalDetail.fromJson(Map<String, dynamic> json) {
+    final reviewedFlag = json['has_reviewed'] ??
+        json['user_has_reviewed'] ??
+        json['is_reviewed'] ??
+        json['already_reviewed'] ??
+        false;
+    final myReview = json['my_review'] ?? json['user_review'];
+    final hasMyReview = myReview is Map && myReview.isNotEmpty;
     return HospitalDetail(
       hospitalId: json['id'] ?? '',
       name: json['name'] ?? '',
@@ -147,6 +157,7 @@ class HospitalDetail extends Hospital {
       website: json['website'],
       facilities: (json['facilities'] as List?)?.map((e) => Facility.fromJson(e)).toList() ?? [],
       departments: (json['departments'] as List?)?.map((e) => Department.fromJson(e)).toList() ?? [],
+      hasReviewed: reviewedFlag == true || hasMyReview,
     );
   }
 }

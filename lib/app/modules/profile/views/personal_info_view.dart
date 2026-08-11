@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
@@ -144,6 +145,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               hint: 'Full Name',
               controller: controller.fullNameCtrl,
               prefixIcon: Icons.person_outline_rounded,
+              keyboardType: TextInputType.name,
+              inputFormatters: TxtValidation.nameFormatters,
+              validator: TxtValidation.personNameError,
             ),
             const SizedBox(height: 14),
             CustomTextField(
@@ -151,6 +155,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               controller: controller.emailCtrl,
               prefixIcon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
+              inputFormatters: TxtValidation.emailFormatters,
+              validator: TxtValidation.emailError,
             ),
             const SizedBox(height: 14),
             CustomTextField(
@@ -242,12 +248,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   void _onContinue() {
-    if (controller.fullNameCtrl.text.trim().isEmpty) {
-      Fluttertoast.showToast(msg: 'Please enter full name');
+    final nameErr = TxtValidation.personNameError(controller.fullNameCtrl.text);
+    if (nameErr != null) {
+      Fluttertoast.showToast(msg: nameErr);
       return;
     }
-    if (controller.emailCtrl.text.trim().isEmpty) {
-      Fluttertoast.showToast(msg: 'Please enter email');
+    final emailErr = TxtValidation.emailError(controller.emailCtrl.text);
+    if (emailErr != null) {
+      Fluttertoast.showToast(msg: emailErr);
       return;
     }
     if (controller.selectedDob.value == null) {

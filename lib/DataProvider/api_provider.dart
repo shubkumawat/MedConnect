@@ -67,6 +67,42 @@ class ApiProvider {
           }
         }
       }
+      else{
+
+      }
+      CustomLoading().hide(context);
+      return result;
+    }catch(e){
+      CustomLoading().hide(context);
+      PrintLog.printLog("Exception..........$e.........");
+      Fluttertoast.showToast(msg: "Something went wrong");
+      return result;
+    }
+
+  }
+  Future<Map<String, dynamic>?> addFamilyMemberAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
+    Map<String, dynamic>? result;
+    try{
+      CustomLoading().show(context);
+      final Response? response = await requestPostForApi(context, url, dictParameter, token);
+
+      if(response != null && response.statusCode == 200){
+        if (response.data is Map) {
+          result = Map<String, dynamic>.from(response.data);
+        } else if (response.data is String && response.data.toString().isNotEmpty) {
+          try {
+            var decoded = jsonDecode(response.data);
+            if (decoded is Map) {
+              result = Map<String, dynamic>.from(decoded);
+            }
+          } catch (e) {
+            PrintLog.printLog("Error decoding login response: $e");
+          }
+        }
+      }
+      else{
+
+      }
       CustomLoading().hide(context);
       return result;
     }catch(e){

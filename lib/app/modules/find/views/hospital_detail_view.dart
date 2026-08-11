@@ -125,6 +125,16 @@ class _HospitalDetailViewState extends State<HospitalDetailView> {
   }
 
   void _showReviewSheet(HospitalDetail hospital) {
+    if (controller.hasUserReviewed.value || hospital.hasReviewed) {
+      Get.snackbar(
+        'Already reviewed',
+        'You have already submitted a review for this place.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.black87,
+        colorText: Colors.white,
+      );
+      return;
+    }
     Get.bottomSheet(
       _WriteReviewSheet(
         hospital: hospital,
@@ -139,7 +149,6 @@ class _HospitalDetailViewState extends State<HospitalDetailView> {
       ),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      ignoreSafeArea: true,
       enableDrag: true,
     );
   }
@@ -176,6 +185,7 @@ class _HospitalDetailViewState extends State<HospitalDetailView> {
         }
         return _DetailBody(
           hospital: hospital,
+          hasReviewed: controller.hasUserReviewed.value || hospital.hasReviewed,
           onBack: () => Get.back(),
           onCall: () => _callPhone(hospital.phone),
           onEmergency: () => _callPhone(
@@ -199,6 +209,7 @@ class _HospitalDetailViewState extends State<HospitalDetailView> {
 
 class _DetailBody extends StatelessWidget {
   final HospitalDetail hospital;
+  final bool hasReviewed;
   final VoidCallback onBack;
   final VoidCallback onCall;
   final VoidCallback onEmergency;
@@ -209,6 +220,7 @@ class _DetailBody extends StatelessWidget {
 
   const _DetailBody({
     required this.hospital,
+    required this.hasReviewed,
     required this.onBack,
     required this.onCall,
     required this.onEmergency,
@@ -353,6 +365,7 @@ class _DetailBody extends StatelessWidget {
                         child: _TopRatingCard(
                           hospital: hospital,
                           rating: rating,
+                          hasReviewed: hasReviewed,
                           onWriteReview: onReview,
                         )
                             .animate()
@@ -563,6 +576,7 @@ class _DetailBody extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                         child: _ReviewsSection(
                           hospital: hospital,
+                          hasReviewed: hasReviewed,
                           onWriteReview: onReview,
                         ),
                       ),
@@ -661,11 +675,13 @@ class _DetailBody extends StatelessWidget {
 class _TopRatingCard extends StatelessWidget {
   final HospitalDetail hospital;
   final double rating;
+  final bool hasReviewed;
   final VoidCallback onWriteReview;
 
   const _TopRatingCard({
     required this.hospital,
     required this.rating,
+    required this.hasReviewed,
     required this.onWriteReview,
   });
 
@@ -838,32 +854,46 @@ class _TopRatingCard extends StatelessWidget {
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      onWriteReview();
-                    },
+                    onTap: hasReviewed
+                        ? null
+                        : () {
+                            HapticFeedback.lightImpact();
+                            onWriteReview();
+                          },
                     borderRadius: BorderRadius.circular(14),
                     child: Ink(
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0B6E4F), Color(0xFF1B9E8E)],
-                        ),
+                        gradient: hasReviewed
+                            ? null
+                            : const LinearGradient(
+                                colors: [Color(0xFF0B6E4F), Color(0xFF1B9E8E)],
+                              ),
+                        color: hasReviewed ? const Color(0xFFE8EEEC) : null,
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
                           horizontal: 14,
                           vertical: 10,
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.edit_rounded,
-                                color: Colors.white, size: 15),
-                            SizedBox(width: 6),
+                            Icon(
+                              hasReviewed
+                                  ? Icons.check_circle_rounded
+                                  : Icons.edit_rounded,
+                              color: hasReviewed
+                                  ? AppColors.tealDark
+                                  : Colors.white,
+                              size: 15,
+                            ),
+                            const SizedBox(width: 6),
                             Text(
-                              'Rate',
+                              hasReviewed ? 'Reviewed' : 'Rate',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: hasReviewed
+                                    ? AppColors.tealDark
+                                    : Colors.white,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 13,
                               ),
@@ -1675,9 +1705,11 @@ class _DeptTile extends StatelessWidget {
 
 class _ReviewsSection extends StatelessWidget {
   final HospitalDetail hospital;
+  final bool hasReviewed;
   final VoidCallback onWriteReview;
   const _ReviewsSection({
     required this.hospital,
+    required this.hasReviewed,
     required this.onWriteReview,
   });
 
@@ -1908,10 +1940,12 @@ class _ReviewsSection extends StatelessWidget {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      onWriteReview();
-                    },
+                    onPressed: hasReviewed
+                        ? null
+                        : () {
+                            HapticFeedback.lightImpact();
+                            onWriteReview();
+                          },
                     style: ElevatedButton.styleFrom(
                       elevation: 0,
                       padding: EdgeInsets.zero,
@@ -1919,25 +1953,40 @@ class _ReviewsSection extends StatelessWidget {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       backgroundColor: Colors.transparent,
+                      disabledBackgroundColor: Colors.transparent,
                     ),
                     child: Ink(
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0B6E4F), Color(0xFF1B9E8E)],
-                        ),
+                        gradient: hasReviewed
+                            ? null
+                            : const LinearGradient(
+                                colors: [Color(0xFF0B6E4F), Color(0xFF1B9E8E)],
+                              ),
+                        color: hasReviewed ? const Color(0xFFE8EEEC) : null,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Center(
+                      child: Center(
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.edit_rounded,
-                                color: Colors.white, size: 18),
-                            SizedBox(width: 8),
+                            Icon(
+                              hasReviewed
+                                  ? Icons.check_circle_rounded
+                                  : Icons.edit_rounded,
+                              color: hasReviewed
+                                  ? AppColors.tealDark
+                                  : Colors.white,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
                             Text(
-                              'Write a review',
+                              hasReviewed
+                                  ? 'You already reviewed'
+                                  : 'Write a review',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: hasReviewed
+                                    ? AppColors.tealDark
+                                    : Colors.white,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 15,
                               ),
@@ -1950,7 +1999,9 @@ class _ReviewsSection extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Your review helps families choose the right care.',
+                  hasReviewed
+                      ? 'Thanks — only one review per place is allowed.'
+                      : 'Your review helps families choose the right care.',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.caption.copyWith(
                     color: AppColors.textGray,
@@ -2136,41 +2187,36 @@ class _WriteReviewSheetState extends State<_WriteReviewSheet> {
     final media = MediaQuery.of(context);
     final keyboard = media.viewInsets.bottom;
     final safeBottom = media.padding.bottom;
-    // Available height above keyboard — avoids empty gap in the middle.
-    final sheetHeight =
-        (media.size.height - keyboard).clamp(320.0, media.size.height * 0.92);
+    // Get.bottomSheet already lifts for the keyboard — don't pad again
+    // (that was causing the empty gap). Just fit content above it.
+    final maxHeight = media.size.height * 0.92;
 
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      padding: EdgeInsets.only(bottom: keyboard),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Material(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-          clipBehavior: Clip.antiAlias,
-          child: SizedBox(
-            height: sheetHeight,
-            width: double.infinity,
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    controller: _scrollCtrl,
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    children: [
+    return Material(
+      color: Colors.white,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                controller: _scrollCtrl,
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
                       // Hospital header
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -2372,61 +2418,59 @@ class _WriteReviewSheetState extends State<_WriteReviewSheet> {
                   ),
                 ),
 
-                // Sticky submit — stays above keyboard, no gap
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.fromLTRB(
-                    20,
-                    10,
-                    20,
-                    (keyboard > 0 ? 10 : 12 + safeBottom),
+            // Sticky submit — flush to sheet bottom / keyboard
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(
+                20,
+                10,
+                20,
+                keyboard > 0 ? 10 : 12 + safeBottom,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, -4),
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 12,
-                        offset: const Offset(0, -4),
-                      ),
-                    ],
-                  ),
-                  child: SizedBox(
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _submitting ? null : _submit,
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: AppColors.tealDark,
-                        disabledBackgroundColor:
-                            AppColors.teal.withValues(alpha: 0.45),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: _submitting
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.4,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'Submit review',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                              ),
-                            ),
+                ],
+              ),
+              child: SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _submitting ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: AppColors.tealDark,
+                    disabledBackgroundColor:
+                        AppColors.teal.withValues(alpha: 0.45),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
+                  child: _submitting
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Submit review',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

@@ -24,35 +24,9 @@ class _BmiCalculatorScreenState extends State<BmiCalculatorScreen> {
   final _ageCtrl = TextEditingController();
   final _heightCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
-  String _gender = 'male';
+  /// Empty until the user picks Male / Female — no defaults.
+  String _gender = '';
   bool _loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _prefillFromSelectedMember();
-  }
-
-  void _prefillFromSelectedMember() {
-    if (!Get.isRegistered<HomeController>()) return;
-    final p = Get.find<HomeController>().selectedPatient;
-    if (p == null) return;
-    if (p.age != null && p.age! > 0) _ageCtrl.text = '${p.age}';
-    final g = (p.gender ?? '').toLowerCase();
-    if (g.startsWith('f')) {
-      _gender = 'female';
-    } else if (g.startsWith('m')) {
-      _gender = 'male';
-    }
-    final h = p.height?.toString().trim() ?? '';
-    if (h.isNotEmpty && h.toLowerCase() != 'null') {
-      _heightCtrl.text = h.replaceAll(RegExp(r'[^0-9.]'), '');
-    }
-    final w = p.weight?.toString().trim() ?? '';
-    if (w.isNotEmpty && w.toLowerCase() != 'null') {
-      _weightCtrl.text = w.replaceAll(RegExp(r'[^0-9.]'), '');
-    }
-  }
 
   @override
   void dispose() {
@@ -67,6 +41,10 @@ class _BmiCalculatorScreenState extends State<BmiCalculatorScreen> {
     final height = double.tryParse(_heightCtrl.text.trim());
     final weight = double.tryParse(_weightCtrl.text.trim());
 
+    if (_gender != 'male' && _gender != 'female') {
+      Fluttertoast.showToast(msg: 'Select gender');
+      return;
+    }
     if (age == null || age <= 0 || age > 120) {
       Fluttertoast.showToast(msg: 'Enter a valid age');
       return;

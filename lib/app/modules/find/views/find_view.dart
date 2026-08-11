@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
@@ -23,9 +25,88 @@ class _FindScreenState extends State<FindScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   final PageController _mapCardsPage = PageController(viewportFraction: 0.88);
   GoogleMapController? mapController;
+  Worker? _userPosWorker;
+  Worker? _showMapWorker;
+
+  BitmapDescriptor? _hospitalMarker;
+  BitmapDescriptor? _clinicMarker;
+  BitmapDescriptor? _doctorMarker;
+
+  static const double _myLocationZoom = 15;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMarkerIcons();
+    // Whenever location arrives (or map opens), keep camera on the user.
+    _userPosWorker = ever(controller.userPosition, (_) => _goToMyLocation());
+    _showMapWorker = ever(controller.showMap, (show) {
+      if (show == true) {
+        _goToMyLocation();
+      } else {
+        mapController = null;
+      }
+    });
+  }
+
+  Future<void> _goToMyLocation({double zoom = _myLocationZoom}) async {
+    if (!controller.showMap.value) return;
+    final p = controller.userPosition.value;
+    final map = mapController;
+    if (p == null || map == null) return;
+    try {
+      await map.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(p.latitude, p.longitude),
+          zoom,
+        ),
+      );
+    } catch (_) {
+      // Map may be disposed during tab switch.
+    }
+  }
+
+  Future<void> _loadMarkerIcons() async {
+    final results = await Future.wait([
+      _createCareMarkerIcon(
+        Icons.local_hospital_rounded,
+        AppColors.tealDark,
+      ),
+      _createCareMarkerIcon(
+        Icons.medical_services_rounded,
+        const Color(0xFFE67E22),
+      ),
+      _createCareMarkerIcon(
+        Icons.person_rounded,
+        const Color(0xFF2E86DE),
+      ),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _hospitalMarker = results[0];
+      _clinicMarker = results[1];
+      _doctorMarker = results[2];
+    });
+  }
+
+  BitmapDescriptor _markerFor(Hospital h) {
+    switch (carePlaceKind(h)) {
+      case CarePlaceKind.clinic:
+        return _clinicMarker ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+      case CarePlaceKind.doctor:
+        return _doctorMarker ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+      case CarePlaceKind.hospital:
+        return _hospitalMarker ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose);
+    }
+  }
 
   @override
   void dispose() {
+    _userPosWorker?.dispose();
+    _showMapWorker?.dispose();
     _searchCtrl.dispose();
     _mapCardsPage.dispose();
     mapController?.dispose();
@@ -183,10 +264,17 @@ class _FindScreenState extends State<FindScreen> {
           .toList();
 
       final markers = withCoords.map((h) {
+        final kind = carePlaceKind(h);
         return Marker(
           markerId: MarkerId(h.hospitalId),
           position: LatLng(double.parse(h.latitude!), double.parse(h.longitude!)),
-          infoWindow: InfoWindow(title: h.name, snippet: h.hospitalType),
+          icon: _markerFor(h),
+          infoWindow: InfoWindow(
+            title: h.name,
+            snippet: h.hospitalType.isNotEmpty
+                ? h.hospitalType
+                : carePlaceLabel(kind),
+          ),
           onTap: () {
             final idx = withCoords.indexWhere((e) => e.hospitalId == h.hospitalId);
             if (idx >= 0 && _mapCardsPage.hasClients) {
@@ -200,37 +288,39 @@ class _FindScreenState extends State<FindScreen> {
         );
       }).toSet();
 
-      LatLng center = const LatLng(28.6139, 77.2090);
-      if (controller.userPosition.value != null) {
-        center = LatLng(
-          controller.userPosition.value!.latitude,
-          controller.userPosition.value!.longitude,
-        );
-      } else if (markers.isNotEmpty) {
-        center = markers.first.position;
-      }
+      final pos = controller.userPosition.value;
+      final LatLng center = pos != null
+          ? LatLng(pos.latitude, pos.longitude)
+          : (markers.isNotEmpty
+              ? markers.first.position
+              : const LatLng(28.6139, 77.2090));
 
       return Stack(
         children: [
           Positioned.fill(
             child: GoogleMap(
-              initialCameraPosition: CameraPosition(target: center, zoom: 13.5),
+              // Remount once location is known so camera starts on the user.
+              key: ValueKey(pos == null ? 'map-waiting' : 'map-ready'),
+              initialCameraPosition: CameraPosition(
+                target: center,
+                zoom: pos != null ? _myLocationZoom : 13.5,
+              ),
               markers: {
                 ...markers,
-                if (controller.userPosition.value != null)
+                if (pos != null)
                   Marker(
                     markerId: const MarkerId('user_location'),
-                    position: LatLng(
-                      controller.userPosition.value!.latitude,
-                      controller.userPosition.value!.longitude,
-                    ),
+                    position: LatLng(pos.latitude, pos.longitude),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueAzure,
                     ),
                     infoWindow: const InfoWindow(title: 'You are here'),
                   ),
               },
-              onMapCreated: (c) => mapController = c,
+              onMapCreated: (c) {
+                mapController = c;
+                _goToMyLocation();
+              },
               myLocationEnabled: true,
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
@@ -260,15 +350,7 @@ class _FindScreenState extends State<FindScreen> {
                   icon: Icons.my_location_rounded,
                   onTap: () async {
                     await controller.fetchHospitals();
-                    final p = controller.userPosition.value;
-                    if (p != null && mapController != null) {
-                      mapController!.animateCamera(
-                        CameraUpdate.newLatLngZoom(
-                          LatLng(p.latitude, p.longitude),
-                          14,
-                        ),
-                      );
-                    }
+                    await _goToMyLocation();
                   },
                 ),
                 const SizedBox(height: 10),
@@ -1118,12 +1200,23 @@ class _HospitalCard extends StatelessWidget {
                           color: AppColors.teal.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(
-                          hospital.hospitalType,
-                          style: AppTextStyles.captionBold.copyWith(
-                            color: AppColors.tealDark,
-                            fontSize: 11,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              carePlaceIcon(carePlaceKind(hospital)),
+                              size: 12,
+                              color: AppColors.tealDark,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              hospital.hospitalType,
+                              style: AppTextStyles.captionBold.copyWith(
+                                color: AppColors.tealDark,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     const SizedBox(height: 8),
@@ -1189,6 +1282,7 @@ class _HospitalCard extends StatelessWidget {
   }
 
   Widget _coverFallback() {
+    final kind = carePlaceKind(hospital);
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -1197,8 +1291,8 @@ class _HospitalCard extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
       ),
-      child: const Center(
-        child: Icon(Icons.local_hospital_rounded, color: Colors.white54, size: 42),
+      child: Center(
+        child: Icon(carePlaceIcon(kind), color: Colors.white54, size: 42),
       ),
     );
   }
@@ -1213,6 +1307,8 @@ class _MapHospitalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rating = double.tryParse(hospital.averageRating) ?? 0;
     final cover = hospital.bannerUrl ?? hospital.logoUrl;
+    final kind = carePlaceKind(hospital);
+    final placeIcon = carePlaceIcon(kind);
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(20),
@@ -1234,12 +1330,12 @@ class _MapHospitalCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                           color: AppColors.teal.withValues(alpha: 0.15),
-                          child: const Icon(Icons.local_hospital_rounded, color: AppColors.teal),
+                          child: Icon(placeIcon, color: AppColors.teal),
                         ),
                       )
                     : Container(
                         color: AppColors.teal.withValues(alpha: 0.15),
-                        child: const Icon(Icons.local_hospital_rounded, color: AppColors.teal),
+                        child: Icon(placeIcon, color: AppColors.teal),
                       ),
               ),
             ),
@@ -1260,7 +1356,9 @@ class _MapHospitalCard extends StatelessWidget {
                     Text(
                       hospital.hospitalType.isNotEmpty
                           ? hospital.hospitalType
-                          : (hospital.cityName.isNotEmpty ? hospital.cityName : 'Hospital'),
+                          : (hospital.cityName.isNotEmpty
+                              ? hospital.cityName
+                              : carePlaceLabel(kind)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.caption.copyWith(color: AppColors.textGray),
@@ -1382,4 +1480,98 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+enum CarePlaceKind { hospital, clinic, doctor }
+
+CarePlaceKind carePlaceKind(Hospital h) {
+  final t = '${h.hospitalType} ${h.name}'.toLowerCase();
+  if (t.contains('clinic') ||
+      t.contains('polyclinic') ||
+      t.contains('dispensary') ||
+      t.contains('nursing home')) {
+    return CarePlaceKind.clinic;
+  }
+  if (t.contains('doctor') ||
+      t.contains('physician') ||
+      t.contains('practitioner') ||
+      t.contains('dr ') ||
+      t.contains('dr.')) {
+    return CarePlaceKind.doctor;
+  }
+  return CarePlaceKind.hospital;
+}
+
+IconData carePlaceIcon(CarePlaceKind kind) {
+  switch (kind) {
+    case CarePlaceKind.clinic:
+      return Icons.medical_services_rounded;
+    case CarePlaceKind.doctor:
+      return Icons.person_rounded;
+    case CarePlaceKind.hospital:
+      return Icons.local_hospital_rounded;
+  }
+}
+
+String carePlaceLabel(CarePlaceKind kind) {
+  switch (kind) {
+    case CarePlaceKind.clinic:
+      return 'Clinic';
+    case CarePlaceKind.doctor:
+      return 'Doctor';
+    case CarePlaceKind.hospital:
+      return 'Hospital';
+  }
+}
+
+Future<BitmapDescriptor> _createCareMarkerIcon(
+  IconData iconData,
+  Color color,
+) async {
+  const double size = 72;
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  final center = const Offset(size / 2, size / 2 - 6);
+
+  // Soft shadow
+  canvas.drawCircle(
+    center.translate(0, 2),
+    22,
+    Paint()..color = Colors.black.withValues(alpha: 0.18),
+  );
+
+  // Pin head
+  canvas.drawCircle(center, 20, Paint()..color = color);
+  canvas.drawCircle(center, 16, Paint()..color = Colors.white);
+
+  // Pin tip
+  final tip = Path()
+    ..moveTo(size / 2 - 9, size / 2 + 10)
+    ..lineTo(size / 2, size - 4)
+    ..lineTo(size / 2 + 9, size / 2 + 10)
+    ..close();
+  canvas.drawPath(tip, Paint()..color = color);
+
+  final textPainter = TextPainter(textDirection: TextDirection.ltr)
+    ..text = TextSpan(
+      text: String.fromCharCode(iconData.codePoint),
+      style: TextStyle(
+        fontSize: 18,
+        fontFamily: iconData.fontFamily,
+        package: iconData.fontPackage,
+        color: color,
+      ),
+    )
+    ..layout();
+  textPainter.paint(
+    canvas,
+    Offset(
+      (size - textPainter.width) / 2,
+      center.dy - textPainter.height / 2,
+    ),
+  );
+
+  final image = await recorder.endRecording().toImage(size.toInt(), size.toInt());
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+  return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
 }

@@ -65,8 +65,7 @@ class _OtpInputRowState extends State<OtpInputRow> {
     for (int i = 0; i < 6; i++) {
       _controllers[i].text = i < otp.length ? otp[i] : '';
     }
-    _emit();
-    if (otp.length == 6) widget.onCompleted(otp);
+    _emit(); // also triggers onCompleted when 6 digits
   }
 
   String get _otp => _controllers.map((c) => c.text).join();

@@ -153,10 +153,13 @@ class HomeController extends GetxController {
       final i = patients.indexWhere(
         (p) => (p.patientId?.trim() ?? '') == saved.trim(),
       );
-      activePatientIndex.value = i >= 0 ? i : 0;
-    } else {
-      activePatientIndex.value = 0;
+      if (i > 0) {
+        final member = patients.removeAt(i);
+        patients.insert(0, member);
+      }
     }
+    // Selected member always lives at the front of the passport.
+    activePatientIndex.value = 0;
     final member = selectedPatient;
     final id = member?.patientId?.trim() ?? '';
     if (id.isNotEmpty) {
@@ -166,14 +169,18 @@ class HomeController extends GetxController {
     _syncRecordsSelection(member, refreshIfChanged: true);
   }
 
+  /// Select by tap only (not scroll). Moves that member to first position.
   void changePatient(int index) {
     if (patients.isEmpty) return;
     final i = index.clamp(0, patients.length - 1);
-    activePatientIndex.value = i;
-    final member = patients[i];
+    if (i != 0) {
+      final moved = patients.removeAt(i);
+      patients.insert(0, moved);
+    }
+    activePatientIndex.value = 0;
+    final member = patients[0];
     final id = member.patientId?.trim() ?? '';
     StorageService().setString(StorageService.selectedPatientId, id);
-    // Scrolling a passport card selects that member for Records.
     _syncRecordsSelection(member, refreshIfChanged: true);
   }
 
@@ -214,8 +221,8 @@ class HomeController extends GetxController {
   }) async {
     if (index != null) {
       changePatient(index);
-      member ??=
-          (index >= 0 && index < patients.length) ? patients[index] : null;
+      // changePatient moves the member to index 0.
+      member ??= patients.isNotEmpty ? patients[0] : null;
     } else if (patientId != null && patientId.trim().isNotEmpty) {
       final id = patientId.trim();
       await StorageService().setString(StorageService.selectedPatientId, id);

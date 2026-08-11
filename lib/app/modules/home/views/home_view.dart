@@ -31,18 +31,20 @@ class _HomeScreenState extends State<HomeScreen> {
   late final HomeController controller;
   late final PageController _passportPage;
   Worker? _passportIndexWorker;
+  int _passportVisiblePage = 0;
 
   @override
   void initState() {
     super.initState();
     controller = Get.put(HomeController());
     _passportPage = PageController(viewportFraction: 0.88);
-    // Keep PageView on the selected passport card (restore / programmatic select).
+    // Selected member is always index 0 — keep PageView on it after restore/select.
     _passportIndexWorker = ever<int>(controller.activePatientIndex, (i) {
       if (!_passportPage.hasClients) return;
       final page = _passportPage.page?.round();
       if (page == i) return;
       _passportPage.jumpToPage(i);
+      if (mounted) setState(() => _passportVisiblePage = i);
     });
   }
 
@@ -70,21 +72,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _addMember() async {
-    final familyController = Get.find<FamilyMemberController>();
+    // Family tab registers this; home can open Add before that visit.
+    final familyController = Get.isRegistered<FamilyMemberController>()
+        ? Get.find<FamilyMemberController>()
+        : Get.put(FamilyMemberController());
     familyController.clearFields();
     final result = await Get.to(() => const AddFamilyMemberScreen());
     if (result == true) {
       await controller.fetchFamilyMembers();
       if (controller.patients.isNotEmpty) {
-        final last = controller.patients.length - 1;
-        controller.changePatient(last);
+        // New member is appended; select moves them to first card.
+        controller.changePatient(controller.patients.length - 1);
         if (_passportPage.hasClients) {
-          _passportPage.animateToPage(
-            last,
+          await _passportPage.animateToPage(
+            0,
             duration: 320.ms,
             curve: Curves.easeOutCubic,
           );
         }
+        if (mounted) setState(() => _passportVisiblePage = 0);
       }
     }
   }
@@ -115,16 +121,28 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _PassportSection(
                 controller: controller,
                 pageController: _passportPage,
+                visiblePage: _passportVisiblePage,
                 onAdd: _addMember,
+                onPageChanged: (i) {
+                  if (mounted) setState(() => _passportVisiblePage = i);
+                },
                 onSelectMember: (index) async {
+                  // Scroll browses only. Tap selects and brings card to first.
+                  final alreadySelected =
+                      controller.activePatientIndex.value == index;
+                  if (alreadySelected) {
+                    await controller.openRecordsForSelected(index: index);
+                    return;
+                  }
+                  controller.changePatient(index);
                   if (_passportPage.hasClients) {
                     await _passportPage.animateToPage(
-                      index,
+                      0,
                       duration: 280.ms,
                       curve: Curves.easeOutCubic,
                     );
                   }
-                  await controller.openRecordsForSelected(index: index);
+                  if (mounted) setState(() => _passportVisiblePage = 0);
                 },
               ),
             ),
@@ -134,10 +152,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _TodaysCare(controller: controller)
-                        .animate()
-                        .fadeIn(delay: 120.ms, duration: 420.ms)
-                        .slideY(begin: 0.06, end: 0),
+                    // _TodaysCare(controller: controller)
+                    //     .animate()
+                    //     .fadeIn(delay: 120.ms, duration: 420.ms)
+                    //     .slideY(begin: 0.06, end: 0),
                     const SizedBox(height: 18),
                     _BmiCalculatorCard(
                       onTap: () => Get.to(() => const BmiCalculatorScreen()),
@@ -272,13 +290,17 @@ class _IconBtn extends StatelessWidget {
 class _PassportSection extends StatelessWidget {
   final HomeController controller;
   final PageController pageController;
+  final int visiblePage;
   final VoidCallback onAdd;
+  final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onSelectMember;
 
   const _PassportSection({
     required this.controller,
     required this.pageController,
+    required this.visiblePage,
     required this.onAdd,
+    required this.onPageChanged,
     required this.onSelectMember,
   });
 
@@ -325,7 +347,8 @@ class _PassportSection extends StatelessWidget {
             return PageView.builder(
               controller: pageController,
               itemCount: controller.patients.length,
-              onPageChanged: controller.changePatient,
+              // Browse only — selection happens on tap.
+              onPageChanged: onPageChanged,
               physics: const BouncingScrollPhysics(),
               itemBuilder: (context, index) {
                 return AnimatedBuilder(
@@ -355,10 +378,11 @@ class _PassportSection extends StatelessWidget {
         Obx(() {
           final n = controller.patients.length;
           if (n <= 1) return const SizedBox(height: 6);
+          final page = visiblePage.clamp(0, n - 1);
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(n, (i) {
-              final active = controller.activePatientIndex.value == i;
+              final active = page == i;
               return AnimatedContainer(
                 duration: 220.ms,
                 margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -647,7 +671,7 @@ class _PassportCard extends StatelessWidget {
                     Text(
                       isSelected
                           ? 'Tap card → open records'
-                          : 'Tap to select & open records',
+                          : 'Swipe to browse · Tap to select',
                       style: TextStyle(
                         color: AppColors.textGray.withValues(alpha: 0.9),
                         fontSize: 11,

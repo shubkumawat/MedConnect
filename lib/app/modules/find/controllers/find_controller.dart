@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../../DataProvider/app_shared_preferences.dart';
+import '../../../data/services/storage_service.dart';
 
 enum FindSortMode { nearest, rating, reviews, name }
 
@@ -24,6 +25,8 @@ class FindController extends GetxController {
   var hospitalDetail = Rxn<HospitalDetail>();
   var isDetailLoading = false.obs;
   var userPosition = Rxn<Position>();
+  /// Current user already reviewed the open hospital/clinic.
+  var hasUserReviewed = false.obs;
 
   /// Client-side filter + sort over API hospital list (does not change API).
   List<Hospital> get filteredHospitals {
@@ -222,24 +225,44 @@ class FindController extends GetxController {
   Future<void> fetchHospitalDetail(String hospitalId) async {
     try {
       isDetailLoading(true);
+      hasUserReviewed.value = false;
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
       final response = await ApiProvider().getHospitalDetailAPI(null, hospitalId, token ?? '');
       print("Hospital Detail Response: $response");
       if (response != null && response['error'] == false) {
-
-        hospitalDetail.value = HospitalDetail.fromJson(response['data']);
+        final detail = HospitalDetail.fromJson(response['data']);
+        hospitalDetail.value = detail;
+        final local = await StorageService().hasReviewedPlace(hospitalId);
+        hasUserReviewed.value = detail.hasReviewed || local;
+        if (detail.hasReviewed) {
+          await StorageService().markPlaceReviewed(hospitalId);
+        }
       }
     } finally {
       isDetailLoading(false);
     }
   }
 
-  Future<void> submitReview({
+  bool _looksLikeAlreadyReviewed(String? message) {
+    final m = (message ?? '').toLowerCase();
+    return m.contains('already') ||
+        m.contains('already reviewed') ||
+        m.contains('duplicate') ||
+        m.contains('exist') ||
+        m.contains('once');
+  }
+
+  /// Returns true when review was accepted (or already on file).
+  Future<bool> submitReview({
     required String id,
     required double rating,
     required String comment,
     required bool isHospital,
   }) async {
+    if (hasUserReviewed.value) {
+      Fluttertoast.showToast(msg: 'You have already reviewed this place');
+      return false;
+    }
     try {
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
       String url = isHospital
@@ -257,16 +280,27 @@ class FindController extends GetxController {
       );
 
       if (response != null && response['error'] == false) {
+        await StorageService().markPlaceReviewed(id);
+        hasUserReviewed.value = true;
         fetchHospitalDetail(id);
         Get.snackbar("Success", "Review submitted successfully",
             snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
-      } else {
-        Get.snackbar("Error", response?['message'] ?? "Failed to submit review",
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+        return true;
       }
+
+      final msg = response?['message']?.toString() ?? 'Failed to submit review';
+      if (_looksLikeAlreadyReviewed(msg)) {
+        await StorageService().markPlaceReviewed(id);
+        hasUserReviewed.value = true;
+        Fluttertoast.showToast(msg: 'You have already reviewed this place');
+        return false;
+      }
+      Fluttertoast.showToast(msg: msg);
+      return false;
     } catch (e) {
       Get.snackbar("Error", "Something went wrong",
           snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+      return false;
     }
   }
 }

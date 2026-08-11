@@ -8,6 +8,7 @@ import '../../../core/theme/app_text_theme.dart';
 import '../../../core/widgets/live_text_field.dart';
 import '../../../core/widgets/otp_input_row.dart';
 import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
 import '../controllers/login_controller.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -179,6 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
       KeyedSubtree(
         key: ValueKey('otp_section_${controller.otpRebuildKey.value}'),
         child: OtpInputRow(
+          otp: controller.receivedOtp.value,
           onCompleted: _verifyOtp,
           onChanged: (otp) => controller.receivedOtp.value = otp,
         ),
@@ -200,21 +202,47 @@ class _LoginScreenState extends State<LoginScreen> {
         return const SizedBox.shrink();
       }),
       const SizedBox(height: 8),
-      Obx(
-        () => controller.resendSecondsLeft.value > 0
-            ? Text(
-                'Resend code in ${controller.resendSecondsLeft.value}s',
-                style:
-                    AppTextStyles.caption.copyWith(color: AppColors.textGray),
-              )
-            : GestureDetector(
-                onTap: () => controller.getSendOtpAPI(context),
+      Obx(() {
+        final locked = controller.lockoutSecondsLeft.value > 0;
+        final wait = controller.resendSecondsLeft.value;
+        if (wait > 0) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Resend code in ${wait}s',
+              style: AppTextStyles.caption.copyWith(color: AppColors.textGray),
+            ),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            children: [
+              Text(
+                "Didn't get the code? ",
+                style: AppTextStyles.caption.copyWith(color: AppColors.textGray),
+              ),
+              GestureDetector(
+                onTap: locked
+                    ? null
+                    : () => controller.getSendOtpAPI(context),
                 child: Text(
-                  "Didn't receive the code? Resend",
-                  style: AppTextStyles.orangeLabel,
+                  'Resend',
+                  style: AppTextStyles.captionBold.copyWith(
+                    color: locked
+                        ? AppColors.textGray
+                        : AppColors.primary,
+                    decoration: TextDecoration.underline,
+                    decorationColor: locked
+                        ? AppColors.textGray
+                        : AppColors.primary,
+                  ),
                 ),
               ),
-      ),
+            ],
+          ),
+        );
+      }),
       const SizedBox(height: 28),
       Obx(
         () => CustomPrimaryButton(
@@ -289,7 +317,7 @@ class _PhoneStep extends StatelessWidget {
                                 items: controller.countryList.toList(),
                                 selected: selected,
                                 labelOf: (c) =>
-                                    '${c.flagEmoji}  ${c.name}  (+${c.phoneCode})',
+                                    '${c.flagEmoji}  ${c.name}  (${c.phoneCode})',
                               );
                             },
                           ).then((value) {
@@ -342,10 +370,7 @@ class _PhoneStep extends StatelessWidget {
                   controller: controller.phoneController,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.done,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(10),
-                  ],
+                  inputFormatters: TxtValidation.mobileFormatters,
                   hintText: 'Mobile number',
                   showClearButton: true,
                   isDense: true,

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healaura/app/core/Util/image_pick_helper.dart';
 import 'package:healaura/app/data/models/disease_document_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
@@ -100,14 +101,15 @@ class _AddDiseaseDocumentScreenState extends State<AddDiseaseDocumentScreen> {
     );
     if (source == null) return;
 
-    final picker = ImagePicker();
     if (source == 'camera') {
-      final shot = await picker.pickImage(source: ImageSource.camera);
-      if (shot != null) setState(() => _files.add(shot));
+      final file = await ImagePickHelper.pick(source: ImageSource.camera);
+      if (file != null) {
+        setState(() => _files.add(XFile(file.path)));
+      }
       return;
     }
 
-    final images = await picker.pickMultiImage();
+    final images = await ImagePickHelper.pickMulti(limit: remaining);
     if (images.isEmpty) return;
     setState(() {
       _files.addAll(images.take(remaining));

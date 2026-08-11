@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
 import 'package:healaura/app/core/theme/app_colors.dart';
 import 'package:healaura/app/core/theme/app_text_theme.dart';
 import 'package:healaura/app/data/models/GetCountryApiResponseModel.dart'
@@ -85,6 +86,9 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                                 hint: 'Full Name',
                                 controller: controller.fullNameCtrl,
                                 prefixIcon: Icons.person_outline_rounded,
+                                keyboardType: TextInputType.name,
+                                inputFormatters: TxtValidation.nameFormatters,
+                                validator: TxtValidation.personNameError,
                               ),
                               const SizedBox(height: 12),
                               CustomTextField(
@@ -92,11 +96,8 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                                 controller: controller.mobileNumberCtrl,
                                 prefixIcon: Icons.phone_android_rounded,
                                 keyboardType: TextInputType.phone,
-                                maxLength: 10,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(10),
-                                ],
+                                maxLength: TxtValidation.mobileMaxLength,
+                                inputFormatters: TxtValidation.mobileFormatters,
                               ),
                               const SizedBox(height: 12),
                               CustomTextField(
@@ -438,6 +439,9 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                                 hint: 'Contact Person Name',
                                 controller: controller.contactNameCtrl,
                                 prefixIcon: Icons.person_pin_outlined,
+                                keyboardType: TextInputType.name,
+                                inputFormatters: TxtValidation.nameFormatters,
+                                validator: TxtValidation.personNameError,
                               ),
                               const SizedBox(height: 12),
                               CustomTextField(
@@ -445,11 +449,8 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                                 controller: controller.contactMobileCtrl,
                                 prefixIcon: Icons.phone_android_rounded,
                                 keyboardType: TextInputType.phone,
-                                maxLength: 10,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(10),
-                                ],
+                                maxLength: TxtValidation.mobileMaxLength,
+                                inputFormatters: TxtValidation.mobileFormatters,
                               ),
                               const SizedBox(height: 12),
                               Obx(

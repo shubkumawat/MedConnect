@@ -12,6 +12,7 @@ import 'package:healaura/DataProvider/app_shared_preferences.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
 import 'package:healaura/app/core/Util/image_pick_helper.dart';
+import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
 import 'package:healaura/app/data/services/storage_service.dart';
 import 'package:healaura/app/data/models/family_member_model.dart';
 
@@ -606,8 +607,9 @@ class FamilyMemberController extends GetxController {
   void _populateFields(FamilyMember member) {
     fullNameCtrl.text = member.fullName ?? '';
     final mobileDigits = (member.mobileNumber ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-    mobileNumberCtrl.text =
-        mobileDigits.length > 10 ? mobileDigits.substring(mobileDigits.length - 10) : mobileDigits;
+    mobileNumberCtrl.text = mobileDigits.length > TxtValidation.mobileMaxLength
+        ? mobileDigits.substring(mobileDigits.length - TxtValidation.mobileMaxLength)
+        : mobileDigits;
     if (member.dateOfBirth != null) {
       selectedDob.value = DateFormat('yyyy-MM-dd').parse(member.dateOfBirth!);
       dobCtrl.text = DateFormat('dd/MM/yyyy').format(selectedDob.value!);
@@ -657,30 +659,31 @@ class FamilyMemberController extends GetxController {
     }
 
     contactNameCtrl.text = member.emergencyContact?.contactName ?? '';
+    final contactDigits =
+        (member.emergencyContact?.phoneNumber ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+    contactMobileCtrl.text = contactDigits.length > TxtValidation.mobileMaxLength
+        ? contactDigits.substring(contactDigits.length - TxtValidation.mobileMaxLength)
+        : contactDigits;
     if (member.emergencyContact?.relation != null) {
       selectedContactRelationModel.value = relationList.firstWhereOrNull(
           (r) => r.name.toLowerCase() == member.emergencyContact?.relation?.toLowerCase() || 
                  r.code.toLowerCase() == member.emergencyContact?.relation?.toLowerCase());
       contactRelation.value = selectedContactRelationModel.value?.name ?? toBeginningOfSentenceCase(member.emergencyContact?.relation) ?? '';
     }
-    contactMobileCtrl.text = member.emergencyContact?.phoneNumber ?? '';
 
     insuranceProviderCtrl.text = member.insurance?.provider ?? '';
     policyNumberCtrl.text = member.insurance?.policyNumber ?? '';
   }
 
   bool _validate() {
-    if (fullNameCtrl.text.trim().isEmpty) {
-      Fluttertoast.showToast(msg: 'Please enter full name');
+    final nameErr = TxtValidation.personNameError(fullNameCtrl.text);
+    if (nameErr != null) {
+      Fluttertoast.showToast(msg: nameErr);
       return false;
     }
-    final mobile = mobileNumberCtrl.text.trim();
-    if (mobile.isEmpty) {
-      Fluttertoast.showToast(msg: 'Please enter mobile number');
-      return false;
-    }
-    if (mobile.length != 10 || !RegExp(r'^[0-9]{10}$').hasMatch(mobile)) {
-      Fluttertoast.showToast(msg: 'Mobile number must be exactly 10 digits');
+    final mobileErr = TxtValidation.mobileError(mobileNumberCtrl.text);
+    if (mobileErr != null) {
+      Fluttertoast.showToast(msg: mobileErr);
       return false;
     }
     if (selectedDob.value == null) {
@@ -695,10 +698,18 @@ class FamilyMemberController extends GetxController {
       Fluttertoast.showToast(msg: 'Please select relation');
       return false;
     }
-    final contactMobile = contactMobileCtrl.text.trim();
-    if (contactMobile.isNotEmpty &&
-        (contactMobile.length != 10 || !RegExp(r'^[0-9]{10}$').hasMatch(contactMobile))) {
-      Fluttertoast.showToast(msg: 'Emergency mobile must be exactly 10 digits');
+    final contactName = contactNameCtrl.text.trim();
+    if (contactName.isNotEmpty) {
+      final contactNameErr = TxtValidation.personNameError(contactName);
+      if (contactNameErr != null) {
+        Fluttertoast.showToast(msg: contactNameErr);
+        return false;
+      }
+    }
+    final contactMobileErr =
+        TxtValidation.mobileError(contactMobileCtrl.text, required: false);
+    if (contactMobileErr != null) {
+      Fluttertoast.showToast(msg: contactMobileErr);
       return false;
     }
     return true;
@@ -778,7 +789,7 @@ class FamilyMemberController extends GetxController {
         );
       } else {
         dictParameter["profile_photo"] = null;
-        response = await ApiProvider().loginApi(
+        response = await ApiProvider().addFamilyMemberAPI(
           context,
           WebApiConstant.API_URL_ADD_FAMILY_MEMBER,
           dictParameter,

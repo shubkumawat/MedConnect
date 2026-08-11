@@ -4,8 +4,10 @@ import 'package:get/get.dart';
 
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../dashboard/views/dashboard_view.dart';
 import '../controllers/profile_controller.dart';
 import 'widgets/profile_form_shell.dart';
 
@@ -74,6 +76,9 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
               hint: 'Contact Name',
               controller: controller.emergencyNameCtrl,
               prefixIcon: Icons.person_outline_rounded,
+              keyboardType: TextInputType.name,
+              inputFormatters: TxtValidation.nameFormatters,
+              validator: TxtValidation.personNameError,
             ),
             const SizedBox(height: 14),
             Obx(
@@ -103,7 +108,8 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
               controller: controller.emergencyMobileCtrl,
               prefixIcon: Icons.phone_outlined,
               keyboardType: TextInputType.phone,
-              maxLength: 10,
+              maxLength: TxtValidation.mobileMaxLength,
+              inputFormatters: TxtValidation.mobileFormatters,
             ),
           ],
         ),
@@ -196,8 +202,10 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
   }
 
   void _onComplete() {
-    if (controller.emergencyNameCtrl.text.trim().isEmpty) {
-      Fluttertoast.showToast(msg: 'Please enter emergency contact name');
+    final nameErr =
+        TxtValidation.personNameError(controller.emergencyNameCtrl.text);
+    if (nameErr != null) {
+      Fluttertoast.showToast(msg: nameErr);
       return;
     }
     if (controller.selectedEmergencyRelationModel.value == null &&
@@ -205,8 +213,10 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
       Fluttertoast.showToast(msg: 'Please select relationship');
       return;
     }
-    if (controller.emergencyMobileCtrl.text.trim().isEmpty) {
-      Fluttertoast.showToast(msg: 'Please enter mobile number');
+    final mobileErr =
+        TxtValidation.mobileError(controller.emergencyMobileCtrl.text);
+    if (mobileErr != null) {
+      Fluttertoast.showToast(msg: mobileErr);
       return;
     }
     if (controller.cityCtrl.text.trim().isEmpty) {
@@ -218,9 +228,11 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
       return;
     }
     controller.updateEmergencyAPI(context, () {
-      controller.getPatientProfileAPI(context);
-      int count = 0;
-      Navigator.popUntil(context, (route) => count++ == 3);
+      // Broken popUntil was closing Dashboard when stack was shorter than 3.
+      Get.offAll(
+        () => const DashboardScreen(),
+        transition: Transition.fadeIn,
+      );
     });
   }
 }

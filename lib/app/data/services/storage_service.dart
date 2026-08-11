@@ -28,6 +28,9 @@ class StorageService {
   static const vacReminders = "vacReminders";
   static const qrAlerts = "qrAlerts";
 
+  /// Hospital / clinic IDs the current user has already reviewed.
+  static const reviewedPlaceIds = "reviewedPlaceIds";
+
   // Address related keys
   static const savedAddresses = "savedAddresses";
   static const selectedAddress = "selectedAddress";
@@ -171,5 +174,27 @@ class StorageService {
     await prefs.remove(lastLatitude);
     await prefs.remove(lastLongitude);
     return await prefs.remove(selectedAddress);
+  }
+
+  Future<List<String>> getReviewedPlaceIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(reviewedPlaceIds) ?? <String>[];
+  }
+
+  Future<bool> hasReviewedPlace(String placeId) async {
+    final id = placeId.trim();
+    if (id.isEmpty) return false;
+    final ids = await getReviewedPlaceIds();
+    return ids.contains(id);
+  }
+
+  Future<void> markPlaceReviewed(String placeId) async {
+    final id = placeId.trim();
+    if (id.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList(reviewedPlaceIds) ?? <String>[];
+    if (ids.contains(id)) return;
+    ids.add(id);
+    await prefs.setStringList(reviewedPlaceIds, ids);
   }
 }

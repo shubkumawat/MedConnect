@@ -13,6 +13,7 @@ import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
+import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../data/services/notification_service.dart';
 import '../../../data/services/storage_service.dart';
@@ -76,6 +77,12 @@ class LoginController extends GetxController {
     });
   }
 
+  void _stopResendCooldown() {
+    _resendTimer?.cancel();
+    _resendTimer = null;
+    resendSecondsLeft.value = 0;
+  }
+
   void _startLockout() {
     _lockoutTimer?.cancel();
     lockoutSecondsLeft.value = lockoutSeconds;
@@ -137,8 +144,12 @@ class LoginController extends GetxController {
 
   Future<void> getSendOtpAPI(BuildContext context) async {
     try {
-      if (phoneController.text.isEmpty || phoneController.text.length != 10) {
-        Fluttertoast.showToast(msg: "Please enter valid mobile number");
+      if (phoneController.text.isEmpty ||
+          !TxtValidation.isValidMobile(phoneController.text)) {
+        Fluttertoast.showToast(
+          msg:
+              'Please enter a valid mobile number (${TxtValidation.mobileMinLength}–${TxtValidation.mobileMaxLength} digits)',
+        );
         return;
       }
       if (resendSecondsLeft.value > 0) {
@@ -165,9 +176,14 @@ class LoginController extends GetxController {
 
       if (response != null) {
         if (response['error'] == false) {
+          final data = response['data'];
+          final rawOtp = data is Map ? data['otp']?.toString() ?? '' : '';
+          final digits = rawOtp.replaceAll(RegExp(r'[^0-9]'), '');
+
           showOtp.value = true;
           otpAttempts.value = 0;
-          receivedOtp.value = "";
+          // Demo / send-otp response includes OTP — autofill boxes.
+          receivedOtp.value = digits.length >= 6 ? digits.substring(0, 6) : digits;
           otpRebuildKey.value++;
           _startResendCooldown();
           PrintLog.printLog("Received OTP Set: ${receivedOtp.value}");
@@ -208,7 +224,7 @@ class LoginController extends GetxController {
         {
           "mobile_number": phoneController.text.toString(),
           "otp": otp.toString(),
-          "fcmToke": fcmToken,
+          "fcmToken": fcmToken,
           "platForm": Platform.isIOS ? "ios" : "android",
         },
         userAccessToken ?? "",
@@ -219,8 +235,9 @@ class LoginController extends GetxController {
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          _resendTimer?.cancel();
+          _stopResendCooldown();
           _lockoutTimer?.cancel();
+          lockoutSecondsLeft.value = 0;
           otpAttempts.value = 0;
 
           final storage = StorageService();
@@ -246,7 +263,11 @@ class LoginController extends GetxController {
           await Future.delayed(const Duration(milliseconds: 350));
 
           if (fullName.isEmpty || fullName == "null" || email.isEmpty || email == "null") {
-            Get.offAll(() => const PersonalInfoScreen(null, isFromLogin: true), transition: Transition.rightToLeft);
+            // Keep OTP/login under the stack so back returns to OTP.
+            Get.to(
+              () => const PersonalInfoScreen(null, isFromLogin: true),
+              transition: Transition.rightToLeft,
+            );
           } else {
             Get.offAll(() => const DashboardScreen(), transition: Transition.fadeIn);
           }

@@ -153,7 +153,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
                                     member: m,
                                     initials: _initials(m.fullName),
                                     isSelected: isSelected,
-                                    onTap: () => _selectForRecords(m),
+                                    onTap: () => _openDetail(m),
                                     onOpenDetail: () => _openDetail(m),
                                   )
                                       .animate()
