@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
 import 'package:healaura/app/data/models/medical_record_model.dart';
@@ -47,6 +49,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
   /// API format e.g. 1-0-1
   String? _frequency;
+  final _customDaysCtrl = TextEditingController();
 
   /// API with_food values
   String? _withFood;
@@ -66,16 +69,35 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     {'label': 'Four times daily', 'value': '1-1-1-1'},
     {'label': 'Every 6 hours', 'value': 'every_6_hours'},
     {'label': 'Every 8 hours', 'value': 'every_8_hours'},
+    {'label': 'Weekly', 'value': 'weekly'},
+    {'label': 'Every N days', 'value': 'every_n_days'},
     {'label': 'As needed (SOS)', 'value': 'SOS'},
   ];
+
+  bool get _isCustomDaysFrequency => _frequency == 'every_n_days';
 
   List<String> get _frequencyLabels =>
       _frequencyOptions.map((e) => e['label']!).toList();
 
   String? get _frequencyLabel {
     if (_frequency == null) return null;
+    if (_frequency!.startsWith('every_') &&
+        _frequency!.endsWith('_days') &&
+        _frequency != 'every_n_days') {
+      return 'Every N days';
+    }
     for (final opt in _frequencyOptions) {
       if (opt['value'] == _frequency) return opt['label'];
+    }
+    return _frequency;
+  }
+
+  String? get _frequencyPayload {
+    if (_frequency == null) return null;
+    if (_frequency == 'every_n_days') {
+      final days = int.tryParse(_customDaysCtrl.text.trim());
+      if (days == null || days < 1) return null;
+      return 'every_${days}_days';
     }
     return _frequency;
   }
@@ -173,6 +195,12 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       }
     }
     final lower = value.toLowerCase();
+    final everyDays = RegExp(r'every[_\s-]?(\d+)[_\s-]?days?').firstMatch(lower);
+    if (everyDays != null) {
+      _customDaysCtrl.text = everyDays.group(1)!;
+      return 'every_n_days';
+    }
+    if (lower.contains('week')) return 'weekly';
     if (lower.contains('sos') ||
         lower.contains('as needed') ||
         lower.contains('prn')) {
@@ -256,6 +284,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     _instructionsCtrl.dispose();
     _startDateCtrl.dispose();
     _endDateCtrl.dispose();
+    _customDaysCtrl.dispose();
     _medNameFocus.dispose();
     _ocrService.dispose();
     super.dispose();
@@ -515,11 +544,10 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
   Map<String, dynamic> _buildBody() {
     final body = <String, dynamic>{
-      'disease_uuid':_diseaseUuid,
       'name': _medNameCtrl.text.trim(),
       'strength': _strengthCtrl.text.trim(),
       'dosage': _dosageCtrl.text.trim(),
-      'frequency': _frequency,
+      'frequency': _frequencyPayload,
       'timing': _selectedTimings.toList(),
       'with_food': _withFood,
       'start_date':
@@ -529,19 +557,15 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       'status': 'active',
     };
 
-    if (!_isOngoing && _endDateCtrl.text.trim().isNotEmpty) {
-      body['end_date'] = _endDateCtrl.text.trim();
+    // Disease-linked meds only — never send null disease_uuid on current meds.
+    if (!_isCurrentFlow &&
+        _diseaseUuid != null &&
+        _diseaseUuid!.trim().isNotEmpty) {
+      body['disease_uuid'] = _diseaseUuid!.trim();
     }
 
-    if (!_isCurrentFlow) {
-      final disease = controller.selectedDisease.value;
-      if (disease?.conditionType != null &&
-          disease!.conditionType!.isNotEmpty) {
-        body['condition_type'] = disease.conditionType;
-      }
-      if (disease?.diagnosedOn != null && disease!.diagnosedOn!.isNotEmpty) {
-        body['diagnosed_on'] = disease.diagnosedOn;
-      }
+    if (!_isOngoing && _endDateCtrl.text.trim().isNotEmpty) {
+      body['end_date'] = _endDateCtrl.text.trim();
     }
 
     return body;
@@ -549,34 +573,29 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
   Future<void> _save() async {
     if (_medNameCtrl.text.trim().isEmpty) {
-      Get.snackbar(
-        'Required',
-        'Please enter a medication name.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.orange,
-        colorText: Colors.white,
-      );
+      Fluttertoast.showToast(msg: 'Please enter a medication name.');
       return;
     }
     if (_frequency == null) {
-      Get.snackbar(
-        'Required',
-        'Please select frequency.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.orange,
-        colorText: Colors.white,
-      );
+      Fluttertoast.showToast(msg: 'Please select frequency.');
+      return;
+    }
+    if (_isCustomDaysFrequency) {
+      final days = int.tryParse(_customDaysCtrl.text.trim());
+      if (days == null || days < 1) {
+        Fluttertoast.showToast(
+          msg: 'Enter how many days between doses (e.g. 3).',
+        );
+        return;
+      }
+    }
+    if (_withFood == null || _withFood!.isEmpty) {
+      Fluttertoast.showToast(msg: 'Please select With Food option.');
       return;
     }
 
     if (!_isCurrentFlow && (_diseaseUuid == null || _diseaseUuid!.isEmpty)) {
-      Get.snackbar(
-        'Error',
-        'Disease not selected.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.statusRed,
-        colorText: Colors.white,
-      );
+      Fluttertoast.showToast(msg: 'Disease not selected.');
       return;
     }
 
@@ -594,7 +613,6 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       success = await controller.addCurrentMedication(body);
     } else {
       success = await controller.addDiseaseMedication(
-        // diseaseUuid: _diseaseUuid!,
         body: body,
       );
     }
@@ -603,25 +621,13 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
     if (success) {
       Get.back();
-      Get.snackbar(
-        'Success',
-        _isEdit
+      Fluttertoast.showToast(
+        msg: _isEdit
             ? 'Medication updated successfully'
             : 'Medication added successfully',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.teal,
-        colorText: Colors.white,
       );
     }
-    else {
-      Get.snackbar(
-        'Error',
-        'Failed to save medication. Please try again.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.statusRed,
-        colorText: Colors.white,
-      );
-    }
+    // API error message already shown via FlutterToast in RecordsController.
   }
 
   @override
@@ -771,11 +777,32 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                             items: _frequencyLabels,
                             onChanged: (label) {
                               setState(() {
+                                if (label == null) {
+                                  _frequency = null;
+                                  _customDaysCtrl.clear();
+                                  return;
+                                }
                                 _frequency = _frequencyOptions.firstWhere(
                                     (e) => e['label'] == label)['value'];
+                                if (!_isCustomDaysFrequency) {
+                                  _customDaysCtrl.clear();
+                                }
                               });
                             },
                           ),
+                          if (_isCustomDaysFrequency) ...[
+                            const SizedBox(height: 12),
+                            CustomTextField(
+                              hint: 'Every how many days? (e.g. 3)',
+                              controller: _customDaysCtrl,
+                              prefixIcon: Icons.calendar_view_day_rounded,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(3),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 14),
                           const _FieldLabel('Timing'),
                           const SizedBox(height: 8),
@@ -832,6 +859,10 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                             items: withFoodLabels,
                             onChanged: (label) {
                               setState(() {
+                                if (label == null) {
+                                  _withFood = null;
+                                  return;
+                                }
                                 _withFood = _withFoodOptions.firstWhere(
                                     (e) => e['label'] == label)['value'];
                               });

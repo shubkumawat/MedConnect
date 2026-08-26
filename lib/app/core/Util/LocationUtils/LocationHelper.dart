@@ -420,9 +420,9 @@ class LocationHelper {
 
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
-        return place.postalCode ?? "Unknown";
+        return place.postalCode ?? "NA";
       } else {
-        return "Unknown";
+        return "NA";
       }
     } catch (e) {
       throw Exception('Failed to get pincode: $e');

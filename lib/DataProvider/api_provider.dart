@@ -53,7 +53,7 @@ class ApiProvider {
       CustomLoading().show(context);
       final Response? response = await requestPostForApi(context, url, dictParameter, token);
 
-      if(response != null && response.statusCode == 200){
+      if(response != null && (response.statusCode == 200|| response.statusCode == 403)){
         if (response.data is Map) {
           result = Map<String, dynamic>.from(response.data);
         } else if (response.data is String && response.data.toString().isNotEmpty) {
@@ -86,7 +86,9 @@ class ApiProvider {
       CustomLoading().show(context);
       final Response? response = await requestPostForApi(context, url, dictParameter, token);
 
-      if(response != null && response.statusCode == 200){
+      // Create endpoints often return 201 Created (not only 200).
+      if (response != null &&
+          (response.statusCode == 200 || response.statusCode == 201)) {
         if (response.data is Map) {
           result = Map<String, dynamic>.from(response.data);
         } else if (response.data is String && response.data.toString().isNotEmpty) {
@@ -96,12 +98,9 @@ class ApiProvider {
               result = Map<String, dynamic>.from(decoded);
             }
           } catch (e) {
-            PrintLog.printLog("Error decoding login response: $e");
+            PrintLog.printLog("Error decoding add-family response: $e");
           }
         }
-      }
-      else{
-
       }
       CustomLoading().hide(context);
       return result;
@@ -212,8 +211,11 @@ class ApiProvider {
       CustomLoading().show(context);
       final Response? response = await requestPostForApi(context, url, dictParameter, token);
 
-      if (response != null && response.statusCode == 200) {
-        result = Map<String, dynamic>.from(response.data);
+      if (response != null &&
+          (response.statusCode == 200 || response.statusCode == 201)) {
+        if (response.data is Map) {
+          result = Map<String, dynamic>.from(response.data);
+        }
       }
       CustomLoading().hide(context);
       return result;

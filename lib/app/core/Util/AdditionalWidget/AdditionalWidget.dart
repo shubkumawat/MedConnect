@@ -477,6 +477,11 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 }
 
 // ─── Dropdown ──────────────────────────────────────────────────────────────
+class _DropdownSelection<T> {
+  final T? value;
+  const _DropdownSelection(this.value);
+}
+
 class McDropdown<T> extends StatelessWidget {
   final String hint;
   final T? value;
@@ -503,7 +508,7 @@ class McDropdown<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
-        final result = await showModalBottomSheet<T>(
+        final result = await showModalBottomSheet<_DropdownSelection<T>>(
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
@@ -515,17 +520,18 @@ class McDropdown<T> extends StatelessWidget {
             selectedValue: value,
           ),
         );
+        // null = sheet dismissed (no change). Otherwise apply pick / clear.
         if (result != null) {
-          onChanged(result);
+          onChanged(result.value);
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          color: AppColors.bgCardNavy,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: borderColor ?? const Color(0xFFE3EBE7),
+            color: borderColor ?? AppColors.teal,
             width: 1.0,
           ),
         ),
@@ -778,13 +784,32 @@ class _DropdownBottomSheetState<T> extends State<_DropdownBottomSheet<T>> {
                     itemBuilder: (context, index) {
                       final item = filteredItems[index];
                       final label = _labelOf(item);
-                      final isSelected = widget.selectedValue == item;
+                      final isSelected = widget.selectedValue != null &&
+                          (widget.selectedValue == item ||
+                              identical(widget.selectedValue, item) ||
+                              (widget.itemLabel != null &&
+                                  widget.itemLabel!(
+                                          widget.selectedValue as T) ==
+                                      label));
 
                       return Material(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         child: InkWell(
-                          onTap: () => Navigator.pop(context, item),
+                          onTap: () {
+                            // Re-tap selected item → clear selection.
+                            if (isSelected) {
+                              Navigator.pop(
+                                context,
+                                _DropdownSelection<T>(null),
+                              );
+                            } else {
+                              Navigator.pop(
+                                context,
+                                _DropdownSelection<T>(item),
+                              );
+                            }
+                          },
                           borderRadius: BorderRadius.circular(16),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -837,7 +862,7 @@ class _DropdownBottomSheetState<T> extends State<_DropdownBottomSheet<T>> {
                                 ),
                                 if (isSelected)
                                   Text(
-                                    'Selected',
+                                    'Tap to clear',
                                     style: TextStyle(
                                       color: AppColors.tealDark
                                           .withValues(alpha: 0.9),

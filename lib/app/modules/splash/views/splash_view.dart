@@ -4,8 +4,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/services/app_update_service.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
+import '../../location/views/location_permission_view.dart';
 import '../../login/views/login_view.dart';
 import '../../onboarding/views/onboarding_view.dart';
+import '../../profile/views/personal_info_view.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -50,15 +52,32 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     final storage = StorageService();
     final isLogin = await storage.getBool(StorageService.isLogin);
     final isIntro = await storage.getBool(StorageService.isIntro);
+    final profileSetupDone =
+        await storage.getBool(StorageService.profileSetupDone);
+    final token = await storage.getString(StorageService.token);
 
     if (!mounted) return;
 
+    // Destination after splash — never request OS location before this.
+    final Widget next;
     if (isLogin) {
-      Get.offAll(() => const DashboardScreen());
+      next = const DashboardScreen();
+    } else if (token.isNotEmpty && !profileSetupDone) {
+      // Resume post-OTP 3-step profile setup (Personal → Medical → Emergency).
+      next = const PersonalInfoScreen(null, isFromLogin: true);
     } else if (!isIntro) {
-      Get.offAll(() => const OnboardingScreen());
+      next = const OnboardingScreen();
     } else {
-      Get.offAll(() => const LoginScreen());
+      next = const LoginScreen();
+    }
+
+    final showLocationGate = await LocationPermissionScreen.shouldShow();
+    if (!mounted) return;
+
+    if (showLocationGate) {
+      Get.offAll(() => LocationPermissionScreen(next: next));
+    } else {
+      Get.offAll(() => next);
     }
 
     // Runs after navigation so the "Update Available" dialog (a Get overlay)

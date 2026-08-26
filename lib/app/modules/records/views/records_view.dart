@@ -50,14 +50,27 @@ class _RecordsScreenState extends State<RecordsScreen>
   }
 
   void _openQr() {
+    final members = Get.isRegistered<HomeController>()
+        ? Get.find<HomeController>().patients.toList()
+        : <FamilyMember>[];
+    final selectedId = controller.selectedPatientId.value.trim();
+    FamilyMember? selected;
+    for (final m in members) {
+      if ((m.patientId ?? '').trim() == selectedId) {
+        selected = m;
+        break;
+      }
+    }
+    selected ??= members.isNotEmpty ? members.first : null;
+    final isSelf = selected?.isSelf ?? selectedId.isEmpty;
+
     Get.to(() => QrScreen(
           patientName: controller.selectedPatientName.value,
-          patientId: controller.selectedPatientId.value.isEmpty
-              ? null
-              : controller.selectedPatientId.value,
+          patientId: selectedId.isEmpty ? null : selectedId,
           profilePhoto: controller.selectedPatientPhoto.value.isEmpty
               ? null
               : controller.selectedPatientPhoto.value,
+          isSelf: isSelf,
         ));
   }
 
@@ -227,7 +240,7 @@ class _RecordsScreenState extends State<RecordsScreen>
           //   },
           // ),
           _SheetAction(
-            step: '03',
+            step: '02 ',
             icon: Icons.document_scanner_outlined,
             label: 'Scan Prescription (AI)',
             subtitle: 'Extract medicines from a photo instantly',

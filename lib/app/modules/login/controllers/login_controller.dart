@@ -14,7 +14,6 @@ import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
 import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
-import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../data/services/notification_service.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
@@ -102,11 +101,11 @@ class LoginController extends GetxController {
       isCountryLoading.value = true;
       userAccessToken = await StorageService().getString(StorageService.token);
 
-      // Silent fetch — avoid CustomLoading dialog (it steals focus and
-      // breaks live typing display on the phone TextField).
+      // Silent fetch — avoid CustomLoading (steals focus from phone field).
+      // Use dedicated countries endpoint (same as profile / family).
       final raw = await ApiProvider().requestGetForApi(
         context,
-        WebApiConstant.API_URL_MASTER_ALL,
+        WebApiConstant.API_URL_MASTER_COUNTRY,
         {},
         userAccessToken ?? '',
       );
@@ -121,24 +120,53 @@ class LoginController extends GetxController {
       isCountryLoading.value = false;
       PrintLog.printLog(response);
 
-      if (response != null) {
-        if (response['error'] != true && response['error_code'] == 0) {
-          final List list = response['data']?['countries'] ?? [];
-          countryList.value =
-              list.map((e) => CountryModel.fromJson(e)).toList();
+      if (response != null &&
+          response['error'] != true &&
+          response['error_code'] == 0) {
+        // countries API returns data as a list (not data.countries).
+        final dynamic data = response['data'];
+        final List list = data is List
+            ? data
+            : (data is Map ? (data['countries'] ?? []) : []);
 
-          if (selectedCountry.value == null && countryList.isNotEmpty) {
-            selectedCountry.value = countryList.firstWhereOrNull(
-                  (c) =>
-                      c.name.toLowerCase() == 'india' || c.phoneCode == '91',
-                ) ??
-                countryList.first;
-          }
+        countryList.value =
+            list.map((e) => CountryModel.fromJson(e as Map<String, dynamic>)).toList();
+
+        if (selectedCountry.value == null && countryList.isNotEmpty) {
+          selectedCountry.value = countryList.firstWhereOrNull(
+                (c) =>
+                    c.name.toLowerCase() == 'india' || c.phoneCode == '91',
+              ) ??
+              countryList.first;
         }
+      }
+
+      // Fallback so login always shows a code even if API fails.
+      if (selectedCountry.value == null) {
+        selectedCountry.value = CountryModel(
+          id: 0,
+          countryId: '',
+          name: 'India',
+          iso2: 'IN',
+          iso3: 'IND',
+          phoneCode: '91',
+          flagEmoji: '🇮🇳',
+        );
       }
     } catch (e) {
       isCountryLoading.value = false;
       PrintLog.printLog("Exception: $e");
+      if (selectedCountry.value == null) {
+        selectedCountry.value = CountryModel(
+          id: 0,
+          countryId: '',
+          name: 'India',
+          iso2: 'IN',
+          iso3: 'IND',
+          phoneCode: '91',
+          flagEmoji: '🇮🇳',
+        );
+      }
     }
   }
 
@@ -241,20 +269,23 @@ class LoginController extends GetxController {
           otpAttempts.value = 0;
 
           final storage = StorageService();
-          await storage.setBool(StorageService.isLogin, true);
+          // await storage.setBool(StorageService.isLogin, true);
           await storage.setString(StorageService.token, response['data']['access']);
           await storage.setString(StorageService.userID, response['data']['user']['user_id']);
           await storage.setString(StorageService.mobileNo, response['data']['user']['mobile_number'].toString());
           await storage.setString(StorageService.email, response['data']['user']['email'].toString());
           await storage.setString(StorageService.userName, response['data']['user']['full_name'].toString());
 
-          // Check if name or email is missing
           String fullName = response['data']['user']['full_name']?.toString() ?? "";
-          String email = response['data']['user']['email']?.toString() ?? "";
+          final dynamic newUserRaw = response['data']['is_new_user'];
+          final bool isNewUser = newUserRaw == true ||
+              newUserRaw == 1 ||
+              newUserRaw?.toString().toLowerCase() == 'true';
+          PrintLog.printLog('OTP verify is_new_user=$newUserRaw fullName=$fullName');
 
           // Save access_type
-          String accessType = response['data']['user']?['access_type']?.toString() ?? 
-                             response['data']?['access_type']?.toString() ?? "1";
+          String accessType = response['data']['user']!['access_type']?.toString() ??
+                             response['data']?['access_type']!.toString() ?? "";
           await storage.setString(StorageService.accessType, accessType);
 
           FocusManager.instance.primaryFocus?.unfocus();
@@ -262,13 +293,17 @@ class LoginController extends GetxController {
           
           await Future.delayed(const Duration(milliseconds: 350));
 
-          if (fullName.isEmpty || fullName == "null" || email.isEmpty || email == "null") {
-            // Keep OTP/login under the stack so back returns to OTP.
+          if (isNewUser) {
+            // 3-step onboarding: Personal → Medical → Emergency
+            await storage.setBool(StorageService.profileSetupDone, false);
             Get.to(
               () => const PersonalInfoScreen(null, isFromLogin: true),
               transition: Transition.rightToLeft,
             );
-          } else {
+          }
+          else {
+              await storage.setBool(StorageService.isLogin, true);
+              await storage.setBool(StorageService.profileSetupDone, true);
             Get.offAll(() => const DashboardScreen(), transition: Transition.fadeIn);
           }
         } else {

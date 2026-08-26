@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
 import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
+import 'package:healaura/app/data/services/storage_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../dashboard/views/dashboard_view.dart';
@@ -12,7 +13,13 @@ import '../controllers/profile_controller.dart';
 import 'widgets/profile_form_shell.dart';
 
 class EmergencyInfoScreen extends StatefulWidget {
-  const EmergencyInfoScreen(BuildContext? context, {super.key});
+  final bool isFromLogin;
+
+  const EmergencyInfoScreen(
+    BuildContext? context, {
+    super.key,
+    this.isFromLogin = false,
+  });
 
   @override
   State<EmergencyInfoScreen> createState() => _EmergencyInfoScreenState();
@@ -22,6 +29,32 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
   final ProfileController controller = Get.put(ProfileController());
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (controller.relationList.isEmpty) {
+        controller.getMasterRelationAPI(context);
+      }
+    });
+  }
+
+  Future<void> _finishOnboardingLogin() async {
+    final storage = StorageService();
+    await storage.setBool(StorageService.isLogin, true);
+    await storage.setBool(StorageService.profileSetupDone, true);
+  }
+
+  Future<void> _goToDashboard() async {
+    if (widget.isFromLogin) {
+      await _finishOnboardingLogin();
+    }
+    Get.offAll(
+      () => const DashboardScreen(),
+      transition: Transition.fadeIn,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ProfileFormScaffold(
       title: 'Emergency information',
@@ -29,11 +62,29 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
       step: 3,
       heroIcon: Icons.emergency_rounded,
       bottomBar: Obx(
-        () => ProfilePrimaryButton(
-          text: 'Complete setup',
-          color: AppColors.tealDark,
-          isLoading: controller.isLoading.value,
-          onTap: _onComplete,
+        () => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ProfilePrimaryButton(
+              text: widget.isFromLogin ? 'Complete setup' : 'Save',
+              color: AppColors.tealDark,
+              isLoading: controller.isLoading.value,
+              onTap: _onComplete,
+            ),
+            if (widget.isFromLogin) ...[
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: controller.isLoading.value ? null : _goToDashboard,
+                child: Text(
+                  'Skip for now',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.tealDark,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
       children: [
@@ -91,7 +142,9 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
                 prefixIcon: Icons.link_rounded,
                 onChanged: (v) {
                   controller.emergencyRelation.value = v ?? '';
-                  if (v != null) {
+                  if (v == null) {
+                    controller.selectedEmergencyRelationModel.value = null;
+                  } else {
                     controller.selectedEmergencyRelationModel.value =
                         controller.relationList.firstWhereOrNull(
                       (r) =>
@@ -115,10 +168,16 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
         ),
         ProfileSectionCard(
           title: 'Location',
-          caption: 'Home city and state',
+          caption: 'Home address for emergency responders',
           icon: Icons.location_on_outlined,
           accent: AppColors.accentBlue,
           children: [
+            CustomTextField(
+              hint: 'Address / Area',
+              controller: controller.addressLineCtrl,
+              prefixIcon: Icons.home_outlined,
+            ),
+            const SizedBox(height: 14),
             CustomTextField(
               hint: 'Home City',
               controller: controller.cityCtrl,
@@ -135,6 +194,13 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
                 prefixIcon: Icons.map_outlined,
                 onChanged: (v) => controller.selectedState.value = v ?? '',
               ),
+            ),
+            const SizedBox(height: 14),
+            CustomTextField(
+              hint: 'PIN / Post code',
+              controller: controller.postCodeCtrl,
+              prefixIcon: Icons.pin_drop_outlined,
+              keyboardType: TextInputType.number,
             ),
           ],
         ),
@@ -228,11 +294,7 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
       return;
     }
     controller.updateEmergencyAPI(context, () {
-      // Broken popUntil was closing Dashboard when stack was shorter than 3.
-      Get.offAll(
-        () => const DashboardScreen(),
-        transition: Transition.fadeIn,
-      );
+      _goToDashboard();
     });
   }
 }

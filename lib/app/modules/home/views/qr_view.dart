@@ -10,6 +10,8 @@ class QrScreen extends StatelessWidget {
   final String? patientId;
   final String? profilePhoto;
   final String? initials;
+  /// Own QR expire uses `{}`; family passes patient_id.
+  final bool isSelf;
 
   const QrScreen({
     super.key,
@@ -17,6 +19,7 @@ class QrScreen extends StatelessWidget {
     this.patientId,
     this.profilePhoto,
     this.initials,
+    this.isSelf = true,
   });
 
   @override
@@ -31,6 +34,7 @@ class QrScreen extends StatelessWidget {
         patientId: patientId,
         profilePhoto: profilePhoto,
         initials: initials ?? _initialsFromName(patientName),
+        isSelf: isSelf,
       ),
       tag: tag,
     );
@@ -96,14 +100,16 @@ class QrScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        // Expanded(
-                        //   child: _ActionBtn(
-                        //     label: 'Share',
-                        //     icon: Icons.ios_share_rounded,
-                        //     filled: false,
-                        //     onTap: () => controller.shareQr(),
-                        //   ),
-                        // ),
+                        Expanded(
+                          child: _ActionBtn(
+                            label: 'Delete QR',
+                            icon: Icons.delete_outline_rounded,
+                            filled: false,
+                            destructive: true,
+                            loading: controller.isDeleting.value,
+                            onTap: () => _confirmDeleteQr(context, controller),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -126,6 +132,36 @@ class QrScreen extends StatelessWidget {
         );
       }),
     );
+  }
+
+  Future<void> _confirmDeleteQr(
+    BuildContext context,
+    QrController controller,
+  ) async {
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Delete QR?'),
+        content: const Text(
+          'This health QR will be removed. You can generate a new one anytime.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Color(0xFFE03A3A)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await controller.deleteQr();
+    }
   }
 
   static String? _normalizePhoto(String? raw) {
@@ -612,6 +648,7 @@ class _ActionBtn extends StatelessWidget {
   final IconData icon;
   final bool filled;
   final bool loading;
+  final bool destructive;
   final VoidCallback onTap;
 
   const _ActionBtn({
@@ -620,10 +657,17 @@ class _ActionBtn extends StatelessWidget {
     required this.filled,
     required this.onTap,
     this.loading = false,
+    this.destructive = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    const danger = Color(0xFFE03A3A);
+    final fg = destructive ? danger : AppColors.tealDark;
+    final border = destructive
+        ? danger.withValues(alpha: 0.45)
+        : AppColors.teal.withValues(alpha: 0.45);
+
     return SizedBox(
       height: 50,
       child: filled
@@ -655,16 +699,24 @@ class _ActionBtn extends StatelessWidget {
               ),
             )
           : OutlinedButton.icon(
-              onPressed: onTap,
-              icon: Icon(icon, size: 20),
+              onPressed: loading ? null : onTap,
+              icon: loading
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: fg,
+                      ),
+                    )
+                  : Icon(icon, size: 20),
               label: Text(
                 label,
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.tealDark,
-                side: BorderSide(
-                    color: AppColors.teal.withValues(alpha: 0.45)),
+                foregroundColor: fg,
+                side: BorderSide(color: border),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),

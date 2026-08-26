@@ -12,6 +12,7 @@ class ProfileFormScaffold extends StatelessWidget {
   final List<Widget> children;
   final Widget bottomBar;
   final IconData heroIcon;
+  final VoidCallback? onBack;
 
   const ProfileFormScaffold({
     super.key,
@@ -21,6 +22,7 @@ class ProfileFormScaffold extends StatelessWidget {
     required this.children,
     required this.bottomBar,
     this.heroIcon = Icons.person_rounded,
+    this.onBack,
   });
 
   @override
@@ -38,7 +40,7 @@ class ProfileFormScaffold extends StatelessWidget {
             subtitle: subtitle,
             step: step,
             heroIcon: heroIcon,
-            onBack: () => Navigator.pop(context),
+            onBack: onBack ?? () => Navigator.pop(context),
           ),
           Expanded(
             child: SingleChildScrollView(

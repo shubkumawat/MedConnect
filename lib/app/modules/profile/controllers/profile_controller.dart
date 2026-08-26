@@ -13,8 +13,10 @@ import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
+import '../../../core/Util/home_address.dart';
 import '../../../core/Util/image_pick_helper.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../home/controllers/home_controller.dart';
 
 /// Master relation list ka model
 class RelationModel {
@@ -585,7 +587,17 @@ class ProfileController extends GetxController {
   final disabilityTypeCtrl = TextEditingController();
   RxBool isOrganDonor = false.obs;
 
-  final bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+  final bloodGroups = [
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'O+',
+    'O-',
+    'AB+',
+    'AB-',
+    'Unknown',
+  ];
   final maritalStatusOptions = ['Single', 'Married', 'Divorced', 'Widowed'];
 
   final allergyTags = ['Penicillin', 'Peanuts', 'Latex', 'Dust', 'Dairy'];
@@ -620,7 +632,9 @@ class ProfileController extends GetxController {
   // ==================================================================
   final emergencyNameCtrl = TextEditingController();
   final emergencyMobileCtrl = TextEditingController();
+  final addressLineCtrl = TextEditingController();
   final cityCtrl = TextEditingController();
+  final postCodeCtrl = TextEditingController();
   RxString selectedState = ''.obs;
 
   RxString emergencyRelation = ''.obs; // spouse/parent/sibling/friend/other
@@ -640,6 +654,13 @@ class ProfileController extends GetxController {
   final insuranceProviderCtrl = TextEditingController();
   final policyNumberCtrl = TextEditingController();
 
+  // Care reminders (Profile → synced with /notifications/care-reminders/)
+  final medReminders = true.obs;
+  final vacReminders = true.obs;
+  final qrAlerts = true.obs;
+  final remindersLoading = false.obs;
+  final remindersSaving = false.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -655,12 +676,167 @@ class ProfileController extends GetxController {
       // Load profile if token is available
       if (userAccessToken != null && userAccessToken!.isNotEmpty) {
         getPatientProfileAPI(Get.context!);
+        loadCareReminders();
       }
     }
   }
 
   Future<void> _loadToken() async {
     userAccessToken = await StorageService().getString(StorageService.token);
+  }
+
+  Map<String, dynamic> _unwrapCareReminderData(dynamic raw) {
+    if (raw is! Map) return {};
+    final map = Map<String, dynamic>.from(raw);
+    if (map['data'] is Map) {
+      return Map<String, dynamic>.from(map['data'] as Map);
+    }
+    return map;
+  }
+
+  void _applyCareReminderPrefs(Map<String, dynamic> data) {
+    if (data.containsKey('medication_reminders')) {
+      medReminders.value = data['medication_reminders'] == true;
+    }
+    if (data.containsKey('vaccination_reminders')) {
+      vacReminders.value = data['vaccination_reminders'] == true;
+    }
+    if (data.containsKey('qr_scan_alerts')) {
+      qrAlerts.value = data['qr_scan_alerts'] == true;
+    }
+    _persistCareRemindersLocally();
+    _syncHomeReminderFlags();
+  }
+
+  Future<void> _persistCareRemindersLocally() async {
+    final storage = StorageService();
+    await storage.setBool(StorageService.medReminders, medReminders.value);
+    await storage.setBool(StorageService.vacReminders, vacReminders.value);
+    await storage.setBool(StorageService.qrAlerts, qrAlerts.value);
+  }
+
+  void _syncHomeReminderFlags() {
+    if (Get.isRegistered<HomeController>()) {
+      final home = Get.find<HomeController>();
+      home.showMedReminders.value = medReminders.value;
+      home.showVacReminders.value = vacReminders.value;
+    }
+  }
+
+  /// GET /notifications/care-reminders/?device_id=...
+  Future<void> loadCareReminders() async {
+    try {
+      remindersLoading.value = true;
+      final storage = StorageService();
+      // Optimistic local defaults (API defaults are all true).
+      medReminders.value =
+          await storage.getBool(StorageService.medReminders, defaultValue: true);
+      vacReminders.value =
+          await storage.getBool(StorageService.vacReminders, defaultValue: true);
+      qrAlerts.value =
+          await storage.getBool(StorageService.qrAlerts, defaultValue: true);
+
+      await _loadToken();
+      final token = userAccessToken ?? '';
+      if (token.isEmpty) return;
+
+      final deviceId = await storage.getOrCreateDeviceId();
+      final response = await ApiProvider().requestGetForApi(
+        Get.context,
+        WebApiConstant.API_URL_CARE_REMINDERS,
+        {'device_id': deviceId},
+        token,
+      );
+
+      if (response != null &&
+          response.statusCode == 200 &&
+          response.data is Map) {
+        final body = Map<String, dynamic>.from(response.data as Map);
+        if (body['error'] == true) return;
+        _applyCareReminderPrefs(_unwrapCareReminderData(body));
+      }
+    } catch (e) {
+      PrintLog.printLog('loadCareReminders: $e');
+    } finally {
+      remindersLoading.value = false;
+    }
+  }
+
+  /// POST /notifications/care-reminders/ — update one or all toggles.
+  Future<void> setCareReminder({
+    bool? medication,
+    bool? vaccination,
+    bool? qrScan,
+  }) async {
+    final prevMed = medReminders.value;
+    final prevVac = vacReminders.value;
+    final prevQr = qrAlerts.value;
+
+    if (medication != null) medReminders.value = medication;
+    if (vaccination != null) vacReminders.value = vaccination;
+    if (qrScan != null) qrAlerts.value = qrScan;
+    _syncHomeReminderFlags();
+    await _persistCareRemindersLocally();
+
+    try {
+      remindersSaving.value = true;
+      await _loadToken();
+      final token = userAccessToken ?? '';
+      if (token.isEmpty) {
+        Fluttertoast.showToast(msg: 'Please sign in again');
+        return;
+      }
+
+      final deviceId = await StorageService().getOrCreateDeviceId();
+      final body = <String, dynamic>{
+        'device_id': deviceId,
+        'medication_reminders': medReminders.value,
+        'vaccination_reminders': vacReminders.value,
+        'qr_scan_alerts': qrAlerts.value,
+      };
+
+      final response = await ApiProvider().requestPostForApi(
+        Get.context,
+        WebApiConstant.API_URL_CARE_REMINDERS,
+        body,
+        token,
+      );
+
+      if (response != null &&
+          (response.statusCode == 200 || response.statusCode == 201) &&
+          response.data is Map) {
+        final raw = Map<String, dynamic>.from(response.data as Map);
+        if (raw['error'] == true) {
+          medReminders.value = prevMed;
+          vacReminders.value = prevVac;
+          qrAlerts.value = prevQr;
+          await _persistCareRemindersLocally();
+          _syncHomeReminderFlags();
+          Fluttertoast.showToast(
+            msg: raw['message']?.toString() ?? 'Could not update reminders',
+          );
+          return;
+        }
+        _applyCareReminderPrefs(_unwrapCareReminderData(raw));
+      } else {
+        medReminders.value = prevMed;
+        vacReminders.value = prevVac;
+        qrAlerts.value = prevQr;
+        await _persistCareRemindersLocally();
+        _syncHomeReminderFlags();
+        Fluttertoast.showToast(msg: 'Could not update reminders');
+      }
+    } catch (e) {
+      medReminders.value = prevMed;
+      vacReminders.value = prevVac;
+      qrAlerts.value = prevQr;
+      await _persistCareRemindersLocally();
+      _syncHomeReminderFlags();
+      PrintLog.printLog('setCareReminder: $e');
+      Fluttertoast.showToast(msg: 'Could not update reminders');
+    } finally {
+      remindersSaving.value = false;
+    }
   }
 
   // ==================================================================
@@ -746,10 +922,26 @@ class ProfileController extends GetxController {
             // Medical Info
             // Handle Blood Group (String or Map)
             var bgData = data['blood_group'];
+            String bg = '';
             if (bgData is Map) {
-              bloodGroup.value = bgData['name']?.toString() ?? '';
+              bg = bgData['name']?.toString() ?? '';
             } else {
-              bloodGroup.value = bgData?.toString() ?? '';
+              bg = bgData?.toString() ?? '';
+            }
+            final bgTrim = bg.trim();
+            final bgLower = bgTrim.toLowerCase();
+            if (bgTrim.isEmpty ||
+                bgLower == 'null' ||
+                bgTrim == '-' ||
+                bgTrim == '—' ||
+                bgTrim == '--') {
+              bloodGroup.value = '';
+            } else if (bgLower == 'unknown' ||
+                bgLower == "don't know" ||
+                bgLower == 'dont know') {
+              bloodGroup.value = 'Unknown';
+            } else {
+              bloodGroup.value = bgTrim;
             }
 
             heightCtrl.text = data['height']?.toString() ?? '';
@@ -844,13 +1036,12 @@ class ProfileController extends GetxController {
               }
             }
 
-            final address = data['home_address']?.toString() ?? '';
-            if (address.isNotEmpty) {
-              final parts = address.split(',');
-              if (!_isDisposed) {
-                if (parts.isNotEmpty) cityCtrl.text = parts[0].trim();
-              }
-              if (parts.length > 1) selectedState.value = parts[1].trim();
+            final home = HomeAddress.parse(data['home_address']);
+            if (!_isDisposed) {
+              addressLineCtrl.text = home.address;
+              cityCtrl.text = home.city;
+              postCodeCtrl.text = home.postCode;
+              selectedState.value = home.state;
             }
 
             final insurance = data['insurance'];
@@ -878,7 +1069,11 @@ class ProfileController extends GetxController {
   // ==================================================================
   // ---------------------  API : update-profile  ---------------------
   // ==================================================================
-  Future<void> updateProfileAPI(BuildContext context, VoidCallback onSuccess) async {
+  Future<void> updateProfileAPI(
+    BuildContext context,
+    VoidCallback onSuccess, {
+    bool markLoggedIn = true,
+  }) async {
     try {
       isLoading.value = true;
 
@@ -889,9 +1084,12 @@ class ProfileController extends GetxController {
             : '',
         "email": emailCtrl.text.trim(),
         "gender": selectedGender.value.toLowerCase(),
-        "nationality": selectedNationalityId.value,
       };
+      if (selectedNationalityId.value != null) {
+        dictParameter["nationality"] = selectedNationalityId.value;
+      }
       final token = await StorageService().getString(StorageService.token);
+      userAccessToken = token;
 
       Map<String, dynamic>? response;
       if (profileImage.value != null) {
@@ -935,6 +1133,12 @@ class ProfileController extends GetxController {
           final userData = data is Map ? data['user'] : null;
           if (userData is Map) {
             final storage = StorageService();
+            // During post-OTP onboarding (Personal → Medical → Emergency),
+            // do NOT mark login complete yet — remaining steps must still show.
+            if (markLoggedIn) {
+              await storage.setBool(StorageService.isLogin, true);
+              await storage.setBool(StorageService.profileSetupDone, true);
+            }
             await storage.setString(StorageService.userName, userData['full_name']?.toString() ?? '');
             await storage.setString(StorageService.email, userData['email']?.toString() ?? '');
           }
@@ -971,17 +1175,20 @@ class ProfileController extends GetxController {
   Future<void> updateMedicalAPI(BuildContext context, VoidCallback onSuccess) async {
     try {
       isLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
 
       final Map<String, dynamic> dictParameter = <String, dynamic>{
-        "blood_group": bloodGroup.value,
+        "blood_group": bloodGroup.value.toLowerCase() == 'unknown'
+            ? 'unknown'
+            : bloodGroup.value,
         "height": double.tryParse(heightCtrl.text.trim()) ?? 0,
         "weight": double.tryParse(weightCtrl.text.trim()) ?? 0,
         "marital_status": maritalStatus.value.toLowerCase(),
         "occupation": selectedOccupationModel.value?.code ?? occupationCtrl.text.trim(),
         "chronic_disease": hasChronicDisease.value,
         "physically_handicapped": isPhysicallyHandicapped.value,
-        "disability_type": isPhysicallyHandicapped.value 
-            ? (selectedDisabilityTypeModel.value?.code ?? disabilityTypeCtrl.text.trim()) 
+        "disability_type": isPhysicallyHandicapped.value
+            ? (selectedDisabilityTypeModel.value?.code ?? disabilityTypeCtrl.text.trim())
             : "",
         "organ_donor": isOrganDonor.value,
         "allergies": selectedAllergies.toList(),
@@ -992,7 +1199,7 @@ class ProfileController extends GetxController {
         context,
         WebApiConstant.API_URL_PATIENT_UPDATE_MEDICAL,
         dictParameter,
-        userAccessToken!,
+        userAccessToken ?? '',
       );
 
       isLoading.value = false;
@@ -1020,16 +1227,22 @@ class ProfileController extends GetxController {
   Future<void> updateEmergencyAPI(BuildContext context, VoidCallback onSuccess) async {
     try {
       isLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
 
-      final homeAddress = [cityCtrl.text.trim(), selectedState.value]
-          .where((e) => e.isNotEmpty)
-          .join(', ');
+      final home = HomeAddress(
+        address: addressLineCtrl.text.trim(),
+        city: cityCtrl.text.trim(),
+        state: selectedState.value.trim(),
+        postCode: postCodeCtrl.text.trim(),
+      );
 
+      // API expects home_address as a plain string (e.g. "Jaipur, Rajasthan"),
+      // not a nested object — otherwise: "Not a valid string."
       final Map<String, dynamic> dictParameter = <String, dynamic>{
         "contact_name": emergencyNameCtrl.text.trim(),
         "relation": selectedEmergencyRelationModel.value?.code ?? emergencyRelation.value.toLowerCase(),
         "mobile_number": emergencyMobileCtrl.text.trim(),
-        "home_address": homeAddress,
+        "home_address": home.display,
         "insurance_provider": insuranceProviderCtrl.text.trim(),
         "policy_number": policyNumberCtrl.text.trim(),
       };
@@ -1038,7 +1251,7 @@ class ProfileController extends GetxController {
         context,
         WebApiConstant.API_URL_PATIENT_UPDATE_EMERGENCY,
         dictParameter,
-        userAccessToken!,
+        userAccessToken ?? '',
       );
 
       isLoading.value = false;
@@ -1074,7 +1287,9 @@ class ProfileController extends GetxController {
     medicationInputCtrl.dispose();
     emergencyNameCtrl.dispose();
     emergencyMobileCtrl.dispose();
+    addressLineCtrl.dispose();
     cityCtrl.dispose();
+    postCodeCtrl.dispose();
     insuranceProviderCtrl.dispose();
     policyNumberCtrl.dispose();
     super.onClose();

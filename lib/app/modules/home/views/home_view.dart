@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/Util/display_value.dart';
 import '../../../data/models/family_member_model.dart';
 import '../../../data/models/video_model.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
@@ -116,7 +117,12 @@ class _HomeScreenState extends State<HomeScreen> {
             parent: BouncingScrollPhysics(),
           ),
           slivers: [
-            SliverToBoxAdapter(child: _TopBar(topPad: top, greeting: _greeting)),
+            SliverToBoxAdapter(
+                child: _TopBar(
+              topPad: top,
+              greeting: _greeting,
+              controller: controller,
+            )),
             SliverToBoxAdapter(
               child: _PassportSection(
                 controller: controller,
@@ -196,7 +202,13 @@ class _HomeScreenState extends State<HomeScreen> {
 class _TopBar extends StatelessWidget {
   final double topPad;
   final String greeting;
-  const _TopBar({required this.topPad, required this.greeting});
+  final HomeController controller;
+
+  const _TopBar({
+    required this.topPad,
+    required this.greeting,
+    required this.controller,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -236,14 +248,22 @@ class _TopBar extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                Text(
-                  'HealAura',
-                  style: AppTextStyles.heading3.copyWith(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.2,
-                  ),
-                ),
+                Obx(() {
+                  // Touch index so Obx rebuilds when selection changes.
+                  controller.activePatientIndex.value;
+                  final name =
+                      controller.selectedPatient?.fullName?.trim() ?? '';
+                  return Text(
+                    name.isNotEmpty ? name : 'HealAura',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.heading3.copyWith(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  );
+                }),
               ],
             ),
           ),
@@ -467,13 +487,11 @@ class _PassportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final blood = patient.bloodGroup?.trim().isNotEmpty == true
-        ? patient.bloodGroup!
-        : '--';
-    final age = patient.age != null ? '${patient.age}' : '--';
+    final blood = displayOrNa(patient.bloodGroup);
+    final age = patient.age != null ? '${patient.age}' : 'NA';
     final gender = (patient.gender?.trim().isNotEmpty == true)
         ? (patient.gender!.capitalizeFirst ?? patient.gender!)
-        : '--';
+        : 'NA';
     final meds = patient.medical?.currentMedications?.length ?? 0;
     final diseases = patient.medical?.chronicDisease == true ? 1 : 0;
     final isMe = patient.isSelf;
@@ -609,7 +627,7 @@ class _PassportCard extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: const Text(
-                                    'SELECTED',
+                                    'Active',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 10,
@@ -630,6 +648,7 @@ class _PassportCard extends StatelessWidget {
                           patientId: patient.patientId,
                           profilePhoto: patient.profilePhoto,
                           initials: initials,
+                          isSelf: patient.isSelf,
                         ),
                       ),
                     ),
@@ -660,40 +679,40 @@ class _PassportCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.swipe_rounded,
-                      size: 14,
-                      color: AppColors.textGray.withValues(alpha: 0.85),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      isSelected
-                          ? 'Tap card → open records'
-                          : 'Swipe to browse · Tap to select',
-                      style: TextStyle(
-                        color: AppColors.textGray.withValues(alpha: 0.9),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Spacer(),
-                    const Text(
-                      'Show QR',
-                      style: TextStyle(
-                        color: AppColors.tealDark,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      size: 16,
-                      color: AppColors.tealDark,
-                    ),
-                  ],
-                ),
+                // Row(
+                //   children: [
+                //     Icon(
+                //       Icons.swipe_rounded,
+                //       size: 14,
+                //       color: AppColors.textGray.withValues(alpha: 0.85),
+                //     ),
+                //     const SizedBox(width: 6),
+                //     Text(
+                //       isSelected
+                //           ? 'Tap card → open records'
+                //           : 'Swipe to browse · Tap to select',
+                //       style: TextStyle(
+                //         color: AppColors.textGray.withValues(alpha: 0.9),
+                //         fontSize: 11,
+                //         fontWeight: FontWeight.w500,
+                //       ),
+                //     ),
+                //     const Spacer(),
+                //     const Text(
+                //       'Show QR',
+                //       style: TextStyle(
+                //         color: AppColors.tealDark,
+                //         fontSize: 11,
+                //         fontWeight: FontWeight.w700,
+                //       ),
+                //     ),
+                //     const Icon(
+                //       Icons.chevron_right_rounded,
+                //       size: 16,
+                //       color: AppColors.tealDark,
+                //     ),
+                //   ],
+                // ),
               ],
             ),
           ),
@@ -1291,7 +1310,7 @@ class _FeaturedContinue extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Get.to(() => const VideoSeriesScreen()),
+      onTap: () => VideoPlayerScreen.open(video),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
         child: SizedBox(
@@ -1403,7 +1422,7 @@ class _VideoRailCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Get.to(() => const VideoSeriesScreen()),
+      onTap: () => VideoPlayerScreen.open(video),
       child: SizedBox(
         width: 168,
         child: Column(

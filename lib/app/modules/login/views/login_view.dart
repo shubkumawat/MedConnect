@@ -1,14 +1,18 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
+import 'package:healaura/DataProvider/web_api_constant.dart';
+import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
+import 'package:healaura/app/core/Util/web_page_helper.dart';
 
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../core/widgets/live_text_field.dart';
 import '../../../core/widgets/otp_input_row.dart';
-import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
 import '../controllers/login_controller.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -181,7 +185,6 @@ class _LoginScreenState extends State<LoginScreen> {
         key: ValueKey('otp_section_${controller.otpRebuildKey.value}'),
         child: OtpInputRow(
           otp: controller.receivedOtp.value,
-          onCompleted: _verifyOtp,
           onChanged: (otp) => controller.receivedOtp.value = otp,
         ),
       ),
@@ -273,8 +276,38 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 /// Isolated phone step so country/loading Obx updates don't remount the number field.
-class _PhoneStep extends StatelessWidget {
+class _PhoneStep extends StatefulWidget {
   const _PhoneStep();
+
+  @override
+  State<_PhoneStep> createState() => _PhoneStepState();
+}
+
+class _PhoneStepState extends State<_PhoneStep> {
+  late final TapGestureRecognizer _termsTap;
+  late final TapGestureRecognizer _privacyTap;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsTap = TapGestureRecognizer()
+      ..onTap = () => openWebPage(
+            title: 'Terms of service',
+            url: WebApiConstant.WEB_TERMS_URL,
+          );
+    _privacyTap = TapGestureRecognizer()
+      ..onTap = () => openWebPage(
+            title: 'Privacy policy',
+            url: WebApiConstant.WEB_PRIVACY_URL,
+          );
+  }
+
+  @override
+  void dispose() {
+    _termsTap.dispose();
+    _privacyTap.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -306,7 +339,16 @@ class _PhoneStep extends StatelessWidget {
                       left: Radius.circular(12)),
                   onTap: loading
                       ? null
-                      : () {
+                      : () async {
+                          if (controller.countryList.isEmpty) {
+                            await controller.getMasterCountryAPI(context);
+                          }
+                          if (!context.mounted) return;
+                          if (controller.countryList.isEmpty) {
+                            Fluttertoast.showToast(
+                                msg: 'Could not load countries. Try again.');
+                            return;
+                          }
                           showModalBottomSheet<CountryModel>(
                             context: context,
                             isScrollControlled: true,
@@ -315,7 +357,7 @@ class _PhoneStep extends StatelessWidget {
                               return McDropdownSheet(
                                 title: 'Country / Code',
                                 items: controller.countryList.toList(),
-                                selected: selected,
+                                selected: controller.selectedCountry.value,
                                 labelOf: (c) =>
                                     '${c.flagEmoji}  ${c.name}  (${c.phoneCode})',
                               );
@@ -404,6 +446,7 @@ class _PhoneStep extends StatelessWidget {
                   color: AppColors.primary,
                   fontWeight: FontWeight.bold,
                 ),
+                recognizer: _termsTap,
               ),
               const TextSpan(text: ' & '),
               TextSpan(
@@ -412,6 +455,7 @@ class _PhoneStep extends StatelessWidget {
                   color: AppColors.primary,
                   fontWeight: FontWeight.bold,
                 ),
+                recognizer: _privacyTap,
               ),
             ],
           ),

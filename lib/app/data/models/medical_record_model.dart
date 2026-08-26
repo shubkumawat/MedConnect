@@ -285,8 +285,14 @@ class Medication {
       '1-1-1-1': 'Four times daily',
       'every_6_hours': 'Every 6 hours',
       'every_8_hours': 'Every 8 hours',
+      'weekly': 'Weekly',
       'SOS': 'As needed (SOS)',
     };
+    final everyDays = RegExp(r'^every_(\d+)_days$').firstMatch(frequency);
+    if (everyDays != null) {
+      final n = everyDays.group(1);
+      return 'Every $n days';
+    }
     return map[frequency] ?? frequency;
   }
 

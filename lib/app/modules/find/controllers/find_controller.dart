@@ -102,7 +102,8 @@ class FindController extends GetxController {
   void onInit() {
     super.onInit();
     fetchSpecializations();
-    fetchHospitals();
+    // Do not pop the OS location dialog on tab load — splash gate / user tap handles that.
+    fetchHospitals(requestLocation: false);
   }
 
   Future<void> fetchSpecializations() async {
@@ -125,30 +126,36 @@ class FindController extends GetxController {
     }
   }
 
-  /// User ki current position lene aur permissions handle karne ke liye
-  Future<Position?> _determinePosition() async {
+  /// User ki current position lene aur permissions handle karne ke liye.
+  /// [requestIfNeeded] false = never show OS dialog (post-splash gate owns first ask).
+  Future<Position?> _determinePosition({bool requestIfNeeded = false}) async {
     bool serviceEnabled;
     LocationPermission permission;
 
     // Check if location services are enabled.
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      Get.snackbar(
-        "Location Disabled",
-        "Please enable location services to find doctors near you.",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-        mainButton: TextButton(
-          onPressed: () => Geolocator.openLocationSettings(),
-          child: const Text("Enable", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
-      );
+      if (requestIfNeeded) {
+        Get.snackbar(
+          "Location Disabled",
+          "Please enable location services to find doctors near you.",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          mainButton: TextButton(
+            onPressed: () => Geolocator.openLocationSettings(),
+            child: const Text("Enable",
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        );
+      }
       return null;
     }
 
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
+      if (!requestIfNeeded) return null;
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         Get.snackbar(
@@ -161,32 +168,37 @@ class FindController extends GetxController {
         return null;
       }
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
-      Get.snackbar(
-        "Permission Blocked",
-        "Location permissions are permanently denied. Please enable them in settings.",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        mainButton: TextButton(
-          onPressed: () => Geolocator.openAppSettings(),
-          child: const Text("Settings", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
-      );
+      if (requestIfNeeded) {
+        Get.snackbar(
+          "Permission Blocked",
+          "Location permissions are permanently denied. Please enable them in settings.",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          mainButton: TextButton(
+            onPressed: () => Geolocator.openAppSettings(),
+            child: const Text("Settings",
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        );
+      }
       return null;
-    } 
+    }
 
     return await Geolocator.getCurrentPosition();
   }
 
   /// Nearby Doctors API ko fetch karne ke liye
-  Future<void> fetchHospitals() async {
+  Future<void> fetchHospitals({bool requestLocation = false}) async {
     try {
       isHospitalLoading(true);
-      
+
       // Location hasil karein
-      Position? position = await _determinePosition();
+      Position? position =
+          await _determinePosition(requestIfNeeded: requestLocation);
       userPosition.value = position;
       
       if (position == null) {

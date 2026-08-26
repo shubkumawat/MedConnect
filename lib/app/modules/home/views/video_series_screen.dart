@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart';
-import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
 import '../../../data/models/video_model.dart';
 import '../controllers/video_series_controller.dart';
 
@@ -175,7 +174,16 @@ class _VideoSeriesScreenState extends State<VideoSeriesScreen> {
   }
 
   void _openPlayer(BuildContext context, VideoModel video, Color color) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => _VideoPlayerScreen(video: video, color: color, controller: controller)));
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VideoPlayerScreen(
+          video: video,
+          color: color,
+          controller: controller,
+        ),
+      ),
+    );
   }
 }
 
@@ -289,19 +297,55 @@ class _VideoTile extends StatelessWidget {
   Widget _placeholder() => Container(color: AppColors.teal.withOpacity(0.1), child: const Center(child: Icon(Icons.movie_filter_rounded, color: AppColors.teal, size: 40)));
 }
 
-// ── Improved Video Player Screen ──────────────────────────────────────────────
-class _VideoPlayerScreen extends StatefulWidget {
+// ── Video Player Screen (also opened from Home Learn rail) ───────────────────
+class VideoPlayerScreen extends StatefulWidget {
   final VideoModel video;
   final Color color;
   final VideoSeriesController controller;
-  const _VideoPlayerScreen({required this.video, required this.color, required this.controller});
-  @override State<_VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+
+  const VideoPlayerScreen({
+    super.key,
+    required this.video,
+    required this.color,
+    required this.controller,
+  });
+
+  /// Open player from Home / anywhere — ensures VideoSeriesController exists.
+  static Future<void> open(VideoModel video, {Color? color}) {
+    final c = Get.isRegistered<VideoSeriesController>()
+        ? Get.find<VideoSeriesController>()
+        : Get.put(VideoSeriesController());
+    Color theme = color ?? AppColors.teal;
+    final hex = video.topic.backgroundColor;
+    if (hex.isNotEmpty) {
+      try {
+        var value = hex.replaceAll('#', '');
+        if (value.length == 6) value = 'FF$value';
+        theme = Color(int.parse(value, radix: 16));
+      } catch (_) {}
+    }
+    return Get.to(
+          () => VideoPlayerScreen(
+            video: video,
+            color: theme,
+            controller: c,
+          ),
+          transition: Transition.fadeIn,
+        ) ??
+        Future.value();
+  }
+
+  @override
+  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
+class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   VideoPlayerController? _playerController;
+  WebViewController? _webController;
   bool _isInitialized = false;
   bool _hasError = false;
+  bool _isWebVideo = false;
+  String? _errorMessage;
   late bool _isLiked = widget.video.isLiked;
   late bool _isBookmarked = widget.video.isBookmarked;
 
@@ -311,25 +355,194 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
     _initPlayer();
   }
 
+  bool _isYoutube(String url) {
+    final u = url.toLowerCase();
+    return u.contains('youtube.com') || u.contains('youtu.be');
+  }
+
+  bool _isVimeo(String url) => url.toLowerCase().contains('vimeo.com');
+
+  String? _youtubeId(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return null;
+    if (uri.host.contains('youtu.be')) {
+      final id = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
+      return id.isEmpty ? null : id;
+    }
+    final v = uri.queryParameters['v'];
+    if (v != null && v.isNotEmpty) return v;
+    final parts = uri.pathSegments;
+    final embedIdx = parts.indexOf('embed');
+    if (embedIdx >= 0 && embedIdx + 1 < parts.length) return parts[embedIdx + 1];
+    final shortsIdx = parts.indexOf('shorts');
+    if (shortsIdx >= 0 && shortsIdx + 1 < parts.length) return parts[shortsIdx + 1];
+    return null;
+  }
+
+  String? _vimeoId(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return null;
+    for (final p in uri.pathSegments.reversed) {
+      if (RegExp(r'^\d+$').hasMatch(p)) return p;
+    }
+    return null;
+  }
+
+  Future<void> _initWebPlayer(String embedUrl) async {
+    final controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onWebResourceError: (_) {
+            if (mounted) {
+              setState(() {
+                _hasError = true;
+                _errorMessage = 'Could not load video';
+              });
+            }
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(embedUrl));
+    _webController = controller;
+    _isWebVideo = true;
+    if (mounted) setState(() => _isInitialized = true);
+  }
+
   Future<void> _initPlayer() async {
-    final url = widget.video.videoUrl;
-    if (url == null || url.isEmpty) { setState(() => _hasError = true); return; }
+    final url = widget.video.videoUrl?.trim() ?? '';
+    if (url.isEmpty) {
+      setState(() {
+        _hasError = true;
+        _errorMessage = 'No video link available';
+      });
+      return;
+    }
+
     try {
+      if (_isYoutube(url)) {
+        final id = _youtubeId(url);
+        if (id == null) {
+          setState(() {
+            _hasError = true;
+            _errorMessage = 'Invalid YouTube link';
+          });
+          return;
+        }
+        await _initWebPlayer(
+          'https://www.youtube.com/embed/$id?autoplay=1&playsinline=1&rel=0',
+        );
+        return;
+      }
+
+      if (_isVimeo(url)) {
+        final id = _vimeoId(url);
+        if (id == null) {
+          setState(() {
+            _hasError = true;
+            _errorMessage = 'Invalid Vimeo link';
+          });
+          return;
+        }
+        await _initWebPlayer(
+          'https://player.vimeo.com/video/$id?autoplay=1',
+        );
+        return;
+      }
+
+      // Direct stream (mp4 / m3u8 / etc.)
       _playerController = VideoPlayerController.networkUrl(Uri.parse(url));
       await _playerController!.initialize();
-      _playerController!.play();
-      setState(() => _isInitialized = true);
+      await _playerController!.play();
       _playerController!.addListener(() {
-        if (mounted && _playerController != null && _playerController!.value.isPlaying) {
+        if (!mounted || _playerController == null) return;
+        if (_playerController!.value.isPlaying) {
           final pos = _playerController!.value.position.inSeconds;
-          if (pos % 5 == 0 && pos > 0) widget.controller.updateProgress(widget.video.videoId, pos);
+          if (pos % 5 == 0 && pos > 0) {
+            widget.controller.updateProgress(widget.video.videoId, pos);
+          }
         }
       });
-    } catch (e) { setState(() => _hasError = true); }
+      if (mounted) setState(() => _isInitialized = true);
+    } catch (e) {
+      // Last resort: open URL inside WebView so the link still plays.
+      try {
+        await _initWebPlayer(url);
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _hasError = true;
+            _errorMessage = 'Video playback error';
+          });
+        }
+      }
+    }
   }
 
   @override
-  void dispose() { _playerController?.dispose(); super.dispose(); }
+  void dispose() {
+    _playerController?.dispose();
+    super.dispose();
+  }
+
+  Widget _buildPlayer() {
+    if (_hasError) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 60),
+          const SizedBox(height: 16),
+          Text(
+            _errorMessage ?? 'Video playback error',
+            style: AppTextStyles.body.copyWith(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      );
+    }
+    if (!_isInitialized) {
+      return const CircularProgressIndicator(color: AppColors.teal);
+    }
+    if (_isWebVideo && _webController != null) {
+      return AspectRatio(
+        aspectRatio: 16 / 9,
+        child: WebViewWidget(controller: _webController!),
+      );
+    }
+    if (_playerController != null) {
+      return AspectRatio(
+        aspectRatio: _playerController!.value.aspectRatio == 0
+            ? 16 / 9
+            : _playerController!.value.aspectRatio,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            VideoPlayer(_playerController!),
+            IconButton(
+              iconSize: 56,
+              color: Colors.white,
+              icon: Icon(
+                _playerController!.value.isPlaying
+                    ? Icons.pause_circle_filled
+                    : Icons.play_circle_filled,
+              ),
+              onPressed: () {
+                setState(() {
+                  if (_playerController!.value.isPlaying) {
+                    _playerController!.pause();
+                  } else {
+                    _playerController!.play();
+                  }
+                });
+              },
+            ),
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -337,43 +550,101 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          Center(
-            child: _hasError ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.error_outline, color: Colors.red, size: 60), const SizedBox(height: 16), Text('Video playback error', style: AppTextStyles.body.copyWith(color: Colors.white))])
-                : !_isInitialized ? const CircularProgressIndicator(color: AppColors.teal)
-                : AspectRatio(aspectRatio: _playerController!.value.aspectRatio, child: VideoPlayer(_playerController!)),
-          ),
-          
-          // Custom Controls Overlays
-          Positioned(top: 40, left: 20, child: CircleAvatar(backgroundColor: Colors.black45, child: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Get.back()))),
-          
-          // Action Sidebar
+          Center(child: _buildPlayer()),
           Positioned(
-            right: 20, bottom: 120,
+            top: 40,
+            left: 20,
+            child: CircleAvatar(
+              backgroundColor: Colors.black45,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Get.back(),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 20,
+            bottom: 120,
             child: Column(
               children: [
-                _PlayerAction(icon: _isLiked ? Icons.favorite : Icons.favorite_border, label: '${widget.video.totalLikes}', color: _isLiked ? Colors.red : Colors.white, onTap: () { setState(() => _isLiked = !_isLiked); widget.controller.toggleLike(widget.video); }),
+                _PlayerAction(
+                  icon: _isLiked ? Icons.favorite : Icons.favorite_border,
+                  label: '${widget.video.totalLikes}',
+                  color: _isLiked ? Colors.red : Colors.white,
+                  onTap: () {
+                    setState(() => _isLiked = !_isLiked);
+                    widget.controller.toggleLike(widget.video);
+                  },
+                ),
                 const SizedBox(height: 24),
-                _PlayerAction(icon: _isBookmarked ? Icons.bookmark : Icons.bookmark_border, label: 'Save', color: _isBookmarked ? AppColors.orange : Colors.white, onTap: () { setState(() => _isBookmarked = !_isBookmarked); widget.controller.toggleBookmark(widget.video); }),
+                _PlayerAction(
+                  icon: _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                  label: 'Save',
+                  color: _isBookmarked ? AppColors.orange : Colors.white,
+                  onTap: () {
+                    setState(() => _isBookmarked = !_isBookmarked);
+                    widget.controller.toggleBookmark(widget.video);
+                  },
+                ),
                 const SizedBox(height: 24),
-                _PlayerAction(icon: Icons.share_outlined, label: 'Share', color: Colors.white, onTap: () => widget.controller.shareVideo(widget.video)),
+                _PlayerAction(
+                  icon: Icons.share_outlined,
+                  label: 'Share',
+                  color: Colors.white,
+                  onTap: () => widget.controller.shareVideo(widget.video),
+                ),
               ],
             ),
           ),
-
-          // Title & Progress
           Positioned(
-            bottom: 0, left: 0, right: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
             child: Container(
               padding: const EdgeInsets.fromLTRB(24, 40, 24, 30),
-              decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.black.withOpacity(0.95), Colors.transparent], begin: Alignment.bottomCenter, end: Alignment.topCenter)),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.95),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                ),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.video.title, style: AppTextStyles.heading3.copyWith(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(
+                    widget.video.title,
+                    style: AppTextStyles.heading3.copyWith(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text('by ${widget.video.presenterName}', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14)),
-                  const SizedBox(height: 24),
-                  if (_isInitialized) VideoProgressIndicator(_playerController!, allowScrubbing: true, colors: const VideoProgressColors(playedColor: AppColors.teal, bufferedColor: Colors.white24, backgroundColor: Colors.white10)),
+                  Text(
+                    'by ${widget.video.presenterName}',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (_isInitialized &&
+                      !_isWebVideo &&
+                      _playerController != null) ...[
+                    const SizedBox(height: 24),
+                    VideoProgressIndicator(
+                      _playerController!,
+                      allowScrubbing: true,
+                      colors: const VideoProgressColors(
+                        playedColor: AppColors.teal,
+                        bufferedColor: Colors.white24,
+                        backgroundColor: Colors.white10,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

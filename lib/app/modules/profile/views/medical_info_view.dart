@@ -11,7 +11,13 @@ import '../controllers/profile_controller.dart';
 import 'widgets/profile_form_shell.dart';
 
 class MedicalInfoScreen extends StatefulWidget {
-  const MedicalInfoScreen(BuildContext? context, {super.key});
+  final bool isFromLogin;
+
+  const MedicalInfoScreen(
+    BuildContext? context, {
+    super.key,
+    this.isFromLogin = false,
+  });
 
   @override
   State<MedicalInfoScreen> createState() => _MedicalInfoScreenState();
@@ -21,6 +27,33 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
   final ProfileController controller = Get.put(ProfileController());
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (controller.occupationList.isEmpty) {
+        controller.getMasterOccupationAPI(context);
+      }
+      if (controller.disabilityTypeList.isEmpty) {
+        controller.getMasterDisabilityTypeAPI(context);
+      }
+    });
+  }
+
+  void _goToEmergency() {
+    if (widget.isFromLogin) {
+      Get.to(
+        () => const EmergencyInfoScreen(null, isFromLogin: true),
+        transition: Transition.rightToLeft,
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const EmergencyInfoScreen(null)),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ProfileFormScaffold(
       title: 'Medical information',
@@ -28,10 +61,28 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
       step: 2,
       heroIcon: Icons.medical_services_rounded,
       bottomBar: Obx(
-        () => ProfilePrimaryButton(
-          text: 'Continue to emergency',
-          isLoading: controller.isLoading.value,
-          onTap: _onContinue,
+        () => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ProfilePrimaryButton(
+              text: 'Continue to emergency',
+              isLoading: controller.isLoading.value,
+              onTap: _onContinue,
+            ),
+            if (widget.isFromLogin) ...[
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: controller.isLoading.value ? null : _goToEmergency,
+                child: Text(
+                  'Skip for now',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.tealDark,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
       children: [
@@ -135,7 +186,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                 prefixIcon: Icons.work_outline_rounded,
                 onChanged: (v) {
                   controller.selectedOccupationModel.value = v;
-                  if (v != null) controller.occupationCtrl.text = v.name;
+                  controller.occupationCtrl.text = v?.name ?? '';
                 },
               ),
             ),
@@ -270,9 +321,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                         prefixIcon: Icons.accessible_rounded,
                         onChanged: (v) {
                           controller.selectedDisabilityTypeModel.value = v;
-                          if (v != null) {
-                            controller.disabilityTypeCtrl.text = v.name;
-                          }
+                          controller.disabilityTypeCtrl.text = v?.name ?? '';
                         },
                       ),
                     )
@@ -323,10 +372,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
     }
     controller.updateMedicalAPI(context, () {
       controller.getPatientProfileAPI(context);
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const EmergencyInfoScreen(null)),
-      );
+      _goToEmergency();
     });
   }
 }

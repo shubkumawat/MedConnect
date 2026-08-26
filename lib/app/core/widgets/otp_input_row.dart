@@ -4,13 +4,14 @@ import '../theme/app_colors.dart';
 import 'live_text_field.dart';
 
 class OtpInputRow extends StatefulWidget {
-  final Function(String) onCompleted;
+  /// Called when all 6 digits are filled (optional — does not auto-submit).
+  final ValueChanged<String>? onCompleted;
   final ValueChanged<String>? onChanged;
   final String? otp;
 
   const OtpInputRow({
     super.key,
-    required this.onCompleted,
+    this.onCompleted,
     this.onChanged,
     this.otp,
   });
@@ -65,7 +66,7 @@ class _OtpInputRowState extends State<OtpInputRow> {
     for (int i = 0; i < 6; i++) {
       _controllers[i].text = i < otp.length ? otp[i] : '';
     }
-    _emit(); // also triggers onCompleted when 6 digits
+    _emit();
   }
 
   String get _otp => _controllers.map((c) => c.text).join();
@@ -73,7 +74,7 @@ class _OtpInputRowState extends State<OtpInputRow> {
   void _emit() {
     final otp = _otp;
     widget.onChanged?.call(otp);
-    if (otp.length == 6) widget.onCompleted(otp);
+    if (otp.length == 6) widget.onCompleted?.call(otp);
   }
 
   void _onBoxChanged(int index, String value) {

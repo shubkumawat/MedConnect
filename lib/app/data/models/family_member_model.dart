@@ -47,6 +47,7 @@ class FamilyMember {
   Nationality? nationality;
   String? email;
   String? mobileNumber;
+  String? abhaNumber;
   Medical? medical;
   EmergencyContact? emergencyContact;
   Insurance? insurance;
@@ -74,6 +75,7 @@ class FamilyMember {
     this.nationality,
     this.email,
     this.mobileNumber,
+    this.abhaNumber,
     this.medical,
     this.emergencyContact,
     this.insurance,
@@ -142,7 +144,26 @@ class FamilyMember {
             ? Relation.fromJson(json['relation'])
             : Relation(name: json['relation'].toString()))
         : null;
-    bloodGroup = json['blood_group'] is Map ? json['blood_group']['name']?.toString() : json['blood_group']?.toString();
+    bloodGroup = json['blood_group'] is Map
+        ? json['blood_group']['name']?.toString()
+        : json['blood_group']?.toString();
+    if (bloodGroup != null) {
+      final bg = bloodGroup!.trim();
+      final lower = bg.toLowerCase();
+      if (bg.isEmpty ||
+          lower == 'null' ||
+          bg == '-' ||
+          bg == '—' ||
+          bg == '--') {
+        bloodGroup = null;
+      } else if (lower == 'unknown' ||
+          lower == "don't know" ||
+          lower == 'dont know') {
+        bloodGroup = 'Unknown';
+      } else {
+        bloodGroup = bg;
+      }
+    }
     height = json['height']?.toString();
     weight = json['weight']?.toString();
     nationality = json['nationality'] != null
@@ -152,12 +173,34 @@ class FamilyMember {
     mobileNumber = json['mobile_number']?.toString() ??
         json['mobile']?.toString() ??
         json['phone']?.toString();
+    abhaNumber = json['abha_number']?.toString() ??
+        json['health_id']?.toString() ??
+        json['abha_id']?.toString();
+    if (abhaNumber != null) {
+      final a = abhaNumber!.trim();
+      abhaNumber = (a.isEmpty || a.toLowerCase() == 'null') ? null : a;
+    }
     medical = json['medical'] != null ? Medical.fromJson(json['medical']) : null;
     emergencyContact = json['emergency_contact'] != null
         ? EmergencyContact.fromJson(json['emergency_contact'])
         : null;
     insurance = json['insurance'] != null ? Insurance.fromJson(json['insurance']) : null;
-    homeAddress = json['home_address'];
+    // API may return Map {address, city, post_code, state} or a plain string.
+    if (json['home_address'] is Map) {
+      final m = Map<String, dynamic>.from(json['home_address'] as Map);
+      homeAddress = [
+        m['address'],
+        m['city'],
+        m['state'],
+        m['post_code'] ?? m['pincode'],
+      ]
+          .where((e) => e != null && e.toString().trim().isNotEmpty)
+          .map((e) => e.toString().trim())
+          .join(', ');
+    } else {
+      final raw = json['home_address']?.toString();
+      homeAddress = (raw == null || raw.isEmpty || raw == 'null') ? null : raw;
+    }
     occupation = json['occupation'] != null
         ? (json['occupation'] is Map
             ? Occupation.fromJson(json['occupation'])
@@ -188,6 +231,7 @@ class FamilyMember {
     }
     data['email'] = email;
     data['mobile_number'] = mobileNumber;
+    data['abha_number'] = abhaNumber;
     if (medical != null) {
       data['medical'] = medical!.toJson();
     }

@@ -116,7 +116,7 @@ class _FindScreenState extends State<FindScreen> {
   Future<void> _refresh() async {
     await Future.wait([
       controller.fetchSpecializations(),
-      controller.fetchHospitals(),
+      controller.fetchHospitals(requestLocation: true),
     ]);
   }
 
@@ -132,7 +132,8 @@ class _FindScreenState extends State<FindScreen> {
             topPad: top,
             searchController: _searchCtrl,
             onSearch: (query) => controller.setSearch(query),
-            onRefreshLocation: () => controller.fetchHospitals(),
+            onRefreshLocation: () =>
+                controller.fetchHospitals(requestLocation: true),
           ),
           Expanded(
             child: Obx(() {
@@ -227,7 +228,7 @@ class _FindScreenState extends State<FindScreen> {
           hasScrollBody: false,
           child: _EmptyState(
             hasLocation: controller.userPosition.value != null,
-            onRetry: () => controller.fetchHospitals(),
+            onRetry: () => controller.fetchHospitals(requestLocation: true),
           ),
         );
       }
@@ -349,14 +350,14 @@ class _FindScreenState extends State<FindScreen> {
                 _MapFab(
                   icon: Icons.my_location_rounded,
                   onTap: () async {
-                    await controller.fetchHospitals();
+                    await controller.fetchHospitals(requestLocation: true);
                     await _goToMyLocation();
                   },
                 ),
                 const SizedBox(height: 10),
                 _MapFab(
                   icon: Icons.refresh_rounded,
-                  onTap: () => controller.fetchHospitals(),
+                  onTap: () => controller.fetchHospitals(requestLocation: true),
                 ),
               ],
             ),
@@ -428,7 +429,7 @@ class _FindScreenState extends State<FindScreen> {
               bottom: 110,
               child: _EmptyState(
                 hasLocation: controller.userPosition.value != null,
-                onRetry: () => controller.fetchHospitals(),
+                onRetry: () => controller.fetchHospitals(requestLocation: true),
                 compact: true,
               ),
             ),

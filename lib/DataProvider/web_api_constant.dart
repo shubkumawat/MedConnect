@@ -19,6 +19,11 @@ class WebApiConstant {
   static const String API_URL_FAMILY_MEMBER_DETAIL         = BASE_URL + "patients/family-member-detail/";
   static const String API_URL_GIVE_ACCESS                  = BASE_URL + "patients/give-access/";
 
+  // Notifications / care reminders
+  /// GET current prefs · POST to update
+  /// Body/query: device_id + medication_reminders / vaccination_reminders / qr_scan_alerts
+  static const String API_URL_CARE_REMINDERS               = BASE_URL + "notifications/care-reminders/";
+
   // Health Records
   static const String API_URL_RECORDS_DISEASES             = BASE_URL + "health-records/diseases/";
   static const String API_URL_RECORDS_DISEASES_Details             = BASE_URL + "health-records/diseases/detail/";
@@ -32,15 +37,22 @@ class WebApiConstant {
   /// POST /health-records/medications/taken/?medication_uuid=...
   static const String API_URL_RECORDS_MEDICATION_TAKEN     = BASE_URL + "health-records/medications/taken/";
   /// Current-medication add (global active meds — not disease-scoped).
-  /// Matches backend path: /health-records/diseases/?active=1/medications
-  static const String API_URL_RECORDS_CURRENT_MEDICATIONS_ADD = BASE_URL + "health-records/diseases/?active=1/medications";
+  /// POST /health-records/medications/
+  static const String API_URL_RECORDS_CURRENT_MEDICATIONS_ADD = BASE_URL + "health-records/medications/";
   static const String API_URL_RECORDS_MEDICINES_SEARCH     = BASE_URL + "health-records/medicines/search/";
 
   // Patient Health QR
   static const String API_URL_QR_CODES                    = BASE_URL + "qr-codes/";
   static const String API_URL_QR_CURRENT                  = BASE_URL + "qr-codes/current/";
   static const String API_URL_QR_REGENERATE               = BASE_URL + "qr-codes/regenerate/";
+  /// DELETE /qr-codes/{uuid}/  (legacy)
+  static const String API_URL_QR_DELETE                   = BASE_URL + "qr-codes/";
+  /// POST /qr-codes/expire/ — own: {} · family: { patient_id }
+  static const String API_URL_QR_EXPIRE                   = BASE_URL + "qr-codes/expire/";
   static const String MEDIA_BASE_URL                      = "https://medconnect.airainnovations.com";
+  static const String WEB_PRIVACY_URL                     = "https://medconnect.airainnovations.com/privacy/";
+  static const String WEB_TERMS_URL                       = "https://medconnect.airainnovations.com/terms/";
+  static const String WEB_HELP_URL                        = "https://medconnect.airainnovations.com/help/";
 
   // Access Management
   static const String API_URL_UPDATE_ACCESS_CONTROL        = BASE_URL + "patients/update-access-control/";

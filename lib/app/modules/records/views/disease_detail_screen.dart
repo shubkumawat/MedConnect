@@ -242,7 +242,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
                             Text(
                               med.name.isNotEmpty
                                   ? med.name
-                                  : 'Unknown Medication',
+                                  : 'NA',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 15,

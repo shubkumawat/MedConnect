@@ -33,8 +33,8 @@ class _AddDiseaseScreenState extends State<AddDiseaseScreen> {
 
   String? _conditionType;
   String _status = 'Active';
-  String _hereditaryStatus = 'Unknown';
-  String? _bodyPart;
+  String _hereditaryStatus = 'NA';
+  final Set<String> _selectedBodyParts = {};
 
   double _severity = 2;
   bool _isHospitalized = false;
@@ -155,17 +155,27 @@ class _AddDiseaseScreenState extends State<AddDiseaseScreen> {
         (e) => e['value'] == widget.disease!.hereditary,
         orElse: () => {},
       );
-      if (hereditary.isNotEmpty) _hereditaryStatus = hereditary['label']!;
+      if (hereditary.isNotEmpty) {
+        final label = hereditary['label']!;
+        _hereditaryStatus =
+            label.toLowerCase() == 'unknown' ? 'NA' : label;
+      }
     }
 
     if (controller.bodyPartsOptions.isNotEmpty &&
         widget.disease!.bodyParts != null &&
         widget.disease!.bodyParts!.isNotEmpty) {
-      final part = controller.bodyPartsOptions.firstWhere(
-        (e) => e['value'] == widget.disease!.bodyParts!.first,
-        orElse: () => {},
-      );
-      if (part.isNotEmpty) _bodyPart = part['label'];
+      for (final raw in widget.disease!.bodyParts!) {
+        final part = controller.bodyPartsOptions.firstWhere(
+          (e) => e['value'] == raw || e['label'] == raw,
+          orElse: () => {},
+        );
+        if (part.isNotEmpty) {
+          _selectedBodyParts.add(part['label']!);
+        } else if (raw.trim().isNotEmpty) {
+          _selectedBodyParts.add(raw);
+        }
+      }
     }
 
     if (widget.disease!.severity != null) {
@@ -244,20 +254,32 @@ class _AddDiseaseScreenState extends State<AddDiseaseScreen> {
             ? [
                 {
                   'label': _hereditaryStatus,
-                  'value': _hereditaryStatus.toLowerCase()
+                  'value': _hereditaryStatus.toLowerCase() == 'na'
+                      ? 'unknown'
+                      : _hereditaryStatus.toLowerCase(),
                 }
               ]
             : controller.hereditaryOptions)
         .firstWhere(
-      (e) => e['label'] == _hereditaryStatus,
-      orElse: () => {'value': _hereditaryStatus.toLowerCase()},
+      (e) {
+        final label = (e['label'] ?? '').toLowerCase();
+        if (_hereditaryStatus.toLowerCase() == 'na') {
+          return label == 'na' || label == 'unknown';
+        }
+        return e['label'] == _hereditaryStatus;
+      },
+      orElse: () => {
+        'value': _hereditaryStatus.toLowerCase() == 'na'
+            ? 'unknown'
+            : _hereditaryStatus.toLowerCase(),
+      },
     )['value'];
-    final selectedBodyPart = _bodyPart != null
-        ? controller.bodyPartsOptions.firstWhere(
-            (e) => e['label'] == _bodyPart,
-            orElse: () => {'value': _bodyPart!.toLowerCase()},
-          )['value']
-        : null;
+    final selectedBodyParts = _selectedBodyParts.map((label) {
+      return controller.bodyPartsOptions.firstWhere(
+        (e) => e['label'] == label,
+        orElse: () => {'value': label.toLowerCase().replaceAll(' ', '_')},
+      )['value']!;
+    }).toList();
 
     final bool success;
     if (widget.disease == null) {
@@ -270,7 +292,7 @@ class _AddDiseaseScreenState extends State<AddDiseaseScreen> {
         diagnosedOn: _diagnosedDateCtrl.text,
         recoveredOn:
             _recoveredDateCtrl.text.isNotEmpty ? _recoveredDateCtrl.text : null,
-        bodyParts: selectedBodyPart != null ? [selectedBodyPart] : [],
+        bodyParts: selectedBodyParts,
         hereditary: selectedHereditary!,
         nextFollowUpOn:
             _followUpDateCtrl.text.isNotEmpty ? _followUpDateCtrl.text : null,
@@ -294,7 +316,7 @@ class _AddDiseaseScreenState extends State<AddDiseaseScreen> {
         diagnosedOn: _diagnosedDateCtrl.text,
         recoveredOn:
             _recoveredDateCtrl.text.isNotEmpty ? _recoveredDateCtrl.text : null,
-        bodyParts: selectedBodyPart != null ? [selectedBodyPart] : [],
+        bodyParts: selectedBodyParts,
         hereditary: selectedHereditary!,
         nextFollowUpOn:
             _followUpDateCtrl.text.isNotEmpty ? _followUpDateCtrl.text : null,
@@ -548,11 +570,57 @@ class _AddDiseaseScreenState extends State<AddDiseaseScreen> {
                           }).toList(),
                         ),
                         const SizedBox(height: 14),
-                        McDropdown<String>(
-                          hint: 'Body Part / Affected Area',
-                          value: _bodyPart,
-                          items: bodyParts,
-                          onChanged: (v) => setState(() => _bodyPart = v),
+                        const _FieldLabel('Body Part / Affected Area'),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Select one or more areas',
+                          style: AppTextStyles.caption
+                              .copyWith(color: AppColors.textGray),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: bodyParts.map((part) {
+                            final selected = _selectedBodyParts.contains(part);
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedBodyParts.remove(part);
+                                  } else {
+                                    _selectedBodyParts.add(part);
+                                  }
+                                });
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 160),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? AppColors.tealDark
+                                      : const Color(0xFFF3F7F5),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: selected
+                                        ? AppColors.tealDark
+                                        : const Color(0xFFE3EBE7),
+                                  ),
+                                ),
+                                child: Text(
+                                  '${selected ? '✓  ' : ''}$part',
+                                  style: TextStyle(
+                                    color: selected
+                                        ? Colors.white
+                                        : AppColors.textMuted,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
                         ),
                         const SizedBox(height: 12),
                         CustomTextField(
@@ -578,15 +646,20 @@ class _AddDiseaseScreenState extends State<AddDiseaseScreen> {
                         const SizedBox(height: 8),
                         Row(
                           children: (hereditaryList.isEmpty
-                                  ? ['Yes', 'No', 'Unknown']
+                                  ? ['Yes', 'No', 'NA']
                                       .map((e) => {
                                             'label': e,
-                                            'value': e.toLowerCase()
+                                            'value': e.toLowerCase() == 'na'
+                                                ? 'unknown'
+                                                : e.toLowerCase(),
                                           })
                                       .toList()
                                   : hereditaryList)
                               .map((item) {
-                            final val = item['label']!;
+                            final raw = item['label']!;
+                            final val = raw.toLowerCase() == 'unknown'
+                                ? 'NA'
+                                : raw;
                             final isSelected = _hereditaryStatus == val;
                             return Expanded(
                               child: GestureDetector(

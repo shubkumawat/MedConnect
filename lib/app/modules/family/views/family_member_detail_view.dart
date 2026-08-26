@@ -442,13 +442,13 @@ class _ProfileHeaderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = member.fullName?.trim().isNotEmpty == true
         ? member.fullName!
-        : 'Unknown';
+        : 'NA';
     final relation = member.relation?.name ?? 'Family member';
     final mobile = member.mobileNumber?.trim() ?? '';
     final photo = member.profilePhoto;
     final blood = member.bloodGroup?.trim().isNotEmpty == true
         ? member.bloodGroup!
-        : '—';
+        : 'NA';
     final age = member.age != null ? '${member.age} yrs' : '—';
     final gender = (member.gender?.trim().isNotEmpty == true)
         ? (member.gender!.capitalizeFirst ?? member.gender!)

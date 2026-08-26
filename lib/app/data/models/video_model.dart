@@ -127,6 +127,12 @@ class VideoModel {
   }
 
   factory VideoModel.fromJson(Map<String, dynamic> json) {
+    final rawUrl = json['video_url']?.toString() ??
+        json['video_link']?.toString() ??
+        json['url']?.toString() ??
+        json['stream_url']?.toString() ??
+        json['media_url']?.toString() ??
+        '';
     return VideoModel(
       videoId: json['video_id']?.toString() ?? '',
       topic: VideoTopicMini.fromJson(json['topic']),
@@ -134,7 +140,7 @@ class VideoModel {
       shortDescription: json['short_description']?.toString() ?? '',
       presenterName: json['presenter_name']?.toString() ?? '',
       thumbnail: json['thumbnail']?.toString(),
-      videoUrl: json['video_url']?.toString(),
+      videoUrl: rawUrl.trim().isEmpty ? null : rawUrl.trim(),
       duration: json['duration'] ?? 0,
       language: json['language']?.toString() ?? '',
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],

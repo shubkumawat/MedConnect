@@ -11,6 +11,7 @@ import '../../../../DataProvider/api_provider.dart';
 import 'package:healaura/DataProvider/app_shared_preferences.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
+import 'package:healaura/app/core/Util/home_address.dart';
 import 'package:healaura/app/core/Util/image_pick_helper.dart';
 import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
 import 'package:healaura/app/data/services/storage_service.dart';
@@ -150,6 +151,8 @@ class FamilyMemberController extends GetxController {
   // ---------------- Personal ----------------
   final fullNameCtrl = TextEditingController();
   final mobileNumberCtrl = TextEditingController();
+  /// Optional Ayushman Bharat Health Account (ABHA) / Health ID.
+  final abhaNumberCtrl = TextEditingController();
   final dobCtrl = TextEditingController();
   Rx<DateTime?> selectedDob = Rx<DateTime?>(null);
 
@@ -181,7 +184,17 @@ class FamilyMemberController extends GetxController {
 
   // ---------------- Medical ----------------
   RxString bloodGroup = ''.obs;
-  final bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-', "Don't Know"];
+  final bloodGroups = [
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'O+',
+    'O-',
+    'AB+',
+    'AB-',
+    'Unknown',
+  ];
   final heightCtrl = TextEditingController();
   final weightCtrl = TextEditingController();
 
@@ -221,7 +234,9 @@ class FamilyMemberController extends GetxController {
   }
 
   // ---------------- Emergency & Insurance ----------------
+  final addressLineCtrl = TextEditingController();
   final cityCtrl = TextEditingController();
+  final postCodeCtrl = TextEditingController();
   RxString selectedState = ''.obs;
   final states = [
     'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
@@ -450,6 +465,7 @@ class FamilyMemberController extends GetxController {
 
     fullNameCtrl.clear();
     mobileNumberCtrl.clear();
+    abhaNumberCtrl.clear();
     dobCtrl.clear();
     selectedDob.value = null;
     selectedGender.value = '';
@@ -474,7 +490,9 @@ class FamilyMemberController extends GetxController {
     selectedMedications.clear();
     medicationInputCtrl.clear();
 
+    addressLineCtrl.clear();
     cityCtrl.clear();
+    postCodeCtrl.clear();
     selectedState.value = '';
 
     contactNameCtrl.clear();
@@ -610,6 +628,7 @@ class FamilyMemberController extends GetxController {
     mobileNumberCtrl.text = mobileDigits.length > TxtValidation.mobileMaxLength
         ? mobileDigits.substring(mobileDigits.length - TxtValidation.mobileMaxLength)
         : mobileDigits;
+    abhaNumberCtrl.text = member.abhaNumber ?? '';
     if (member.dateOfBirth != null) {
       selectedDob.value = DateFormat('yyyy-MM-dd').parse(member.dateOfBirth!);
       dobCtrl.text = DateFormat('dd/MM/yyyy').format(selectedDob.value!);
@@ -652,11 +671,11 @@ class FamilyMemberController extends GetxController {
     selectedAllergies.value = member.medical?.allergies?.map((e) => e.allergyName ?? '').toList() ?? [];
     selectedMedications.value = member.medical?.currentMedications ?? [];
 
-    if (member.homeAddress != null) {
-      final parts = member.homeAddress!.split(', ');
-      if (parts.isNotEmpty) cityCtrl.text = parts[0];
-      if (parts.length > 1) selectedState.value = parts[1];
-    }
+    final home = HomeAddress.parse(member.homeAddress);
+    addressLineCtrl.text = home.address;
+    cityCtrl.text = home.city;
+    postCodeCtrl.text = home.postCode;
+    selectedState.value = home.state;
 
     contactNameCtrl.text = member.emergencyContact?.contactName ?? '';
     final contactDigits =
@@ -743,18 +762,24 @@ class FamilyMemberController extends GetxController {
       isLoading.value = true;
       userAccessToken = await AppSharedPreferences().getString(AppSharedPreferences.token);
 
-      final homeAddress = [cityCtrl.text.trim(), selectedState.value]
-          .where((e) => e.isNotEmpty)
-          .join(', ');
+      final homeAddress = HomeAddress(
+        address: addressLineCtrl.text.trim(),
+        city: cityCtrl.text.trim(),
+        state: selectedState.value.trim(),
+        postCode: postCodeCtrl.text.trim(),
+      ).display;
 
       final Map<String, dynamic> dictParameter = {
         "full_name": fullNameCtrl.text.trim(),
         "mobile_number": mobileNumberCtrl.text.trim(),
+        "abha_number": abhaNumberCtrl.text.trim(),
         "date_of_birth": DateFormat('yyyy-MM-dd').format(selectedDob.value!),
         "gender": selectedGender.value.toLowerCase(),
         "nationality": selectedCountry.value?.id,
         "relation": selectedRelationModel.value?.code,
-        "blood_group": bloodGroup.value,
+        "blood_group": bloodGroup.value.toLowerCase() == 'unknown'
+            ? 'unknown'
+            : bloodGroup.value,
         "height": double.tryParse(heightCtrl.text.trim()) ?? 0,
         "weight": double.tryParse(weightCtrl.text.trim()) ?? 0,
         "marital_status": maritalStatus.value.toLowerCase(),
@@ -788,7 +813,7 @@ class FamilyMemberController extends GetxController {
           userAccessToken!,
         );
       } else {
-        dictParameter["profile_photo"] = null;
+        // Don't send profile_photo: null — omit the field when no photo.
         response = await ApiProvider().addFamilyMemberAPI(
           context,
           WebApiConstant.API_URL_ADD_FAMILY_MEMBER,
@@ -798,7 +823,6 @@ class FamilyMemberController extends GetxController {
       }
 
       isLoading.value = false;
-      // ... handle response
       PrintLog.printLog(response);
 
       if (response != null) {
@@ -845,19 +869,25 @@ class FamilyMemberController extends GetxController {
       isLoading.value = true;
       userAccessToken = await AppSharedPreferences().getString(AppSharedPreferences.token);
 
-      final homeAddress = [cityCtrl.text.trim(), selectedState.value]
-          .where((e) => e.isNotEmpty)
-          .join(', ');
+      final homeAddress = HomeAddress(
+        address: addressLineCtrl.text.trim(),
+        city: cityCtrl.text.trim(),
+        state: selectedState.value.trim(),
+        postCode: postCodeCtrl.text.trim(),
+      ).display;
 
       final Map<String, dynamic> dictParameter = {
         "patient_id": currentPatientId,
         "full_name": fullNameCtrl.text.trim(),
         "mobile_number": mobileNumberCtrl.text.trim(),
+        "abha_number": abhaNumberCtrl.text.trim(),
         "date_of_birth": DateFormat('yyyy-MM-dd').format(selectedDob.value!),
         "gender": selectedGender.value.toLowerCase(),
         "nationality": selectedCountry.value?.id,
         "relation": selectedRelationModel.value?.code,
-        "blood_group": bloodGroup.value,
+        "blood_group": bloodGroup.value.toLowerCase() == 'unknown'
+            ? 'unknown'
+            : bloodGroup.value,
         "height": double.tryParse(heightCtrl.text.trim()) ?? 0,
         "weight": double.tryParse(weightCtrl.text.trim()) ?? 0,
         "marital_status": maritalStatus.value.toLowerCase(),
@@ -962,13 +992,16 @@ class FamilyMemberController extends GetxController {
   void onClose() {
     fullNameCtrl.dispose();
     mobileNumberCtrl.dispose();
+    abhaNumberCtrl.dispose();
     dobCtrl.dispose();
     heightCtrl.dispose();
     weightCtrl.dispose();
     occupationCtrl.dispose();
     disabilityTypeCtrl.dispose();
     medicationInputCtrl.dispose();
+    addressLineCtrl.dispose();
     cityCtrl.dispose();
+    postCodeCtrl.dispose();
     contactNameCtrl.dispose();
     contactMobileCtrl.dispose();
     insuranceProviderCtrl.dispose();

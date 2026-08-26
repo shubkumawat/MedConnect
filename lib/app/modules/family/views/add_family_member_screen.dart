@@ -101,6 +101,13 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                               ),
                               const SizedBox(height: 12),
                               CustomTextField(
+                                hint: 'Health ID / ABHA Number (optional)',
+                                controller: controller.abhaNumberCtrl,
+                                prefixIcon: Icons.badge_outlined,
+                                keyboardType: TextInputType.text,
+                              ),
+                              const SizedBox(height: 12),
+                              CustomTextField(
                                 hint: 'Date of Birth',
                                 controller: controller.dobCtrl,
                                 prefixIcon: Icons.calendar_month_outlined,
@@ -174,9 +181,8 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                                   onChanged: (v) {
                                     controller.selectedOccupationModel.value =
                                         v;
-                                    if (v != null) {
-                                      controller.occupationCtrl.text = v.name;
-                                    }
+                                    controller.occupationCtrl.text =
+                                        v?.name ?? '';
                                   },
                                 );
                               }),
@@ -366,11 +372,8 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                                                   controller
                                                       .selectedDisabilityTypeModel
                                                       .value = v;
-                                                  if (v != null) {
-                                                    controller
-                                                        .disabilityTypeCtrl
-                                                        .text = v.name;
-                                                  }
+                                                  controller.disabilityTypeCtrl
+                                                      .text = v?.name ?? '';
                                                 },
                                               ),
                                       )
@@ -394,6 +397,12 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                             accent: AppColors.accentBlue,
                             children: [
                               CustomTextField(
+                                hint: 'Address / Area',
+                                controller: controller.addressLineCtrl,
+                                prefixIcon: Icons.home_outlined,
+                              ),
+                              const SizedBox(height: 12),
+                              CustomTextField(
                                 hint: 'City',
                                 controller: controller.cityCtrl,
                                 prefixIcon: Icons.location_city_rounded,
@@ -411,6 +420,13 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                                   onChanged: (v) => controller
                                       .selectedState.value = v ?? '',
                                 ),
+                              ),
+                              const SizedBox(height: 12),
+                              CustomTextField(
+                                hint: 'PIN / Post code',
+                                controller: controller.postCodeCtrl,
+                                prefixIcon: Icons.pin_drop_outlined,
+                                keyboardType: TextInputType.number,
                               ),
                               const SizedBox(height: 12),
                               CustomTextField(

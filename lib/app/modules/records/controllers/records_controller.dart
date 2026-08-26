@@ -238,7 +238,7 @@ class RecordsController extends GetxController {
   }
 
   // ─── Current Medications (Health Record → Medications tab) ───────────────
-  // GET /medications/?active=1  |  POST /diseases/?active=1/medications
+  // GET /medications/?active=1  |  POST /medications/
   // Do NOT use disease/{uuid} APIs here.
 
   Future<void> fetchCurrentMedications() async {
@@ -262,13 +262,33 @@ class RecordsController extends GetxController {
     }
   }
 
+  String _medicationApiMessage(dynamic raw, {String fallback = 'Failed to save medication'}) {
+    if (raw is Map) {
+      final msg = raw['message']?.toString().trim();
+      if (msg != null && msg.isNotEmpty) return msg;
+      final data = raw['data'];
+      if (data is Map && data.isNotEmpty) {
+        final first = data.values.first;
+        if (first is List && first.isNotEmpty) {
+          return first.first.toString();
+        }
+        return first.toString();
+      }
+    }
+    return fallback;
+  }
+
+  void _toastMedicationError(dynamic raw, {String fallback = 'Failed to save medication'}) {
+    Fluttertoast.showToast(msg: _medicationApiMessage(raw, fallback: fallback));
+  }
+
   Future<bool> addCurrentMedication(Map<String, dynamic> body) async {
     try {
       isLoading.value = true;
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
 
       attachPatientId(body);
-      // POST /health-records/diseases/?active=1/medications
+      // POST /health-records/medications/
       var response = await ApiProvider().requestPostForApi(
         Get.context,
         WebApiConstant.API_URL_RECORDS_CURRENT_MEDICATIONS_ADD,
@@ -277,12 +297,19 @@ class RecordsController extends GetxController {
       );
 
       if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
+        final raw = response.data;
+        if (raw is Map && raw['error'] == true) {
+          _toastMedicationError(raw);
+          return false;
+        }
         await fetchCurrentMedications();
         return true;
       }
+      _toastMedicationError(response?.data);
       return false;
     } catch (e) {
       debugPrint("Error adding current medication: $e");
+      Fluttertoast.showToast(msg: 'Failed to save medication');
       return false;
     } finally {
       isLoading.value = false;
@@ -441,12 +468,19 @@ class RecordsController extends GetxController {
       );
 
       if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
-        await fetchDiseaseMedications(body['disease_uuid']);
+        final raw = response.data;
+        if (raw is Map && raw['error'] == true) {
+          _toastMedicationError(raw);
+          return false;
+        }
+        await fetchDiseaseMedications(body['disease_uuid']?.toString() ?? '');
         return true;
       }
+      _toastMedicationError(response?.data);
       return false;
     } catch (e) {
       debugPrint("Error adding disease medication: $e");
+      Fluttertoast.showToast(msg: 'Failed to save medication');
       return false;
     } finally {
       isLoading.value = false;
@@ -480,6 +514,11 @@ class RecordsController extends GetxController {
       );
 
       if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
+        final raw = response.data;
+        if (raw is Map && raw['error'] == true) {
+          _toastMedicationError(raw);
+          return false;
+        }
         if (isCurrentMedication || diseaseUuid == null || diseaseUuid.isEmpty) {
           await fetchCurrentMedications();
         } else {
@@ -492,9 +531,11 @@ class RecordsController extends GetxController {
         }
         return true;
       }
+      _toastMedicationError(response?.data);
       return false;
     } catch (e) {
       debugPrint("Error updating medication: $e");
+      Fluttertoast.showToast(msg: 'Failed to save medication');
       return false;
     } finally {
       isLoading.value = false;

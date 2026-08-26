@@ -20,6 +20,8 @@ class QrController extends GetxController {
   final String? patientId;
   final String? profilePhoto;
   final String? initials;
+  /// True when QR is for the logged-in user (expire with `{}`).
+  final bool isSelf;
 
   /// Default QR validity — also overridden by API `expiry_minutes`.
   static const int qrExpiryMinutes = 10;
@@ -29,10 +31,12 @@ class QrController extends GetxController {
     this.patientId,
     this.profilePhoto,
     this.initials,
+    this.isSelf = true,
   });
 
   final isLoading = false.obs;
   final isRegenerating = false.obs;
+  final isDeleting = false.obs;
   final qrData = Rxn<QrCodeData>();
   final secondsLeft = 0.obs;
 
@@ -109,6 +113,56 @@ class QrController extends GetxController {
   /// "New QR" button — same generate API.
   Future<void> regenerateQr({bool silent = false}) =>
       generateQr(silent: silent);
+
+  /// POST /qr-codes/expire/ — own: {} · family: { patient_id }
+  Future<void> deleteQr() async {
+    try {
+      isDeleting.value = true;
+      final token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      // Own QR → empty body. Family QR → include patient_id.
+      final body = <String, dynamic>{};
+      if (!isSelf &&
+          patientId != null &&
+          patientId!.trim().isNotEmpty) {
+        body['patient_id'] = patientId!.trim();
+      }
+
+      final response = await ApiProvider().requestPostForApi(
+        Get.context,
+        WebApiConstant.API_URL_QR_EXPIRE,
+        body,
+        token,
+      );
+
+      final ok = response != null &&
+          (response.statusCode == 200 ||
+              response.statusCode == 201 ||
+              response.statusCode == 204);
+      final raw = response?.data;
+      final apiError = raw is Map && raw['error'] == true;
+
+      if (ok && !apiError) {
+        _timer?.cancel();
+        qrData.value = null;
+        secondsLeft.value = 0;
+        Fluttertoast.showToast(
+          msg: raw is Map
+              ? (raw['message']?.toString() ?? 'QR deleted')
+              : 'QR deleted',
+        );
+      } else {
+        final msg = raw is Map ? raw['message']?.toString() : null;
+        Fluttertoast.showToast(msg: msg ?? 'Failed to delete QR');
+      }
+    } catch (e) {
+      debugPrint('QR expire/delete error: $e');
+      Fluttertoast.showToast(msg: 'Failed to delete QR');
+    } finally {
+      isDeleting.value = false;
+    }
+  }
 
   /// POST /api/v1/qr-codes/generate/
   Future<void> generateQr({bool silent = false}) async {

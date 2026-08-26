@@ -3,12 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
+import 'package:healaura/DataProvider/web_api_constant.dart';
 import 'package:healaura/app/core/Util/LogoutWidget.dart';
-import 'package:healaura/app/data/services/storage_service.dart';
+import 'package:healaura/app/core/Util/display_value.dart';
+import 'package:healaura/app/core/Util/web_page_helper.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import '../../home/controllers/home_controller.dart';
 import '../controllers/profile_controller.dart';
 import 'emergency_info_view.dart';
 import 'medical_info_view.dart';
@@ -23,44 +24,12 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final controller = Get.put(ProfileController());
-  final storage = StorageService();
-
-  final RxBool _medReminders = true.obs;
-  final RxBool _vacReminders = true.obs;
-  final RxBool _qrAlerts = true.obs;
 
   @override
   void initState() {
     super.initState();
-    _loadReminders();
     controller.getPatientProfileAPI(context);
-  }
-
-  Future<void> _loadReminders() async {
-    _medReminders.value = await storage.getBool(StorageService.medReminders);
-    _vacReminders.value = await storage.getBool(StorageService.vacReminders);
-    _qrAlerts.value = await storage.getBool(StorageService.qrAlerts);
-  }
-
-  void _toggleMed(bool val) {
-    _medReminders.value = val;
-    storage.setBool(StorageService.medReminders, val);
-    if (Get.isRegistered<HomeController>()) {
-      Get.find<HomeController>().showMedReminders.value = val;
-    }
-  }
-
-  void _toggleVac(bool val) {
-    _vacReminders.value = val;
-    storage.setBool(StorageService.vacReminders, val);
-    if (Get.isRegistered<HomeController>()) {
-      Get.find<HomeController>().showVacReminders.value = val;
-    }
-  }
-
-  void _toggleQR(bool val) {
-    _qrAlerts.value = val;
-    storage.setBool(StorageService.qrAlerts, val);
+    controller.loadCareReminders();
   }
 
   double _completeness() {
@@ -197,24 +166,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Obx(() => _SwitchTile(
                                 icon: Icons.medication_liquid_rounded,
                                 title: 'Medication reminders',
-                                value: _medReminders.value,
+                                value: controller.medReminders.value,
                                 activeColor: AppColors.orange,
-                                onChanged: _toggleMed,
+                                onChanged: (v) =>
+                                    controller.setCareReminder(medication: v),
                               )),
                           Obx(() => _SwitchTile(
                                 icon: Icons.vaccines_rounded,
                                 title: 'Vaccination reminders',
-                                value: _vacReminders.value,
+                                value: controller.vacReminders.value,
                                 activeColor: AppColors.teal,
-                                onChanged: _toggleVac,
+                                onChanged: (v) =>
+                                    controller.setCareReminder(vaccination: v),
                                 showDivider: true,
                               )),
                           Obx(() => _SwitchTile(
                                 icon: Icons.qr_code_scanner_rounded,
                                 title: 'QR scan alerts',
-                                value: _qrAlerts.value,
+                                value: controller.qrAlerts.value,
                                 activeColor: AppColors.accentBlue,
-                                onChanged: _toggleQR,
+                                onChanged: (v) =>
+                                    controller.setCareReminder(qrScan: v),
                                 showDivider: true,
                               )),
                         ],
@@ -247,20 +219,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           // ),
                           _LinkTile(
                             icon: Icons.lock_outline_rounded,
-                            title: 'Privacy & security',
-                            onTap: () {},
+                            title: 'Privacy policy',
+                            onTap: () => openWebPage(
+                              title: 'Privacy policy',
+                              url: WebApiConstant.WEB_PRIVACY_URL,
+                            ),
+                            showDivider: true,
+                          ),
+                          _LinkTile(
+                            icon: Icons.gavel_rounded,
+                            title: 'Terms of service',
+                            onTap: () => openWebPage(
+                              title: 'Terms of service',
+                              url: WebApiConstant.WEB_TERMS_URL,
+                            ),
                             showDivider: true,
                           ),
                           _LinkTile(
                             icon: Icons.support_agent_rounded,
                             title: 'Help & support',
-                            onTap: () {},
-                            showDivider: true,
-                          ),
-                          _LinkTile(
-                            icon: Icons.gavel_rounded,
-                            title: 'Terms & privacy policy',
-                            onTap: () {},
+                            onTap: () => openWebPage(
+                              title: 'Help & support',
+                              url: WebApiConstant.WEB_HELP_URL,
+                            ),
                             showDivider: true,
                           ),
                         ],
@@ -662,14 +643,14 @@ class _MemberCard extends StatelessWidget {
                 Expanded(
                   child: _StatCell(
                     label: 'Age',
-                    value: age > 0 ? '$age yrs' : '—',
+                    value: age > 0 ? '$age yrs' : 'NA',
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _StatCell(
                     label: 'Blood',
-                    value: blood.isNotEmpty ? blood : '—',
+                    value: displayOrNa(blood),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -678,7 +659,7 @@ class _MemberCard extends StatelessWidget {
                     label: 'Gender',
                     value: gender.isNotEmpty
                         ? (gender.capitalizeFirst ?? gender)
-                        : '—',
+                        : 'NA',
                   ),
                 ),
               ],

@@ -47,7 +47,7 @@ class PdfGenerator {
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(disease.name ?? "Unknown Disease", style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                pw.Text(disease.name ?? "NA", style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
                 pw.Divider(thickness: 1),
                 pw.SizedBox(height: 10),
                 _buildInfoRow("Condition Type", disease.conditionType ?? "N/A"),

@@ -74,8 +74,10 @@ class HomeController extends GetxController {
 
   Future<void> loadReminderSettings() async {
     final storage = StorageService();
-    showMedReminders.value = await storage.getBool(StorageService.medReminders);
-    showVacReminders.value = await storage.getBool(StorageService.vacReminders);
+    showMedReminders.value =
+        await storage.getBool(StorageService.medReminders, defaultValue: true);
+    showVacReminders.value =
+        await storage.getBool(StorageService.vacReminders, defaultValue: true);
   }
 
   Future<void> fetchFamilyMembers() async {

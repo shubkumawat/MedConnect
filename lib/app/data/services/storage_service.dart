@@ -5,6 +5,10 @@ class StorageService {
 
   static const isLogin = "isLogin";
   static const isIntro = "isIntro";
+  /// User finished the post-splash location gate (granted or skipped).
+  static const locationPromptSkipped = "locationPromptSkipped";
+  /// New-user finished Personal → Medical → Emergency (or skipped remaining).
+  static const profileSetupDone = "profileSetupDone";
   static const usertype = "usertype";
   static const token = "token";
   static const userID = "userID";
@@ -20,8 +24,8 @@ class StorageService {
   static const kycStatus = "kycStatus";
   static const walletBalance = "walletBalance";
   static const fcmToken = "fcmToken";
-
-
+  /// Stable local device id for care-reminders API.
+  static const deviceId = "deviceId";
 
   // Reminder settings
   static const medReminders = "medReminders";
@@ -52,14 +56,27 @@ class StorageService {
     return prefs.getString(key) ?? "";
   }
 
-  Future<bool> getBool(String key) async {
+  Future<bool> getBool(String key, {bool defaultValue = false}) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(key) ?? false;
+    return prefs.getBool(key) ?? defaultValue;
   }
 
   Future<bool> setBool(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     return await prefs.setBool(key, value);
+  }
+
+  /// Stable id for device-scoped notification prefs (care-reminders).
+  Future<String> getOrCreateDeviceId() async {
+    final existing = await getString(deviceId);
+    if (existing.isNotEmpty) return existing;
+
+    final fcm = await getString(fcmToken);
+    final id = (fcm.isNotEmpty)
+        ? 'fcm-${fcm.length > 24 ? fcm.substring(0, 24) : fcm}'
+        : 'device-${DateTime.now().millisecondsSinceEpoch}';
+    await setString(deviceId, id);
+    return id;
   }
 
   Future<void> clear() async {
