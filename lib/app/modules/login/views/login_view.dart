@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../core/widgets/live_text_field.dart';
 import '../../../core/widgets/otp_input_row.dart';
+import '../../../core/widgets/powered_by_aira.dart';
 import '../controllers/login_controller.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -88,6 +89,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   }),
                   const SizedBox(height: 40),
                   _buildSecureFooter(),
+                  const SizedBox(height: 18),
+                  const PoweredByAira(),
                 ],
               ),
             ),

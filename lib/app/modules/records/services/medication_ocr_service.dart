@@ -142,11 +142,25 @@ class MedicationOcrParser {
   }
 
   static String? _extractTiming(String lower) {
-    if (RegExp(r'\b(empty\s+stomach|before\s+breakfast)\b').hasMatch(lower)) return 'Empty Stomach';
-    if (RegExp(r'\b(before\s+(food|meals?|meal)|ac)\b').hasMatch(lower)) return 'Before Food';
-    if (RegExp(r'\b(after\s+(food|meals?|meal)|pc)\b').hasMatch(lower)) return 'After Food';
-    if (RegExp(r'\b(with\s+(food|meals?|meal))\b').hasMatch(lower)) return 'With Food';
-    if (RegExp(r'\b(bedtime|at\s+night|hs|nightly)\b').hasMatch(lower)) return 'Bedtime';
+    if (RegExp(r'\b(empty\s+stomach|before\s+breakfast)\b').hasMatch(lower)) {
+      return 'Empty Stomach';
+    }
+    if (RegExp(r'\b(before\s+(food|meals?|meal)|ac)\b').hasMatch(lower)) {
+      return 'Before Food';
+    }
+    if (RegExp(r'\b(after\s+(food|meals?|meal)|pc)\b').hasMatch(lower)) {
+      return 'After Food';
+    }
+    if (RegExp(r'\b(with\s+(food|meals?|meal))\b').hasMatch(lower)) {
+      return 'With Food';
+    }
+    if (RegExp(r'\b(anytime|any\s+time)\b').hasMatch(lower)) return 'Anytime';
+    if (RegExp(r'\b(bedtime|at\s+night|hs|nightly|night)\b').hasMatch(lower)) {
+      return 'Night';
+    }
+    if (RegExp(r'\b(afternoon|noon)\b').hasMatch(lower)) return 'Afternoon';
+    if (RegExp(r'\b(morning|breakfast)\b').hasMatch(lower)) return 'Morning';
+    if (RegExp(r'\b(evening)\b').hasMatch(lower)) return 'Evening';
     return null;
   }
 

@@ -118,10 +118,16 @@ class FamilyMemberController extends GetxController {
       isLoading.value = true;
       userAccessToken = await AppSharedPreferences().getString(AppSharedPreferences.token);
       
-      // If fullAccess is turned on, emergencyOnly should probably be turned off or vice versa 
-      // depending on business logic. For now, I'll just send what's toggled.
-      final newFullAccess = isFullAccess ? value : fullAccess.value;
-      final newEmergencyOnly = !isFullAccess ? value : emergencyOnly.value;
+      // Mutual exclusivity: full vs emergency-only.
+      final bool newFullAccess;
+      final bool newEmergencyOnly;
+      if (isFullAccess) {
+        newFullAccess = value;
+        newEmergencyOnly = value ? false : emergencyOnly.value;
+      } else {
+        newEmergencyOnly = value;
+        newFullAccess = value ? false : fullAccess.value;
+      }
 
       final response = await ApiProvider().updateAccessControlAPI(
         context,
@@ -138,6 +144,24 @@ class FamilyMemberController extends GetxController {
       if (response != null && response['error'] != true) {
         fullAccess.value = newFullAccess;
         emergencyOnly.value = newEmergencyOnly;
+        final detail = familyMemberDetail.value;
+        if (detail != null) {
+          detail.fullAccess = newFullAccess;
+          detail.emergencyOnly = newEmergencyOnly;
+          detail.accessGiven = newFullAccess || newEmergencyOnly;
+          familyMemberDetail.refresh();
+        }
+        // Keep list chips in sync.
+        final id = detail?.patientId;
+        if (id != null) {
+          final i = familyMemberList.indexWhere((e) => e.patientId == id);
+          if (i >= 0) {
+            familyMemberList[i].fullAccess = newFullAccess;
+            familyMemberList[i].emergencyOnly = newEmergencyOnly;
+            familyMemberList[i].accessGiven = newFullAccess || newEmergencyOnly;
+            familyMemberList.refresh();
+          }
+        }
         Fluttertoast.showToast(msg: response['message'] ?? "Access updated");
       } else {
         Fluttertoast.showToast(msg: response?['message'] ?? "Failed to update access");
@@ -718,15 +742,17 @@ class FamilyMemberController extends GetxController {
       return false;
     }
     final contactName = contactNameCtrl.text.trim();
-    if (contactName.isNotEmpty) {
-      final contactNameErr = TxtValidation.personNameError(contactName);
-      if (contactNameErr != null) {
-        Fluttertoast.showToast(msg: contactNameErr);
-        return false;
-      }
+    final contactNameErr = TxtValidation.personNameError(contactName);
+    if (contactNameErr != null) {
+      Fluttertoast.showToast(
+        msg: contactName.isEmpty
+            ? 'Please enter emergency contact name'
+            : contactNameErr,
+      );
+      return false;
     }
     final contactMobileErr =
-        TxtValidation.mobileError(contactMobileCtrl.text, required: false);
+        TxtValidation.mobileError(contactMobileCtrl.text, required: true);
     if (contactMobileErr != null) {
       Fluttertoast.showToast(msg: contactMobileErr);
       return false;
@@ -976,7 +1002,14 @@ class FamilyMemberController extends GetxController {
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          Fluttertoast.showToast(msg: response['message'] ?? 'Access given successfully');
+          Fluttertoast.showToast(
+            msg: response['message'] ??
+                (type == 'revoke'
+                    ? 'Access revoked successfully'
+                    : 'Access given successfully'),
+          );
+          await getFamilyMemberDetailAPI(context, patientId);
+          await getFamilyMemberListAPI(context);
         } else {
           Fluttertoast.showToast(msg: response['message'] ?? 'Failed to give access');
         }

@@ -136,7 +136,7 @@ class FamilyMemberDetailScreen extends StatelessWidget {
                               ],
                             ).animate().fadeIn(delay: 160.ms, duration: 300.ms),
                             const SizedBox(height: 12),
-                            _AccessNote(name: member.fullName ?? 'Patient')
+                            _AccessStatusCard(controller: controller)
                                 .animate()
                                 .fadeIn(delay: 180.ms, duration: 300.ms),
                           ],
@@ -163,53 +163,74 @@ class FamilyMemberDetailScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: SizedBox(
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: controller.isLoading.value
-                        ? null
-                        : () {
-                            final id = member.patientId;
-                            if (id != null) {
-                              controller.giveAccessAPI(context, id);
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      elevation: 0,
-                      backgroundColor: AppColors.tealDark,
-                      disabledBackgroundColor:
-                          AppColors.tealDark.withValues(alpha: 0.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                child: Obx(() {
+                  final hasAccess = controller.fullAccess.value ||
+                      controller.emergencyOnly.value ||
+                      (controller.familyMemberDetail.value?.hasAccess ?? false);
+                  return SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: controller.isLoading.value
+                          ? null
+                          : () async {
+                              final id = member.patientId;
+                              if (id == null) return;
+                              if (hasAccess) {
+                                // Turn off both access modes via access-control API.
+                                await controller.updateAccessControl(
+                                    context, true, false);
+                                if (controller.emergencyOnly.value) {
+                                  await controller.updateAccessControl(
+                                      context, false, false);
+                                }
+                              } else {
+                                await controller.giveAccessAPI(context, id);
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        elevation: 0,
+                        backgroundColor: hasAccess
+                            ? AppColors.statusRed
+                            : AppColors.tealDark,
+                        disabledBackgroundColor:
+                            AppColors.tealDark.withValues(alpha: 0.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
-                    ),
-                    child: controller.isLoading.value
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.lock_open_rounded,
-                                  color: Colors.white, size: 18),
-                              SizedBox(width: 8),
-                              Text(
-                                'Give Access',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
-                                ),
+                      child: controller.isLoading.value
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white,
                               ),
-                            ],
-                          ),
-                  ),
-                ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  hasAccess
+                                      ? Icons.lock_rounded
+                                      : Icons.lock_open_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  hasAccess ? 'Revoke Access' : 'Give Access',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  );
+                }),
               ),
           ],
         );
@@ -529,22 +550,59 @@ class _ProfileHeaderCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 9, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.teal.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          relation.toUpperCase(),
-                          style: const TextStyle(
-                            color: AppColors.tealDark,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.4,
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 9, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.teal.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              relation.toUpperCase(),
+                              style: const TextStyle(
+                                color: AppColors.tealDark,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
                           ),
-                        ),
+                          Builder(
+                            builder: (_) {
+                              final has = member.hasAccess;
+                              final color = member.fullAccess == true
+                                  ? AppColors.tealDark
+                                  : member.emergencyOnly == true
+                                      ? AppColors.orange
+                                      : has
+                                          ? AppColors.accentBlue
+                                          : AppColors.textGray;
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 9, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                      color: color.withValues(alpha: 0.28)),
+                                ),
+                                child: Text(
+                                  member.accessLabel.toUpperCase(),
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                       if (mobile.isNotEmpty) ...[
                         const SizedBox(height: 7),
@@ -962,39 +1020,110 @@ class _Chips extends StatelessWidget {
   }
 }
 
-class _AccessNote extends StatelessWidget {
-  final String name;
-  const _AccessNote({required this.name});
+class _AccessStatusCard extends StatelessWidget {
+  final FamilyMemberController controller;
+  const _AccessStatusCard({required this.controller});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.teal.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.teal.withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+    return Obx(() {
+      final member = controller.familyMemberDetail.value;
+      final name = member?.fullName?.trim().isNotEmpty == true
+          ? member!.fullName!
+          : 'this member';
+      final full = controller.fullAccess.value;
+      final emergency = controller.emergencyOnly.value;
+      final has = full || emergency || (member?.hasAccess ?? false);
+      final statusColor = full
+          ? AppColors.tealDark
+          : emergency
+              ? AppColors.orange
+              : has
+                  ? AppColors.accentBlue
+                  : AppColors.textGray;
+      final statusText = full
+          ? 'Full access granted'
+          : emergency
+              ? 'Emergency-only access'
+              : has
+                  ? 'Access given'
+                  : 'No access yet';
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE3EBE7)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    has ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+                    color: statusColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Record access',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        statusText,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    has ? 'ACTIVE' : 'OFF',
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            child: const Icon(
-              Icons.security_rounded,
-              color: AppColors.tealDark,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Use Give Access below to securely share $name’s health records.',
+            const SizedBox(height: 10),
+            Text(
+              has
+                  ? '$name can currently view health records with the access type below.'
+                  : 'Share $name’s health records securely. Choose access type, then tap Give Access.',
               style: const TextStyle(
                 fontSize: 12.5,
                 height: 1.4,
@@ -1002,9 +1131,95 @@ class _AccessNote extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
             ),
+            const SizedBox(height: 14),
+            _AccessToggleTile(
+              title: 'Full access',
+              subtitle: 'Complete records, meds and documents',
+              value: full,
+              activeColor: AppColors.tealDark,
+              onChanged: (v) =>
+                  controller.updateAccessControl(context, true, v),
+            ),
+            const SizedBox(height: 8),
+            _AccessToggleTile(
+              title: 'Emergency only',
+              subtitle: 'Limited emergency details only',
+              value: emergency,
+              activeColor: AppColors.orange,
+              onChanged: (v) =>
+                  controller.updateAccessControl(context, false, v),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+}
+
+class _AccessToggleTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool value;
+  final Color activeColor;
+  final ValueChanged<bool> onChanged;
+
+  const _AccessToggleTile({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.activeColor,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+      decoration: BoxDecoration(
+        color: value
+            ? activeColor.withValues(alpha: 0.08)
+            : const Color(0xFFF3F7F5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: value
+              ? activeColor.withValues(alpha: 0.28)
+              : const Color(0xFFE3EBE7),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                    color: value ? activeColor : AppColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.textGray,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            activeColor: activeColor,
+            onChanged: onChanged,
           ),
         ],
       ),
     );
   }
 }
+

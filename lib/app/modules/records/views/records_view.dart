@@ -957,14 +957,11 @@ class _MedicationsTab extends StatelessWidget {
         );
       }
       if (controller.medications.isEmpty) {
-        return _EmptyState(
+        return const _EmptyState(
           icon: Icons.medication_outlined,
           title: 'No current medications',
           subtitle:
-              'Add medicines you take regularly to track dosage, timing and reminders.',
-          cta: 'Add Medication',
-          onTap: () => Get.to(
-              () => const AddMedicationScreen(isCurrentMedication: true)),
+              'Medicines linked to your diseases will show up here.',
         );
       }
       return RefreshIndicator(
@@ -1312,15 +1309,15 @@ class _EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final String cta;
-  final VoidCallback onTap;
+  final String? cta;
+  final VoidCallback? onTap;
 
   const _EmptyState({
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.cta,
-    required this.onTap,
+    this.cta,
+    this.onTap,
   });
 
   @override
@@ -1359,26 +1356,28 @@ class _EmptyState extends StatelessWidget {
                 height: 1.45,
               ),
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: onTap,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.tealDark,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+            if (cta != null && onTap != null) ...[
+              const SizedBox(height: 24),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: onTap,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.tealDark,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 22),
-                ),
-                child: Text(
-                  cta,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  child: Text(
+                    cta!,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

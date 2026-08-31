@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/widgets/powered_by_aira.dart';
 import '../../../data/services/storage_service.dart';
 import '../../login/views/login_view.dart';
 
@@ -204,6 +205,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
                   ),
                 ),
                 _buildBottomControls(isLast, accent),
+                const PoweredByAira(padding: EdgeInsets.only(bottom: 12)),
               ],
             ),
           ),
@@ -257,7 +259,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
 
   Widget _buildBottomControls(bool isLast, Color accent) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
+      padding: const EdgeInsets.fromLTRB(28, 8, 28, 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [

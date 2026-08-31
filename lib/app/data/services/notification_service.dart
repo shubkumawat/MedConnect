@@ -191,4 +191,32 @@ class NotificationService {
     PrintLog.printLog('Notification tapped: ${message.data}');
     onNotificationTap?.call(message.data);
   }
+
+  /// Show a local system notification (e.g. emergency SOS from Home).
+  Future<void> showLocal({
+    required String title,
+    required String body,
+    int id = 0,
+  }) async {
+    await _localNotifications.show(
+      id,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _androidChannel.id,
+          _androidChannel.name,
+          channelDescription: _androidChannel.description,
+          icon: '@mipmap/ic_launcher',
+          importance: Importance.max,
+          priority: Priority.max,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+    );
+  }
 }

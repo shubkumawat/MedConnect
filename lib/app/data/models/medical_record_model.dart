@@ -138,6 +138,8 @@ class Medication {
   final String? dosageUnit;
   final String? form;
   final String? withFood;
+  final List<String> sideEffects;
+  final List<String> allergies;
   final String? startDate;
   final String? endDate;
   final bool isOngoing;
@@ -163,6 +165,8 @@ class Medication {
     this.dosageUnit,
     this.form,
     this.withFood,
+    this.sideEffects = const [],
+    this.allergies = const [],
     this.startDate,
     this.endDate,
     this.isOngoing = false,
@@ -246,6 +250,10 @@ class Medication {
       dosageUnit: json['dosage_unit']?.toString() ?? json['unit']?.toString(),
       form: json['form']?.toString() ?? json['dosage_form']?.toString(),
       withFood: json['with_food']?.toString(),
+      sideEffects: _parseStringList(
+        json['side_effects'] ?? json['side_effects_noted'],
+      ),
+      allergies: _parseStringList(json['allergies']),
       startDate: json['start_date']?.toString() ?? json['started_on']?.toString(),
       endDate: json['end_date']?.toString() ?? json['ended_on']?.toString(),
       isOngoing: json['is_ongoing'] == true || json['ongoing'] == true,
@@ -259,6 +267,42 @@ class Medication {
       reminders: reminderList,
       dosesToday: doses,
     );
+  }
+
+  static List<String> _parseStringList(dynamic raw) {
+    if (raw == null) return const [];
+    if (raw is List) {
+      return raw
+          .map((e) {
+            if (e is Map) {
+              return (e['name'] ??
+                      e['allergy_name'] ??
+                      e['side_effect'] ??
+                      e['label'] ??
+                      '')
+                  .toString();
+            }
+            return e.toString();
+          })
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    final s = raw.toString().trim();
+    if (s.isEmpty) return const [];
+    if (s.startsWith('[') && s.endsWith(']')) {
+      final inner = s.substring(1, s.length - 1);
+      return inner
+          .split(',')
+          .map((e) => e.replaceAll('"', '').replaceAll("'", '').trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    return s
+        .split(RegExp(r'[,|]'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
   }
 
   String get subtitle {

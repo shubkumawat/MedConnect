@@ -42,6 +42,8 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
   final _instructionsCtrl = TextEditingController();
   final _startDateCtrl = TextEditingController();
   final _endDateCtrl = TextEditingController();
+  final _sideEffectInputCtrl = TextEditingController();
+  final _allergyInputCtrl = TextEditingController();
 
   final MedicationOcrService _ocrService = MedicationOcrService();
   final FocusNode _medNameFocus = FocusNode();
@@ -54,8 +56,13 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
   /// API with_food values
   String? _withFood;
 
+  /// API dosage_form value
+  String? _dosageForm;
+
   /// API timing array: morning / afternoon / evening / night
   final Set<String> _selectedTimings = {};
+  final Set<String> _selectedSideEffects = {};
+  final Set<String> _selectedAllergies = {};
 
   bool _isOngoing = true;
   bool _isScanning = false;
@@ -104,11 +111,9 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
   final _timingOptions = const [
     {'value': 'morning', 'label': 'Morning'},
+    {'value': 'afternoon', 'label': 'Afternoon'},
     {'value': 'evening', 'label': 'Evening'},
-    {'value': 'before_food', 'label': 'Before Food'},
-    {'value': 'after_food', 'label': 'After Food'},
-    {'value': 'with_food', 'label': 'With Food'},
-    {'value': 'bedtime', 'label': 'Bedtime'},
+    {'value': 'night', 'label': 'Night'},
   ];
 
   final _withFoodOptions = const [
@@ -116,7 +121,56 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     {'value': 'after_food', 'label': 'After Food'},
     {'value': 'with_food', 'label': 'With Food'},
     {'value': 'empty_stomach', 'label': 'Empty Stomach'},
+    {'value': 'any', 'label': 'Anytime'},
   ];
+
+  final _dosageFormOptions = const [
+    {'value': 'tablet', 'label': 'Tablet'},
+    {'value': 'capsule', 'label': 'Capsule'},
+    {'value': 'syrup', 'label': 'Syrup'},
+    {'value': 'injection', 'label': 'Injection'},
+    {'value': 'drops', 'label': 'Drops'},
+    {'value': 'inhaler', 'label': 'Inhaler'},
+    {'value': 'topical', 'label': 'Topical'},
+    {'value': 'patch', 'label': 'Patch'},
+  ];
+
+  static const _sideEffectTags = [
+    'Nausea',
+    'Vomiting',
+    'Dizziness',
+    'Headache',
+    'Drowsiness',
+    'Rash',
+    'Itching',
+    'Diarrhea',
+    'Constipation',
+    'Upset stomach',
+    'Fatigue',
+    'Loss of appetite',
+  ];
+
+  static const _allergyTags = [
+    'Penicillin',
+    'Sulfa',
+    'Aspirin',
+    'Ibuprofen',
+    'Latex',
+    'Peanuts',
+    'Dairy',
+    'Dust',
+  ];
+
+  List<String> get _dosageFormLabels =>
+      _dosageFormOptions.map((e) => e['label']!).toList();
+
+  String? get _dosageFormLabel {
+    if (_dosageForm == null) return null;
+    for (final opt in _dosageFormOptions) {
+      if (opt['value'] == _dosageForm) return opt['label'];
+    }
+    return _dosageForm;
+  }
 
   bool get _isEdit => widget.medication != null;
 
@@ -148,20 +202,19 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       _dosageCtrl.text = med.dosage ?? '';
       _frequency =
           med.frequency.isNotEmpty ? _normalizeFrequency(med.frequency) : null;
-      _selectedTimings.addAll(med.timingSlots);
-      if (_selectedTimings.isEmpty && med.timing.isNotEmpty) {
-        for (final t in med.timing.split(',')) {
-          final v = t.trim().toLowerCase().replaceAll(' ', '_');
-          if (_timingOptions.any((e) => e['value'] == v)) {
-            _selectedTimings.add(v);
-          }
-        }
-      }
+      _dosageForm = _normalizeDosageForm(med.form);
       _withFood = med.withFood;
       if (_withFood != null &&
           !_withFoodOptions.any((e) => e['value'] == _withFood)) {
         _withFood = _mapLegacyWithFood(_withFood!);
       }
+      if (med.timingSlots.isNotEmpty) {
+        _ingestTimingValues(med.timingSlots);
+      } else if (med.timing.isNotEmpty) {
+        _ingestTimingValues(med.timing.split(','));
+      }
+      _selectedSideEffects.addAll(med.sideEffects);
+      _selectedAllergies.addAll(med.allergies);
       _isOngoing = med.isOngoing;
       _instructionsCtrl.text = med.instructions ?? '';
       if (med.startDate != null && med.startDate!.isNotEmpty) {
@@ -176,14 +229,68 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
           initial['strength']?.toString() ?? initial['dosage']?.toString() ?? '';
       _dosageCtrl.text = initial['dosage']?.toString() ?? '';
       _frequency = _normalizeFrequency(initial['frequency']?.toString() ?? '');
+      _dosageForm = _normalizeDosageForm(
+        initial['dosage_form']?.toString() ?? initial['form']?.toString(),
+      );
+      _withFood = initial['with_food']?.toString();
+      if (_withFood != null &&
+          !_withFoodOptions.any((e) => e['value'] == _withFood)) {
+        _withFood = _mapLegacyWithFood(_withFood!);
+      }
       final timing = initial['timing'];
       if (timing is List) {
-        _selectedTimings.addAll(timing.map((e) => e.toString()));
+        _ingestTimingValues(timing.map((e) => e.toString()));
+      } else if (timing != null) {
+        _ingestTimingValues(timing.toString().split(','));
       }
-      _withFood = initial['with_food']?.toString() ??
-          _mapLegacyWithFood(initial['timing']?.toString() ?? '');
+      _withFood ??= _mapLegacyWithFood(initial['timing']?.toString() ?? '');
+      _selectedSideEffects.addAll(
+        _stringListFrom(initial['side_effects'] ?? initial['side_effects_noted']),
+      );
+      _selectedAllergies.addAll(_stringListFrom(initial['allergies']));
       _instructionsCtrl.text = initial['instructions']?.toString() ?? '';
     }
+  }
+
+  List<String> _stringListFrom(dynamic raw) {
+    if (raw == null) return const [];
+    if (raw is List) {
+      return raw
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    final s = raw.toString().trim();
+    if (s.isEmpty) return const [];
+    return s
+        .split(RegExp(r'[,|]'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  String? _normalizeDosageForm(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final lower = value.trim().toLowerCase().replaceAll(' ', '_');
+    for (final opt in _dosageFormOptions) {
+      if (opt['value'] == lower || opt['label']!.toLowerCase() == lower) {
+        return opt['value'];
+      }
+    }
+    if (lower.contains('tab')) return 'tablet';
+    if (lower.contains('cap')) return 'capsule';
+    if (lower.contains('syrup')) return 'syrup';
+    if (lower.contains('inj')) return 'injection';
+    if (lower.contains('drop')) return 'drops';
+    if (lower.contains('inhal')) return 'inhaler';
+    if (lower.contains('cream') ||
+        lower.contains('ointment') ||
+        lower.contains('gel') ||
+        lower.contains('topical')) {
+      return 'topical';
+    }
+    if (lower.contains('patch')) return 'patch';
+    return null;
   }
 
   String? _normalizeFrequency(String value) {
@@ -247,14 +354,34 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     if (value.isEmpty) return null;
     final lower = value.toLowerCase().replaceAll(' ', '_');
     if (_withFoodOptions.any((e) => e['value'] == lower)) return lower;
+    if (lower == 'anytime' || lower.contains('any_time') || lower == 'any') {
+      return 'any';
+    }
     if (lower.contains('before')) return 'before_food';
     if (lower.contains('after')) return 'after_food';
     if (lower.contains('with')) return 'with_food';
     if (lower.contains('empty')) return 'empty_stomach';
-    if (lower.contains('bedtime') || lower.contains('night')) {
-      return 'after_food';
-    }
     return null;
+  }
+
+  /// Keep only morning/afternoon/evening/night; map food-related values to with_food.
+  void _ingestTimingValues(Iterable<String> raw) {
+    for (final item in raw) {
+      final v = item.trim().toLowerCase().replaceAll(' ', '_');
+      if (v.isEmpty) continue;
+      if (_timingOptions.any((e) => e['value'] == v)) {
+        _selectedTimings.add(v);
+        continue;
+      }
+      if (v == 'bedtime') {
+        _selectedTimings.add('night');
+        continue;
+      }
+      final food = _mapLegacyWithFood(v);
+      if (food != null && _withFood == null) {
+        _withFood = food;
+      }
+    }
   }
 
   void _onMedNameChanged() {
@@ -285,6 +412,8 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     _startDateCtrl.dispose();
     _endDateCtrl.dispose();
     _customDaysCtrl.dispose();
+    _sideEffectInputCtrl.dispose();
+    _allergyInputCtrl.dispose();
     _medNameFocus.dispose();
     _ocrService.dispose();
     super.dispose();
@@ -508,14 +637,21 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       if (_dosageCtrl.text.trim().isEmpty && (result.form?.isNotEmpty ?? false)) {
         _dosageCtrl.text = '1 ${result.form!.toLowerCase()}';
       }
+      _dosageForm ??= _normalizeDosageForm(result.form);
       if (_frequency == null && result.frequency != null) {
         _frequency = _normalizeFrequency(result.frequency!);
       }
-      if (_withFood == null && result.timing != null) {
-        _withFood = _mapLegacyWithFood(result.timing!);
-        if (result.timing!.toLowerCase().contains('bedtime') ||
-            result.timing!.toLowerCase().contains('night')) {
+      if (result.timing != null) {
+        final t = result.timing!.toLowerCase();
+        _withFood ??= _mapLegacyWithFood(result.timing!);
+        if (t.contains('bedtime') || t.contains('night')) {
           _selectedTimings.add('night');
+        } else if (t.contains('morning') || t.contains('breakfast')) {
+          _selectedTimings.add('morning');
+        } else if (t.contains('afternoon') || t.contains('noon')) {
+          _selectedTimings.add('afternoon');
+        } else if (t.contains('evening')) {
+          _selectedTimings.add('evening');
         }
       }
       if (_instructionsCtrl.text.trim().isEmpty &&
@@ -547,9 +683,12 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       'name': _medNameCtrl.text.trim(),
       'strength': _strengthCtrl.text.trim(),
       'dosage': _dosageCtrl.text.trim(),
+      'dosage_form': _dosageForm,
       'frequency': _frequencyPayload,
       'timing': _selectedTimings.toList(),
       'with_food': _withFood,
+      'side_effects': _selectedSideEffects.toList(),
+      'allergies': _selectedAllergies.toList(),
       'start_date':
           _startDateCtrl.text.trim().isEmpty ? null : _startDateCtrl.text.trim(),
       'is_ongoing': _isOngoing,
@@ -574,6 +713,10 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
   Future<void> _save() async {
     if (_medNameCtrl.text.trim().isEmpty) {
       Fluttertoast.showToast(msg: 'Please enter a medication name.');
+      return;
+    }
+    if (_dosageForm == null || _dosageForm!.isEmpty) {
+      Fluttertoast.showToast(msg: 'Please select dosage form.');
       return;
     }
     if (_frequency == null) {
@@ -757,6 +900,23 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                             prefixIcon: Icons.science_outlined,
                           ),
                           const SizedBox(height: 12),
+                          McDropdown(
+                            hint: 'Dosage Form *',
+                            value: _dosageFormLabel,
+                            items: _dosageFormLabels,
+                            prefixIcon: Icons.medication_liquid_outlined,
+                            onChanged: (label) {
+                              setState(() {
+                                if (label == null) {
+                                  _dosageForm = null;
+                                  return;
+                                }
+                                _dosageForm = _dosageFormOptions.firstWhere(
+                                    (e) => e['label'] == label)['value'];
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 12),
                           CustomTextField(
                             hint: 'Dosage (e.g. 1 tablet)',
                             controller: _dosageCtrl,
@@ -880,6 +1040,58 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                       const SizedBox(height: 12),
                       _SectionCard(
                         step: '03',
+                        title: 'Reactions & allergies',
+                        caption: 'Optional side effects and allergy notes',
+                        icon: Icons.warning_amber_rounded,
+                        children: [
+                          const _FieldLabel('Side Effects Noted'),
+                          const SizedBox(height: 8),
+                          _MultiTagPicker(
+                            presetTags: _sideEffectTags,
+                            selected: _selectedSideEffects,
+                            inputCtrl: _sideEffectInputCtrl,
+                            hint: 'Add side effect',
+                            accent: AppColors.orange,
+                            onToggle: (tag) {
+                              setState(() {
+                                if (_selectedSideEffects.contains(tag)) {
+                                  _selectedSideEffects.remove(tag);
+                                } else {
+                                  _selectedSideEffects.add(tag);
+                                }
+                              });
+                            },
+                            onAddCustom: (tag) {
+                              setState(() => _selectedSideEffects.add(tag));
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          const _FieldLabel('Allergies'),
+                          const SizedBox(height: 8),
+                          _MultiTagPicker(
+                            presetTags: _allergyTags,
+                            selected: _selectedAllergies,
+                            inputCtrl: _allergyInputCtrl,
+                            hint: 'Add allergy',
+                            accent: AppColors.statusRed,
+                            onToggle: (tag) {
+                              setState(() {
+                                if (_selectedAllergies.contains(tag)) {
+                                  _selectedAllergies.remove(tag);
+                                } else {
+                                  _selectedAllergies.add(tag);
+                                }
+                              });
+                            },
+                            onAddCustom: (tag) {
+                              setState(() => _selectedAllergies.add(tag));
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _SectionCard(
+                        step: '04',
                         title: 'Duration',
                         caption: 'Start date and ongoing status',
                         icon: Icons.event_available_outlined,
@@ -1529,6 +1741,103 @@ class _SheetTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MultiTagPicker extends StatelessWidget {
+  final List<String> presetTags;
+  final Set<String> selected;
+  final TextEditingController inputCtrl;
+  final String hint;
+  final Color accent;
+  final ValueChanged<String> onToggle;
+  final ValueChanged<String> onAddCustom;
+
+  const _MultiTagPicker({
+    required this.presetTags,
+    required this.selected,
+    required this.inputCtrl,
+    required this.hint,
+    required this.accent,
+    required this.onToggle,
+    required this.onAddCustom,
+  });
+
+  void _addFromInput() {
+    final tag = inputCtrl.text.trim();
+    if (tag.isEmpty) return;
+    onAddCustom(tag);
+    inputCtrl.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final extras = selected.where((t) => !presetTags.contains(t)).toList();
+    final allTags = [...presetTags, ...extras];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: allTags.map((tag) {
+            final sel = selected.contains(tag);
+            return GestureDetector(
+              onTap: () => onToggle(tag),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: sel
+                      ? accent.withValues(alpha: 0.14)
+                      : const Color(0xFFF3F7F5),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: sel ? accent : const Color(0xFFE3EBE7),
+                  ),
+                ),
+                child: Text(
+                  '${sel ? '✓  ' : '+  '}$tag',
+                  style: TextStyle(
+                    color: sel ? accent : AppColors.textMuted,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: CustomTextField(
+                hint: hint,
+                controller: inputCtrl,
+                prefixIcon: Icons.add_circle_outline,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Material(
+              color: accent,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: _addFromInput,
+                borderRadius: BorderRadius.circular(12),
+                child: const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(Icons.add_rounded, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

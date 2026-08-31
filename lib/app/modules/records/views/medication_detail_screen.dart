@@ -228,11 +228,26 @@ class _Body extends StatelessWidget {
 
   String _foodLabel(String? value) {
     if (value == null || value.trim().isEmpty) return '—';
-    return value
-        .replaceAll('_', ' ')
-        .split(' ')
-        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-        .join(' ');
+    switch (value.trim().toLowerCase()) {
+      case 'before_food':
+        return 'Before Food';
+      case 'after_food':
+        return 'After Food';
+      case 'with_food':
+        return 'With Food';
+      case 'empty_stomach':
+        return 'Empty Stomach';
+      case 'any':
+      case 'anytime':
+        return 'Anytime';
+      default:
+        return value
+            .replaceAll('_', ' ')
+            .split(' ')
+            .map((w) =>
+                w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+            .join(' ');
+    }
   }
 
   String _fmtTime(String raw) {
@@ -413,6 +428,18 @@ class _Body extends StatelessWidget {
           child: _InfoGrid(
             items: [
               _InfoItem('Dosage', _v(med.dosage)),
+              _InfoItem(
+                'Form',
+                med.form != null && med.form!.trim().isNotEmpty
+                    ? med.form!
+                        .replaceAll('_', ' ')
+                        .split(' ')
+                        .map((w) => w.isEmpty
+                            ? w
+                            : '${w[0].toUpperCase()}${w.substring(1)}')
+                        .join(' ')
+                    : '—',
+              ),
               _InfoItem('Frequency', _v(med.frequencyDisplay)),
               _InfoItem(
                 'Timing',
@@ -422,6 +449,27 @@ class _Body extends StatelessWidget {
             ],
           ),
         ),
+        if (med.sideEffects.isNotEmpty || med.allergies.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _SectionCard(
+            title: 'Reactions & allergies',
+            icon: Icons.warning_amber_rounded,
+            child: _InfoGrid(
+              items: [
+                _InfoItem(
+                  'Side effects',
+                  med.sideEffects.isNotEmpty
+                      ? med.sideEffects.join(', ')
+                      : '—',
+                ),
+                _InfoItem(
+                  'Allergies',
+                  med.allergies.isNotEmpty ? med.allergies.join(', ') : '—',
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         _SectionCard(
           title: 'Duration',

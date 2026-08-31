@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/widgets/powered_by_aira.dart';
 import '../controllers/qr_controller.dart';
 
 class QrScreen extends StatelessWidget {
@@ -118,12 +119,8 @@ class QrScreen extends StatelessWidget {
                       body:
                           'Show this QR to your doctor or clinic. It stays valid for ${controller.activeExpiryMinutes} minutes, then tap New QR for a fresh code.',
                     ),
-                    const SizedBox(height: 10),
-                    _MetaRow(
-                      icon: Icons.history_rounded,
-                      label: 'Last scanned',
-                      value: controller.lastScannedLabel,
-                    ),
+                    const SizedBox(height: 18),
+                    const PoweredByAira(),
                   ],
                 ),
               ),
@@ -777,56 +774,6 @@ class _InfoCard extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetaRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _MetaRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE3EBE7)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.tealDark),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textGray,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const Spacer(),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: AppColors.textDark,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
             ),
           ),
         ],

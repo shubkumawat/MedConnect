@@ -474,6 +474,7 @@ class _MemberCard extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            _AccessChip(member: member),
                             if (isSelected)
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -558,6 +559,51 @@ class _MemberCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AccessChip extends StatelessWidget {
+  final FamilyMember member;
+  const _AccessChip({required this.member});
+
+  @override
+  Widget build(BuildContext context) {
+    final has = member.hasAccess;
+    final color = member.fullAccess == true
+        ? AppColors.tealDark
+        : member.emergencyOnly == true
+            ? AppColors.orange
+            : has
+                ? AppColors.accentBlue
+                : AppColors.textGray;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            has ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+            size: 11,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            member.accessLabel.toUpperCase(),
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -12,6 +12,7 @@ import '../../family/controllers/family_member_controller.dart';
 import '../../family/views/add_family_member_screen.dart';
 import '../controllers/home_controller.dart';
 import 'bmi_calculator_screen.dart';
+import 'health_tips_screen.dart';
 import 'notifications_screen.dart';
 import 'qr_view.dart';
 import 'video_series_screen.dart';
@@ -183,6 +184,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     _LearnHub(controller: controller)
                         .animate()
                         .fadeIn(delay: 240.ms, duration: 420.ms),
+                    const SizedBox(height: 26),
+                    _HealthTipsStrip()
+                        .animate()
+                        .fadeIn(delay: 280.ms, duration: 420.ms)
+                        .slideY(begin: 0.06, end: 0),
                     const SizedBox(height: 130),
                   ],
                 ),
@@ -1485,6 +1491,275 @@ class _VideoRailCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HEALTH TIPS STRIP
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _HealthTipsStrip extends StatelessWidget {
+  const _HealthTipsStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.tealDark.withValues(alpha: 0.18),
+                    AppColors.accentTeal.withValues(alpha: 0.12),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: const Icon(
+                Icons.lightbulb_outline_rounded,
+                color: AppColors.tealDark,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Health Tips', style: AppTextStyles.heading3),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Small habits · better everyday health',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textGray,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Material(
+              color: AppColors.tealDark.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: () => Get.to(() => const HealthTipsScreen()),
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'See all',
+                        style: AppTextStyles.tealLabel.copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 11,
+                        color: AppColors.tealDark,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 168,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            padding: const EdgeInsets.only(right: 4, bottom: 4),
+            itemCount: kHealthTips.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (context, i) {
+              return _HealthTipCard(
+                tip: kHealthTips[i],
+                index: i + 1,
+                onTap: () => Get.to(() => const HealthTipsScreen()),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HealthTipCard extends StatelessWidget {
+  final HealthTip tip;
+  final int index;
+  final VoidCallback onTap;
+
+  const _HealthTipCard({
+    required this.tip,
+    required this.index,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Ink(
+          width: 220,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              colors: [
+                tip.color.withValues(alpha: 0.16),
+                tip.color.withValues(alpha: 0.05),
+                Colors.white,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              stops: const [0.0, 0.45, 1.0],
+            ),
+            border: Border.all(color: tip.color.withValues(alpha: 0.18)),
+            boxShadow: [
+              BoxShadow(
+                color: tip.color.withValues(alpha: 0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -18,
+                top: -18,
+                child: Container(
+                  width: 78,
+                  height: 78,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: tip.color.withValues(alpha: 0.1),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 18,
+                bottom: -28,
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: tip.color.withValues(alpha: 0.07),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(13),
+                            boxShadow: [
+                              BoxShadow(
+                                color: tip.color.withValues(alpha: 0.16),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Icon(tip.icon, color: tip.color, size: 22),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: tip.color.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'TIP ${index.toString().padLeft(2, '0')}',
+                            style: TextStyle(
+                              color: tip.color,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 10,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      tip.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.captionBold.copyWith(
+                        color: AppColors.textDark,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      tip.body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textGray,
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Text(
+                          'Read tip',
+                          style: TextStyle(
+                            color: tip.color,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 14,
+                          color: tip.color,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

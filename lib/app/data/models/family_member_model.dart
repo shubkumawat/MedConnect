@@ -57,6 +57,8 @@ class FamilyMember {
   Vitals? vitals;
   bool? fullAccess;
   bool? emergencyOnly;
+  /// Whether this member has been granted access (API may send access_given).
+  bool? accessGiven;
 
   /// True when this card is the logged-in user's own profile.
   bool isSelf = false;
@@ -85,6 +87,7 @@ class FamilyMember {
     this.vitals,
     this.fullAccess,
     this.emergencyOnly,
+    this.accessGiven,
     this.isSelf = false,
   });
 
@@ -208,8 +211,38 @@ class FamilyMember {
         : null;
     maritalStatus = json['marital_status'] is Map ? json['marital_status']['name']?.toString() : json['marital_status']?.toString();
     vitals = json['vitals'] != null ? Vitals.fromJson(json['vitals']) : null;
-    fullAccess = json['full_access'];
-    emergencyOnly = json['emergency_only'];
+    fullAccess = _asBool(json['full_access'] ?? json['has_full_access']);
+    emergencyOnly = _asBool(
+      json['emergency_only'] ?? json['has_emergency_only'],
+    );
+    accessGiven = _asBool(
+      json['access_given'] ??
+          json['has_access'] ??
+          json['is_access_given'] ??
+          ((fullAccess == true || emergencyOnly == true) ? true : null),
+    );
+  }
+
+  static bool? _asBool(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final s = value.toString().trim().toLowerCase();
+    if (s == 'true' || s == '1' || s == 'yes') return true;
+    if (s == 'false' || s == '0' || s == 'no') return false;
+    return null;
+  }
+
+  /// True when any share/access flag is on.
+  bool get hasAccess =>
+      accessGiven == true || fullAccess == true || emergencyOnly == true;
+
+  /// Short label for chips / cards.
+  String get accessLabel {
+    if (fullAccess == true) return 'Full access';
+    if (emergencyOnly == true) return 'Emergency only';
+    if (accessGiven == true) return 'Access given';
+    return 'No access';
   }
 
   Map<String, dynamic> toJson() {
@@ -251,6 +284,7 @@ class FamilyMember {
     }
     data['full_access'] = fullAccess;
     data['emergency_only'] = emergencyOnly;
+    data['access_given'] = accessGiven;
     return data;
   }
 }

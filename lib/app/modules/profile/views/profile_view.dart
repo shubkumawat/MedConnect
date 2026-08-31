@@ -10,6 +10,7 @@ import 'package:healaura/app/core/Util/web_page_helper.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/widgets/powered_by_aira.dart';
 import '../controllers/profile_controller.dart';
 import 'emergency_info_view.dart';
 import 'medical_info_view.dart';
@@ -291,6 +292,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 letterSpacing: 0.3,
                               ),
                             ),
+                            const SizedBox(height: 8),
+                            const PoweredByAira(),
                           ],
                         ),
                       ),

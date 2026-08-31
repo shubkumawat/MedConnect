@@ -157,6 +157,13 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
               prefixIcon: Icons.monitor_weight_outlined,
               keyboardType: TextInputType.number,
             ),
+            const SizedBox(height: 14),
+            CustomTextField(
+              hint: 'Health ID / ABHA Number (optional)',
+              controller: controller.abhaNumberCtrl,
+              prefixIcon: Icons.badge_outlined,
+              keyboardType: TextInputType.text,
+            ),
           ],
         ),
         ProfileSectionCard(

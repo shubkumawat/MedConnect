@@ -452,7 +452,7 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                             accent: AppColors.statusRed,
                             children: [
                               CustomTextField(
-                                hint: 'Contact Person Name',
+                                hint: 'Contact Person Name *',
                                 controller: controller.contactNameCtrl,
                                 prefixIcon: Icons.person_pin_outlined,
                                 keyboardType: TextInputType.name,
@@ -461,12 +461,14 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                               ),
                               const SizedBox(height: 12),
                               CustomTextField(
-                                hint: 'Mobile Number',
+                                hint: 'Mobile Number *',
                                 controller: controller.contactMobileCtrl,
                                 prefixIcon: Icons.phone_android_rounded,
                                 keyboardType: TextInputType.phone,
                                 maxLength: TxtValidation.mobileMaxLength,
                                 inputFormatters: TxtValidation.mobileFormatters,
+                                validator: (v) =>
+                                    TxtValidation.mobileError(v, required: true),
                               ),
                               const SizedBox(height: 12),
                               Obx(

@@ -578,6 +578,8 @@ class ProfileController extends GetxController {
   RxString heightUnit = 'cm'.obs;
   final heightCtrl = TextEditingController();
   final weightCtrl = TextEditingController();
+  /// Optional Ayushman Bharat Health Account (ABHA) / Health ID.
+  final abhaNumberCtrl = TextEditingController();
 
   RxString maritalStatus = ''.obs; // single/married/divorced/widowed
   final occupationCtrl = TextEditingController();
@@ -946,6 +948,20 @@ class ProfileController extends GetxController {
 
             heightCtrl.text = data['height']?.toString() ?? '';
             weightCtrl.text = data['weight']?.toString() ?? '';
+            var abha = data['abha_number']?.toString() ??
+                data['health_id']?.toString() ??
+                data['abha_id']?.toString() ??
+                '';
+            if (abha.trim().isEmpty && data['medical'] is Map) {
+              final m = Map<String, dynamic>.from(data['medical'] as Map);
+              abha = m['abha_number']?.toString() ??
+                  m['health_id']?.toString() ??
+                  '';
+            }
+            abhaNumberCtrl.text =
+                (abha.trim().isEmpty || abha.trim().toLowerCase() == 'null')
+                    ? ''
+                    : abha.trim();
 
             final medical = data['medical'];
             if (medical != null) {
@@ -1183,6 +1199,7 @@ class ProfileController extends GetxController {
             : bloodGroup.value,
         "height": double.tryParse(heightCtrl.text.trim()) ?? 0,
         "weight": double.tryParse(weightCtrl.text.trim()) ?? 0,
+        "abha_number": abhaNumberCtrl.text.trim(),
         "marital_status": maritalStatus.value.toLowerCase(),
         "occupation": selectedOccupationModel.value?.code ?? occupationCtrl.text.trim(),
         "chronic_disease": hasChronicDisease.value,
@@ -1282,6 +1299,7 @@ class ProfileController extends GetxController {
     dobCtrl.dispose();
     heightCtrl.dispose();
     weightCtrl.dispose();
+    abhaNumberCtrl.dispose();
     occupationCtrl.dispose();
     disabilityTypeCtrl.dispose();
     medicationInputCtrl.dispose();

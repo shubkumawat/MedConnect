@@ -876,16 +876,48 @@ class RecordsController extends GetxController {
       } else if (!data.containsKey('disease') && !data.containsKey('new_disease_name')) {
         data['new_disease_name'] = 'General Health';
       }
+      // Backend review endpoint is PATCH /prescriptions/review/ (uuid in body).
+      data['uuid'] = uuid;
+      data['prescription_uuid'] = uuid;
       attachPatientId(data);
 
-      var response = await ApiProvider().requestPostForApi(
+      var response = await ApiProvider().requestPatchForApi(
         Get.context,
-        "${WebApiConstant.API_URL_RECORDS_PRESCRIPTIONS}$uuid/review/",
+        "${WebApiConstant.API_URL_RECORDS_PRESCRIPTIONS}review/",
         data,
         token ?? "",
       );
 
-      if (response != null && response.statusCode == 200) {
+      final reviewOk = response != null &&
+          (response.statusCode == 200 || response.statusCode == 201) &&
+          (response.data is! Map || response.data['error'] != true);
+
+      if (!reviewOk) {
+        return false;
+      }
+
+      // Finalize after review edits.
+      final confirmBody = <String, dynamic>{
+        'uuid': uuid,
+        'prescription_uuid': uuid,
+      };
+      if (diseaseUuid != null && diseaseUuid.isNotEmpty) {
+        confirmBody['disease'] = diseaseUuid;
+      }
+      attachPatientId(confirmBody);
+
+      final confirm = await ApiProvider().requestPostForApi(
+        Get.context,
+        "${WebApiConstant.API_URL_RECORDS_PRESCRIPTIONS}confirm/",
+        confirmBody,
+        token ?? "",
+      );
+
+      final confirmOk = confirm != null &&
+          (confirm.statusCode == 200 || confirm.statusCode == 201) &&
+          (confirm.data is! Map || confirm.data['error'] != true);
+
+      if (confirmOk || reviewOk) {
         if (diseaseUuid != null) {
           fetchDiseaseDocuments(diseaseUuid);
           fetchDiseaseTimeline(diseaseUuid);
