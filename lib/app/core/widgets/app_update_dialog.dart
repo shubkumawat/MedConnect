@@ -80,7 +80,7 @@ class AppUpdateDialog extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'A new version of HealAura is here with the latest '
+                'A new version of Healora is here with the latest '
                 'features, improvements and bug fixes.',
                 style: AppTextStyles.body.copyWith(color: AppColors.textGray),
                 textAlign: TextAlign.center,

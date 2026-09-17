@@ -10,6 +10,7 @@ import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
 import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
 import 'package:healaura/app/core/theme/app_colors.dart';
 import 'package:healaura/app/core/theme/app_text_theme.dart';
+import 'package:healaura/app/core/widgets/healora_logo.dart';
 import 'package:healaura/app/data/models/GetCountryApiResponseModel.dart'
     show CountryModel;
 
@@ -30,11 +31,11 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.countryList.isEmpty ||
-          controller.relationList.isEmpty ||
-          controller.occupationList.isEmpty ||
-          controller.disabilityTypeList.isEmpty) {
+      if (controller.disabilityTypeList.isEmpty) {
         controller.getAllMasterDataAPI(context);
+      }
+      if (controller.riskFactorList.isEmpty) {
+        controller.getRiskFactorsAPI(context);
       }
     });
   }
@@ -91,14 +92,50 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                                 validator: TxtValidation.personNameError,
                               ),
                               const SizedBox(height: 12),
-                              CustomTextField(
-                                hint: 'Mobile Number',
-                                controller: controller.mobileNumberCtrl,
-                                prefixIcon: Icons.phone_android_rounded,
-                                keyboardType: TextInputType.phone,
-                                maxLength: TxtValidation.mobileMaxLength,
-                                inputFormatters: TxtValidation.mobileFormatters,
-                              ),
+                              Obx(() {
+                                final c = controller.selectedCountry.value;
+                                final flag = (c?.flagEmoji ?? '🇮🇳').trim();
+                                final code = (c?.phoneCode ?? '91')
+                                    .replaceAll(RegExp(r'[^0-9]'), '');
+                                return Row(
+                                  children: [
+                                    Container(
+                                      height: 52,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12),
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                            color: const Color(0xFFE3EBE7)),
+                                      ),
+                                      child: Text(
+                                        '$flag  +$code',
+                                        style: AppTextStyles.bodyBold.copyWith(
+                                          color: AppColors.textDark,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: CustomTextField(
+                                        hint: 'Mobile Number',
+                                        controller:
+                                            controller.mobileNumberCtrl,
+                                        prefixIcon:
+                                            Icons.phone_android_rounded,
+                                        keyboardType: TextInputType.phone,
+                                        maxLength:
+                                            TxtValidation.mobileMaxLength,
+                                        inputFormatters:
+                                            TxtValidation.mobileFormatters,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
                               const SizedBox(height: 12),
                               CustomTextField(
                                 hint: 'Health ID / ABHA Number (optional)',
@@ -188,13 +225,16 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                               }),
                               const SizedBox(height: 12),
                               Obx(() {
-                                if (controller.isCountryLoading.value) {
-                                  return const _Loader();
-                                }
+                                final selected =
+                                    controller.selectedCountry.value ??
+                                        CountryModel.indiaFallback;
+                                final items = controller.countryList.isEmpty
+                                    ? <CountryModel>[selected]
+                                    : controller.countryList.toList();
                                 return McDropdown<CountryModel>(
                                   hint: 'Nationality',
-                                  value: controller.selectedCountry.value,
-                                  items: controller.countryList,
+                                  value: selected,
+                                  items: items,
                                   selectedItemBuilder: (c) => Text(
                                     '${c.flagEmoji}  ${c.name}',
                                     style: AppTextStyles.body
@@ -273,6 +313,31 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                                   }).toList(),
                                 ),
                               ),
+                              const SizedBox(height: 14),
+                              const _FieldLabel('Risk factors'),
+                              const SizedBox(height: 8),
+                              Obx(() {
+                                if (controller.isRiskFactorLoading.value &&
+                                    controller.riskFactorList.isEmpty) {
+                                  return const _Loader();
+                                }
+                                return Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children:
+                                      controller.riskFactorList.map((rf) {
+                                    final sel = controller.selectedRiskFactors
+                                        .contains(rf.value);
+                                    return _TagChip(
+                                      label: rf.label,
+                                      selected: sel,
+                                      activeColor: AppColors.orange,
+                                      onTap: () => controller
+                                          .toggleRiskFactor(rf.value),
+                                    );
+                                  }).toList(),
+                                );
+                              }),
                               const SizedBox(height: 14),
                               const _FieldLabel('Current medications'),
                               const SizedBox(height: 8),
@@ -726,19 +791,7 @@ class _PremiumHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Container(
-                width: 40,
-                height: 40,
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Image.asset(
-                  'assets/logo/ic_logo_icon.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
+              const HealoraLogo.chip(),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(

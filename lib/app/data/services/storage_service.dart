@@ -31,6 +31,9 @@ class StorageService {
   static const medReminders = "medReminders";
   static const vacReminders = "vacReminders";
   static const qrAlerts = "qrAlerts";
+  static const recordingConsentAsked = "recordingConsentAsked";
+  static const recordingConsentAllowed = "recordingConsentAllowed";
+  static const upcomingApptPopupDate = "upcomingApptPopupDate";
 
   /// Hospital / clinic IDs the current user has already reviewed.
   static const reviewedPlaceIds = "reviewedPlaceIds";

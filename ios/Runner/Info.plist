@@ -2,10 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access is required to record doctor visit conversations on this device.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is required to scan medication strips, boxes, and prescriptions.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Photo library access is required to select medication images for scanning.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Healora uses your location to show nearby hospitals, clinics, and doctors.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Healora uses your location to show nearby hospitals, clinics, and doctors.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
@@ -17,7 +23,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>HealAura</string>
+	<string>Healora</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,7 +31,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>HealAura</string>
+	<string>Healora</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

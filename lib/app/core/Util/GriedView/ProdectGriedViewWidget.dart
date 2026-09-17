@@ -1,7 +1,7 @@
 // import 'dart:math';
+import 'package:healaura/app/core/Util/app_toast.dart';
 //
 // import 'package:flutter/material.dart';
-// import 'package:fluttertoast/fluttertoast.dart';
 // import 'package:get/get.dart';
 // import 'package:groticapp/Model/CategoriesModel/CategoriesResponseApi.dart';
 // import 'package:groticapp/Model/ProductModel/ProductResponseApi.dart';
@@ -840,7 +840,7 @@
 //                                       onItemClicked(true);
 //                                       //
 //                                     } else {
-//                                       Fluttertoast.showToast(msg: "You added maximum.");
+//                                       AppToast.showToast(msg: "You added maximum.");
 //                                     }
 //
 //                                     // await cartCtrl.addToCartLocal(context, top_s_p_list[index].product_id!, top_s_p_list[index].image, top_s_p_list[index].title, top_s_p_list[index].price, top_s_p_list[index].discPrice, (top_s_p_list[index].cartItem!));
@@ -1356,7 +1356,7 @@
 //                                   onItemClicked(true);
 //
 //                                 } else {
-//                                   Fluttertoast.showToast(msg: "You added maximum.");
+//                                   AppToast.showToast(msg: "You added maximum.");
 //                                 }
 //                               },
 //                               child: const Text(
@@ -1768,7 +1768,7 @@
 //   //                                     onItemClicked(true);
 //   //                                     //
 //   //                                   } else {
-//   //                                     Fluttertoast.showToast(msg: "You can add maximum 5 items");
+//   //                                     AppToast.showToast(msg: "You can add maximum 5 items");
 //   //                                   }
 //   //
 //   //                                   // await cartCtrl.addToCartLocal(context, top_s_p_list[index].product_id!, top_s_p_list[index].image, top_s_p_list[index].title, top_s_p_list[index].price, top_s_p_list[index].discPrice, (top_s_p_list[index].cartItem!));
@@ -2245,7 +2245,7 @@
 //                                     //   onItemClicked(true);
 //                                     //   //
 //                                     // } else {
-//                                     //   Fluttertoast.showToast(msg: "You can add maximum 5 items");
+//                                     //   AppToast.showToast(msg: "You can add maximum 5 items");
 //                                     // }
 //                                     //
 //                                     // // await cartCtrl.addToCartLocal(context, top_s_p_list[index].product_id!, top_s_p_list[index].image, top_s_p_list[index].title, top_s_p_list[index].price, top_s_p_list[index].discPrice, (top_s_p_list[index].cartItem!));
@@ -2630,10 +2630,10 @@
 //                   onItemClicked(product.product_id!);
 //                   setState(() {});
 //                 } else {
-//                   Fluttertoast.showToast(msg: "You added maximum.");
+//                   AppToast.showToast(msg: "You added maximum.");
 //                 }
 //                 if(product.stock == 0 || product.stock == null){
-//                   Fluttertoast.showToast(msg: "Out of Stock",);
+//                   AppToast.showToast(msg: "Out of Stock",);
 //                 }
 //               },
 //               child: Padding(padding: EdgeInsets.all(4), child: Text("+", style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold))),
@@ -2645,7 +2645,7 @@
 //       return InkWell(
 //         onTap: () async {
 //           if(product.stock == 0 || product.stock == null){
-//             Fluttertoast.showToast(msg: "Out of Stock",);
+//             AppToast.showToast(msg: "Out of Stock",);
 //           }
 //           product.cartItem = (product.cartItem ?? 0) + 1;
 //           String imageUrl = (product.images != null && product.images!.isNotEmpty)
@@ -2935,7 +2935,7 @@
 //   //                                     );
 //   //                                     onItemClicked(product.product_id!);
 //   //                                   } else {
-//   //                                     Fluttertoast.showToast(msg: "You added maximum.");
+//   //                                     AppToast.showToast(msg: "You added maximum.");
 //   //                                   }
 //   //                                 },
 //   //                                 child: Padding(
@@ -3325,7 +3325,7 @@
 //                                       (top_s_p_list[index].cartItem!),(top_s_p_list[index].stock!));
 //                                   onItemClicked(true);
 //                                 } else {
-//                                   Fluttertoast.showToast(msg: "You added maximum.");
+//                                   AppToast.showToast(msg: "You added maximum.");
 //                                 }
 //                                 setState(() {});
 //                               },
@@ -3729,7 +3729,7 @@
 //                                       (top_s_p_list[index].cartItem!),(top_s_p_list[index].stock!));
 //                                   onItemClicked(true);
 //                                 } else {
-//                                   Fluttertoast.showToast(msg: "You added maximum.");
+//                                   AppToast.showToast(msg: "You added maximum.");
 //                                 }
 //                                 setState(() {});
 //                               },
@@ -4124,7 +4124,7 @@
 //   //                                     await cartCtrl.addToCartLocal(context, top_s_p_list[index].product_id!, top_s_p_list[index].images![0], top_s_p_list[index].title, top_s_p_list[index].price, top_s_p_list[index].discPrice, (top_s_p_list[index].cartItem!));
 //   //                                     onItemClicked(true);
 //   //                                   } else {
-//   //                                     Fluttertoast.showToast(msg: "You can add maximum 5 items");
+//   //                                     AppToast.showToast(msg: "You can add maximum 5 items");
 //   //                                   }
 //   //                                   // cartCtrl.addToCart(
 //   //                                   //   context,
@@ -4563,7 +4563,7 @@
 //                                     (top_s_p_list[index]!.cartItemCount ?? 0) +
 //                                         1;
 //                               } else {
-//                                 Fluttertoast.showToast(msg: "You added maximum.");
+//                                 AppToast.showToast(msg: "You added maximum.");
 //                               }
 //                               // cartCtrl.addToCart(
 //                               //   context,

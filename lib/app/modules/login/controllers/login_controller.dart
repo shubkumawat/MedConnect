@@ -5,7 +5,6 @@ import 'package:healaura/app/modules/home/controllers/home_controller.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,6 +17,7 @@ import '../../../data/services/notification_service.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../profile/views/personal_info_view.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 class LoginController extends GetxController {
   static const int resendCooldownSeconds = 30;
@@ -50,9 +50,7 @@ class LoginController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Context is not available immediately in onInit, but we can fetch it later or
-    // use a delay if needed. Usually for master data it's fine.
-    // However, getSendOtpAPI takes context. Let's make getMasterCountryAPI separate.
+    selectedCountry.value = CountryModel.indiaFallback;
   }
 
   @override
@@ -132,40 +130,21 @@ class LoginController extends GetxController {
         countryList.value =
             list.map((e) => CountryModel.fromJson(e as Map<String, dynamic>)).toList();
 
-        if (selectedCountry.value == null && countryList.isNotEmpty) {
-          selectedCountry.value = countryList.firstWhereOrNull(
-                (c) =>
-                    c.name.toLowerCase() == 'india' || c.phoneCode == '91',
-              ) ??
-              countryList.first;
+        final current = selectedCountry.value;
+        if (current == null || current.id == 0 || current.isIndia) {
+          selectedCountry.value = CountryModel.indiaFrom(countryList);
         }
       }
 
       // Fallback so login always shows a code even if API fails.
       if (selectedCountry.value == null) {
-        selectedCountry.value = CountryModel(
-          id: 0,
-          countryId: '',
-          name: 'India',
-          iso2: 'IN',
-          iso3: 'IND',
-          phoneCode: '91',
-          flagEmoji: '🇮🇳',
-        );
+        selectedCountry.value = CountryModel.indiaFallback;
       }
     } catch (e) {
       isCountryLoading.value = false;
       PrintLog.printLog("Exception: $e");
       if (selectedCountry.value == null) {
-        selectedCountry.value = CountryModel(
-          id: 0,
-          countryId: '',
-          name: 'India',
-          iso2: 'IN',
-          iso3: 'IND',
-          phoneCode: '91',
-          flagEmoji: '🇮🇳',
-        );
+        selectedCountry.value = CountryModel.indiaFallback;
       }
     }
   }
@@ -174,14 +153,14 @@ class LoginController extends GetxController {
     try {
       if (phoneController.text.isEmpty ||
           !TxtValidation.isValidMobile(phoneController.text)) {
-        Fluttertoast.showToast(
+        AppToast.showToast(
           msg:
               'Please enter a valid mobile number (${TxtValidation.mobileMinLength}–${TxtValidation.mobileMaxLength} digits)',
         );
         return;
       }
       if (resendSecondsLeft.value > 0) {
-        Fluttertoast.showToast(msg: "Please wait ${resendSecondsLeft.value}s before resending");
+        AppToast.showToast(msg: "Please wait ${resendSecondsLeft.value}s before resending");
         return;
       }
 
@@ -216,12 +195,12 @@ class LoginController extends GetxController {
           _startResendCooldown();
           PrintLog.printLog("Received OTP Set: ${receivedOtp.value}");
         } else {
-          Fluttertoast.showToast(msg: response['message'] ?? 'Error sending OTP');
+          AppToast.showToast(msg: response['message'] ?? 'Error sending OTP');
         }
       }
     } catch (e) {
       PrintLog.printLog("Exception: $e");
-      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+      AppToast.showToast(msg: WebApiConstant.ApiError);
       isLoading.value = false;
     }
   }
@@ -229,13 +208,13 @@ class LoginController extends GetxController {
   Future<void> getVerifyOtpAPI(BuildContext context, String otp) async {
     try {
       if (lockoutSecondsLeft.value > 0) {
-        Fluttertoast.showToast(
+        AppToast.showToast(
           msg: "Too many incorrect attempts. Try again in ${lockoutSecondsLeft.value}s",
         );
         return;
       }
       if (otp.isEmpty || otp.length != 6) {
-        Fluttertoast.showToast(msg: "Please enter valid otp");
+        AppToast.showToast(msg: "Please enter valid otp");
         return;
       }
 
@@ -313,12 +292,12 @@ class LoginController extends GetxController {
 
           if (otpAttempts.value >= maxOtpAttempts) {
             _startLockout();
-            Fluttertoast.showToast(
+            AppToast.showToast(
               msg: "Too many incorrect attempts. Try again in $lockoutSeconds seconds",
             );
           } else {
             final attemptsLeft = maxOtpAttempts - otpAttempts.value;
-            Fluttertoast.showToast(
+            AppToast.showToast(
               msg: "${response['message'] ?? 'Incorrect OTP'} ($attemptsLeft attempt${attemptsLeft == 1 ? '' : 's'} left)",
             );
           }
@@ -326,7 +305,7 @@ class LoginController extends GetxController {
       }
     } catch (e) {
       PrintLog.printLog("Exception: $e");
-      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+      AppToast.showToast(msg: WebApiConstant.ApiError);
       isLoading.value = false;
     }
   }

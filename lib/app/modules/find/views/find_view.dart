@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/widgets/healora_logo.dart';
 import '../../../data/models/doctor_model.dart';
 import '../controllers/find_controller.dart';
 import 'hospital_detail_view.dart';
@@ -166,6 +167,7 @@ class _FindScreenState extends State<FindScreen> {
                             _ResultsHeader(
                               controller: controller,
                               onSort: _showSortSheet,
+                              onFilters: _showSmartFiltersSheet,
                             ),
                             const SizedBox(height: 12),
                           ],
@@ -502,6 +504,293 @@ class _FindScreenState extends State<FindScreen> {
       ),
     );
   }
+
+  void _showSmartFiltersSheet() {
+    Get.bottomSheet(
+      SafeArea(
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(Get.context!).size.height * 0.88,
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Obx(() {
+            final cities = controller.availableCities;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Smart Filters', style: AppTextStyles.heading3),
+                    ),
+                    TextButton(
+                      onPressed: controller.clearSmartFilters,
+                      child: Text(
+                        'Clear all',
+                        style: AppTextStyles.tealLabel.copyWith(fontSize: 12.5),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      Text('Specialization', style: AppTextStyles.captionBold),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: controller.specializations.map((s) {
+                          final sel =
+                              controller.selectedSpecialties.contains(s.name);
+                          return FilterChip(
+                            label: Text(s.name),
+                            selected: sel,
+                            onSelected: (_) =>
+                                controller.toggleSpecialtyFilter(s.name),
+                            selectedColor:
+                                AppColors.teal.withValues(alpha: 0.18),
+                            checkmarkColor: AppColors.tealDark,
+                            labelStyle: TextStyle(
+                              color: sel
+                                  ? AppColors.tealDark
+                                  : AppColors.textMuted,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12.5,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 18),
+                      Text('Location', style: AppTextStyles.captionBold),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _FilterChoice(
+                              label: 'Near Me',
+                              selected: controller.locationMode.value ==
+                                  FindLocationMode.nearMe,
+                              onTap: () => controller
+                                  .setLocationMode(FindLocationMode.nearMe),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _FilterChoice(
+                              label: 'City',
+                              selected: controller.locationMode.value ==
+                                  FindLocationMode.city,
+                              onTap: () => controller
+                                  .setLocationMode(FindLocationMode.city),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (controller.locationMode.value ==
+                          FindLocationMode.city) ...[
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          value: controller.selectedCity.value.isEmpty
+                              ? null
+                              : controller.selectedCity.value,
+                          decoration: InputDecoration(
+                            hintText: cities.isEmpty
+                                ? 'No cities in results yet'
+                                : 'Select city',
+                            filled: true,
+                            fillColor: const Color(0xFFF3F7F5),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          items: cities
+                              .map((c) => DropdownMenuItem(
+                                    value: c,
+                                    child: Text(c),
+                                  ))
+                              .toList(),
+                          onChanged: cities.isEmpty
+                              ? null
+                              : controller.setSelectedCity,
+                        ),
+                      ],
+                      const SizedBox(height: 18),
+                      Text('Minimum rating', style: AppTextStyles.captionBold),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _FilterChoice(
+                            label: 'Any',
+                            selected: controller.minRating.value == null,
+                            onTap: () => controller.setMinRating(null),
+                          ),
+                          ...FindController.ratingOptions.map((r) {
+                            final label = '≥${r == r.roundToDouble() ? r.toInt() : r}';
+                            return _FilterChoice(
+                              label: label,
+                              selected: controller.minRating.value == r,
+                              onTap: () => controller.setMinRating(r),
+                            );
+                          }),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Text('Consultation type',
+                          style: AppTextStyles.captionBold),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _FilterChoice(
+                            label: 'Any',
+                            selected: controller.consultationType.value.isEmpty,
+                            onTap: () => controller.setConsultationType(''),
+                          ),
+                          ...FindController.consultationOptions.map((o) {
+                            return _FilterChoice(
+                              label: o['label']!,
+                              selected: controller.consultationType.value ==
+                                  o['value'],
+                              onTap: () =>
+                                  controller.setConsultationType(o['value']),
+                            );
+                          }),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Text('Gender preference',
+                          style: AppTextStyles.captionBold),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: FindController.genderOptions.map((o) {
+                          final selected =
+                              controller.genderPreference.value == o['value'] ||
+                                  (o['value'] == 'any' &&
+                                      controller
+                                          .genderPreference.value.isEmpty);
+                          return _FilterChoice(
+                            label: o['label']!,
+                            selected: selected,
+                            onTap: () => controller
+                                .setGenderPreference(o['value'] == 'any' ? '' : o['value']),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 18),
+                      Text('Language', style: AppTextStyles.captionBold),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _FilterChoice(
+                            label: 'Any',
+                            selected:
+                                controller.languagePreference.value.isEmpty,
+                            onTap: () =>
+                                controller.setLanguagePreference(''),
+                          ),
+                          ...FindController.languageOptions.map((lang) {
+                            return _FilterChoice(
+                              label: lang,
+                              selected:
+                                  controller.languagePreference.value == lang,
+                              onTap: () =>
+                                  controller.setLanguagePreference(lang),
+                            );
+                          }),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () => Get.back(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.tealDark,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'Show ${controller.filteredHospitals.length} results',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+    );
+  }
+}
+
+class _FilterChoice extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FilterChoice({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.tealDark : const Color(0xFFF3F7F5),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? AppColors.tealDark : const Color(0xFFE3EBE7),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : AppColors.textMuted,
+            fontWeight: FontWeight.w700,
+            fontSize: 12.5,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -560,19 +849,7 @@ class _HeroHeaderState extends State<_HeroHeader> {
         children: [
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Image.asset(
-                  'assets/logo/ic_logo_icon.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
+              const HealoraLogo.chip(),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -822,12 +1099,18 @@ class _SpecialtyStrip extends StatelessWidget {
 class _ResultsHeader extends StatelessWidget {
   final FindController controller;
   final VoidCallback onSort;
-  const _ResultsHeader({required this.controller, required this.onSort});
+  final VoidCallback onFilters;
+  const _ResultsHeader({
+    required this.controller,
+    required this.onSort,
+    required this.onFilters,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       final count = controller.filteredHospitals.length;
+      final filters = controller.activeFilterCount;
       return Row(
         children: [
           Expanded(
@@ -844,6 +1127,40 @@ class _ResultsHeader extends StatelessWidget {
               ],
             ),
           ),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: onFilters,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: filters > 0
+                        ? AppColors.tealDark
+                        : AppColors.teal.withValues(alpha: 0.25),
+                  ),
+                  color: filters > 0
+                      ? AppColors.teal.withValues(alpha: 0.08)
+                      : Colors.white,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.filter_list_rounded,
+                        size: 16, color: AppColors.teal),
+                    const SizedBox(width: 4),
+                    Text(
+                      filters > 0 ? 'Filters ($filters)' : 'Filters',
+                      style: AppTextStyles.tealLabel.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Material(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),

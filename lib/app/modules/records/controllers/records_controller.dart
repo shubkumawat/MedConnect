@@ -1,8 +1,8 @@
 import 'package:healaura/app/data/services/storage_service.dart';
 import 'package:dio/dio.dart' as dio;
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:healaura/app/data/models/medical_record_model.dart';
+import 'package:healaura/app/data/models/appointment_model.dart';
 import 'package:healaura/app/data/models/disease_response_model.dart';
 import 'package:healaura/app/data/models/disease_document_model.dart';
 import 'package:healaura/app/data/models/family_member_model.dart';
@@ -16,6 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../views/disease_pdf_preview_screen.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 class RecordsController extends GetxController {
   var diseases = <DiseaseResult>[].obs;
@@ -34,6 +35,10 @@ class RecordsController extends GetxController {
   var isMedicationDetailLoading = false.obs;
   var medicineSearchResults = <Map<String, dynamic>>[].obs;
   var selectedDisease = Rxn<DiseaseResult>();
+  var diseaseAppointments = <DiseaseAppointment>[].obs;
+  var selectedAppointment = Rxn<AppointmentDetail>();
+  var isAppointmentsLoading = false.obs;
+  var isAppointmentDetailLoading = false.obs;
 
   /// Active Health Passport member — records APIs send this `patient_id`.
   final selectedPatientId = ''.obs;
@@ -68,6 +73,22 @@ class RecordsController extends GetxController {
   void attachPatientId(Map<String, dynamic> body) {
     final id = selectedPatientId.value.trim();
     if (id.isNotEmpty) body['patient_id'] = id;
+  }
+
+  void attachAppointmentUuid(Map<String, dynamic> body, String? appointmentUuid) {
+    final id = appointmentUuid?.trim() ?? '';
+    if (id.isNotEmpty) body['appointment_uuid'] = id;
+  }
+
+  String _apiMessage(dynamic raw, {String fallback = 'Something went wrong'}) {
+    if (raw is Map) {
+      final msg = raw['message']?.toString();
+      if (msg != null && msg.trim().isNotEmpty) return msg.trim();
+      final data = raw['data'];
+      if (data is List && data.isNotEmpty) return data.first.toString();
+      if (data is String && data.trim().isNotEmpty) return data.trim();
+    }
+    return fallback;
   }
 
   void applySelectedMember(FamilyMember p) => _applySelectedMember(p);
@@ -118,6 +139,16 @@ class RecordsController extends GetxController {
   }
 
   Future<void> selectMember(FamilyMember member, {int? index}) async {
+    if (member.recordsLocked) {
+      AppToast.showToast(
+        msg: member.needsLoginAccess
+            ? '${member.fullName ?? 'This member'} is 18 or older. Give them login access so they can grant you permission.'
+            : (member.parentPermission?.isDeclined == true
+                ? '${member.fullName ?? 'This member'} declined record access.'
+                : 'Waiting for ${member.fullName ?? 'this member'} to grant record permission.'),
+      );
+      return;
+    }
     _applySelectedMember(member);
     final id = member.patientId?.trim() ?? '';
     await StorageService().setString(StorageService.selectedPatientId, id);
@@ -224,6 +255,11 @@ class RecordsController extends GetxController {
         print("details Response....$data");
         if (data != null) {
           selectedDisease.value = DiseaseResult.fromJson(data);
+          final embedded = selectedDisease.value?.appointments;
+          if (embedded != null && embedded.isNotEmpty) {
+            diseaseAppointments.value = embedded;
+          }
+          fetchDiseaseAppointments(uuid);
           // Fetch related data (medications load on Medications tab)
           fetchDiseaseTimeline(uuid);
           fetchDiseaseDocuments(uuid);
@@ -279,7 +315,7 @@ class RecordsController extends GetxController {
   }
 
   void _toastMedicationError(dynamic raw, {String fallback = 'Failed to save medication'}) {
-    Fluttertoast.showToast(msg: _medicationApiMessage(raw, fallback: fallback));
+    AppToast.showToast(msg: _medicationApiMessage(raw, fallback: fallback));
   }
 
   Future<bool> addCurrentMedication(Map<String, dynamic> body) async {
@@ -309,7 +345,7 @@ class RecordsController extends GetxController {
       return false;
     } catch (e) {
       debugPrint("Error adding current medication: $e");
-      Fluttertoast.showToast(msg: 'Failed to save medication');
+      AppToast.showToast(msg: 'Failed to save medication');
       return false;
     } finally {
       isLoading.value = false;
@@ -365,7 +401,7 @@ class RecordsController extends GetxController {
       if (medicationUuid.trim().isEmpty ||
           reminderUuid.trim().isEmpty ||
           time.trim().isEmpty) {
-        Fluttertoast.showToast(msg: "Missing dose details");
+        AppToast.showToast(msg: "Missing dose details");
         return false;
       }
 
@@ -394,17 +430,17 @@ class RecordsController extends GetxController {
         if (ok) {
           await fetchMedicationDetail(medicationUuid);
           await fetchCurrentMedications();
-          Fluttertoast.showToast(msg: "Marked as taken");
+          AppToast.showToast(msg: "Marked as taken");
           return true;
         }
-        Fluttertoast.showToast(
+        AppToast.showToast(
             msg: (raw is Map ? raw['message']?.toString() : null) ??
                 "Could not mark as taken");
       }
       return false;
     } catch (e) {
       debugPrint("Error marking medication taken: $e");
-      Fluttertoast.showToast(msg: "Something went wrong");
+      AppToast.showToast(msg: "Something went wrong");
       return false;
     }
   }
@@ -452,9 +488,16 @@ class RecordsController extends GetxController {
   }
 
   Future<bool> addDiseaseMedication({
-    // required String diseaseUuid,
     required Map<String, dynamic> body,
-  }) async {
+    String? appointmentUuid,
+  })
+  async {
+    try {
+      isLoading.value = true;
+      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
+
+      attachPatientId(body);
+      attachAppointmentUuid(body, appointmentUuid);
     try {
       isLoading.value = true;
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
@@ -480,19 +523,23 @@ class RecordsController extends GetxController {
       return false;
     } catch (e) {
       debugPrint("Error adding disease medication: $e");
-      Fluttertoast.showToast(msg: 'Failed to save medication');
+      AppToast.showToast(msg: 'Failed to save medication');
       return false;
     } finally {
       isLoading.value = false;
     }
+  }catch(e){
+    debugPrint("Error adding disease medication: $e");}
+    return false;
   }
 
   /// Kept for callers — disease-scoped add.
   Future<bool> addMedication({
     required String diseaseUuid,
     required Map<String, dynamic> body,
+    String? appointmentUuid,
   }) =>
-      addDiseaseMedication(body: body);
+      addDiseaseMedication(body: body, appointmentUuid: appointmentUuid);
 
   /// Edit uses medication UUID only. Refresh the list that was edited.
   Future<bool> updateMedication({
@@ -535,7 +582,7 @@ class RecordsController extends GetxController {
       return false;
     } catch (e) {
       debugPrint("Error updating medication: $e");
-      Fluttertoast.showToast(msg: 'Failed to save medication');
+      AppToast.showToast(msg: 'Failed to save medication');
       return false;
     } finally {
       isLoading.value = false;
@@ -760,6 +807,7 @@ class RecordsController extends GetxController {
     String notes = '',
     String? reportTypeCode,
     String? documentDate,
+    String? appointmentUuid,
   }) async {
     try {
       if (filePaths.isEmpty) return false;
@@ -781,6 +829,7 @@ class RecordsController extends GetxController {
           'report_type_code': reportTypeCode.trim(),
       };
       attachPatientId(formMap);
+      attachAppointmentUuid(formMap, appointmentUuid);
 
       final formData = dio.FormData.fromMap(formMap);
       final limited = filePaths.take(3).toList();
@@ -828,7 +877,7 @@ class RecordsController extends GetxController {
     );
   }
 
-  Future<Map<String, dynamic>?> scanPrescription(String filePath, {String? diseaseUuid}) async {
+  Future<Map<String, dynamic>?> scanPrescription(String filePath, {String? diseaseUuid, String? appointmentUuid}) async {
     try {
       isLoading.value = true;
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
@@ -839,8 +888,13 @@ class RecordsController extends GetxController {
 
       if (diseaseUuid != null && diseaseUuid.isNotEmpty) {
         formData.fields.add(MapEntry('disease', diseaseUuid));
+        formData.fields.add(MapEntry('disease_uuid', diseaseUuid));
       } else {
         formData.fields.add(const MapEntry('new_disease_name', 'General Health'));
+      }
+      final apt = appointmentUuid?.trim() ?? '';
+      if (apt.isNotEmpty) {
+        formData.fields.add(MapEntry('appointment_uuid', apt));
       }
       final pid = selectedPatientId.value.trim();
       if (pid.isNotEmpty) {
@@ -866,7 +920,7 @@ class RecordsController extends GetxController {
     }
   }
 
-  Future<bool> reviewPrescription(String uuid, Map<String, dynamic> data, {String? diseaseUuid}) async {
+  Future<bool> reviewPrescription(String uuid, Map<String, dynamic> data, {String? diseaseUuid, String? appointmentUuid}) async {
     try {
       isLoading.value = true;
       String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
@@ -880,6 +934,7 @@ class RecordsController extends GetxController {
       data['uuid'] = uuid;
       data['prescription_uuid'] = uuid;
       attachPatientId(data);
+      attachAppointmentUuid(data, appointmentUuid);
 
       var response = await ApiProvider().requestPatchForApi(
         Get.context,
@@ -905,6 +960,7 @@ class RecordsController extends GetxController {
         confirmBody['disease'] = diseaseUuid;
       }
       attachPatientId(confirmBody);
+      attachAppointmentUuid(confirmBody, appointmentUuid);
 
       final confirm = await ApiProvider().requestPostForApi(
         Get.context,
@@ -953,19 +1009,19 @@ class RecordsController extends GetxController {
 
       if (response != null &&
           (response.statusCode == 200 || response.statusCode == 204)) {
-        Fluttertoast.showToast(msg: "Disease deleted successfully");
+        AppToast.showToast(msg: "Disease deleted successfully");
       } else if (removed != null) {
         // API failed — restore item in list.
         final insertAt = removedIndex.clamp(0, diseases.length);
         diseases.insert(insertAt, removed);
-        Fluttertoast.showToast(msg: "Failed to delete disease");
+        AppToast.showToast(msg: "Failed to delete disease");
       }
     } catch (e) {
       debugPrint("Error deleting disease: $e");
       if (removed != null) {
         final insertAt = removedIndex.clamp(0, diseases.length);
         diseases.insert(insertAt, removed);
-        Fluttertoast.showToast(msg: "Failed to delete disease");
+        AppToast.showToast(msg: "Failed to delete disease");
       }
     }
   }
@@ -984,7 +1040,7 @@ class RecordsController extends GetxController {
 
       if (response != null && response.statusCode == 200) {
         fetchDiseases();
-        Fluttertoast.showToast(msg: "Disease archived successfully");
+        AppToast.showToast(msg: "Disease archived successfully");
       }
     } catch (e) {
       debugPrint("Error archiving disease: $e");
@@ -1010,7 +1066,7 @@ class RecordsController extends GetxController {
       ]);
 
       if (selectedDisease.value == null) {
-        Fluttertoast.showToast(msg: "No disease data available to export");
+        AppToast.showToast(msg: "No disease data available to export");
         return;
       }
 
@@ -1031,7 +1087,7 @@ class RecordsController extends GetxController {
           ));
     } catch (e) {
       debugPrint("Error generating PDF: $e");
-      Fluttertoast.showToast(msg: "Error generating PDF");
+      AppToast.showToast(msg: "Error generating PDF");
     } finally {
       isLoading.value = false;
     }
@@ -1208,5 +1264,320 @@ class RecordsController extends GetxController {
     else if (index == 4) type = "qr";
     
     fetchGlobalTimeline(eventType: type);
+  }
+
+  // ─── Disease appointments ─────────────────────────────────────────────────
+
+  Future<void> fetchDiseaseAppointments(String diseaseUuid) async {
+    try {
+      isAppointmentsLoading.value = true;
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+      var response = await ApiProvider().requestGetForApi(
+        Get.context,
+        WebApiConstant.API_URL_RECORDS_APPOINTMENTS,
+        patientQuery({
+          'disease_uuid': diseaseUuid.trim(),
+          'page': 1,
+          'page_size': 50,
+        }),
+        token ?? "",
+      );
+
+      if (response != null && response.statusCode == 200) {
+        final raw = response.data;
+        if (raw is Map && raw['error'] == true) {
+          AppToast.showToast(
+              msg: _apiMessage(raw, fallback: 'Failed to load appointments'));
+          return;
+        }
+        dynamic payload = raw is Map ? raw['data'] : null;
+        List results = const [];
+        if (payload is Map && payload['results'] is List) {
+          results = payload['results'] as List;
+        } else if (payload is List) {
+          results = payload;
+        }
+        diseaseAppointments.value = DiseaseAppointment.listFrom(results);
+      }
+    } catch (e) {
+      debugPrint("Error fetching appointments: $e");
+    } finally {
+      isAppointmentsLoading.value = false;
+    }
+  }
+
+  Future<bool> scheduleAppointment({
+    required String diseaseUuid,
+    required String date,
+    required String time,
+    String notes = '',
+  }) async {
+    try {
+      isLoading.value = true;
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+      final body = <String, dynamic>{
+        'disease_uuid': diseaseUuid.trim(),
+        'date': date.trim(),
+        'time': time.trim(),
+        if (notes.trim().isNotEmpty) 'notes': notes.trim(),
+      };
+      attachPatientId(body);
+
+      var response = await ApiProvider().requestPostForApi(
+        Get.context,
+        WebApiConstant.API_URL_RECORDS_APPOINTMENTS,
+        body,
+        token ?? "",
+      );
+
+      final raw = response?.data;
+      if (raw is Map && raw['error'] == true) {
+        AppToast.showToast(
+            msg: _apiMessage(raw, fallback: 'Failed to schedule appointment'));
+        return false;
+      }
+      if (response != null &&
+          (response.statusCode == 200 || response.statusCode == 201)) {
+        AppToast.showToast(
+            msg: (raw is Map ? raw['message']?.toString() : null) ??
+                'Appointment scheduled successfully.');
+        await fetchDiseaseAppointments(diseaseUuid);
+        await fetchDiseaseDetail(diseaseUuid);
+        await fetchDiseases();
+        return true;
+      }
+      AppToast.showToast(msg: 'Failed to schedule appointment');
+      return false;
+    } catch (e) {
+      debugPrint("Error scheduling appointment: $e");
+      AppToast.showToast(msg: 'Failed to schedule appointment');
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<AppointmentDetail?> fetchAppointmentDetail(
+      String appointmentUuid) async {
+    try {
+      isAppointmentDetailLoading.value = true;
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+      var response = await ApiProvider().requestGetForApi(
+        Get.context,
+        WebApiConstant.API_URL_RECORDS_APPOINTMENT_DETAIL,
+        patientQuery({'appointment_uuid': appointmentUuid.trim()}),
+        token ?? "",
+      );
+
+      final raw = response?.data;
+      if (response != null && response.statusCode == 404) {
+        AppToast.showToast(
+            msg: _apiMessage(raw, fallback: 'Appointment not found.'));
+        return null;
+      }
+      if (raw is Map && raw['error'] == true) {
+        AppToast.showToast(
+            msg: _apiMessage(raw, fallback: 'Appointment not found.'));
+        return null;
+      }
+      if (response != null && response.statusCode == 200 && raw is Map) {
+        final data = raw['data'];
+        if (data is Map) {
+          final detail =
+              AppointmentDetail.fromJson(Map<String, dynamic>.from(data));
+          selectedAppointment.value = detail;
+          return detail;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint("Error fetching appointment detail: $e");
+      return null;
+    } finally {
+      isAppointmentDetailLoading.value = false;
+    }
+  }
+
+  Future<bool> cancelAppointment({
+    required String appointmentUuid,
+    required String diseaseUuid,
+  }) async {
+    try {
+      isLoading.value = true;
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+      final body = <String, dynamic>{
+        'appointment_uuid': appointmentUuid.trim(),
+      };
+      attachPatientId(body);
+
+      var response = await ApiProvider().requestPostForApi(
+        Get.context,
+        WebApiConstant.API_URL_RECORDS_APPOINTMENT_CANCEL,
+        body,
+        token ?? "",
+      );
+
+      final raw = response?.data;
+      if (raw is Map && raw['error'] == true) {
+        AppToast.showToast(
+            msg: _apiMessage(raw, fallback: 'Failed to cancel appointment'));
+        return false;
+      }
+      if (response != null &&
+          (response.statusCode == 200 || response.statusCode == 201)) {
+        AppToast.showToast(
+            msg: (raw is Map ? raw['message']?.toString() : null) ??
+                'Appointment cancelled successfully.');
+        await fetchDiseaseAppointments(diseaseUuid);
+        await fetchDiseaseDetail(diseaseUuid);
+        await fetchDiseases();
+        if (selectedAppointment.value?.uuid == appointmentUuid) {
+          await fetchAppointmentDetail(appointmentUuid);
+        }
+        return true;
+      }
+      AppToast.showToast(msg: 'Failed to cancel appointment');
+      return false;
+    } catch (e) {
+      debugPrint("Error cancelling appointment: $e");
+      AppToast.showToast(msg: 'Failed to cancel appointment');
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> uploadConsultationRecording({
+    required String appointmentUuid,
+    required String filePath,
+  }) async {
+    try {
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+      final form = dio.FormData.fromMap({
+        'appointment_uuid': appointmentUuid.trim(),
+        'audio': await dio.MultipartFile.fromFile(
+          filePath,
+          filename: filePath.split('/').last,
+        ),
+      });
+      final pid = selectedPatientId.value.trim();
+      if (pid.isNotEmpty) {
+        form.fields.add(MapEntry('patient_id', pid));
+      }
+      final response = await ApiProvider().requestMultipartApi(
+        Get.context,
+        WebApiConstant.API_URL_CONSULTATION_RECORDINGS,
+        form,
+        token ?? '',
+      );
+      final raw = response?.data;
+      if (raw is Map && raw['error'] == true) {
+        AppToast.showToast(
+            msg: _apiMessage(raw, fallback: 'Could not upload recording.'));
+        return null;
+      }
+      if (response != null &&
+          (response.statusCode == 200 || response.statusCode == 201) &&
+          raw is Map) {
+        final data = raw['data'];
+        if (data is Map) return Map<String, dynamic>.from(data);
+      }
+      AppToast.showToast(msg: 'Could not upload recording.');
+      return null;
+    } catch (e) {
+      debugPrint('Error uploading consultation recording: $e');
+      AppToast.showToast(msg: 'Could not upload recording.');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchConsultationTranscript(
+      String recordingUuid) async {
+    try {
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+      final response = await ApiProvider().requestGetForApi(
+        Get.context,
+        WebApiConstant.API_URL_CONSULTATION_TRANSCRIPT,
+        {'recording_uuid': recordingUuid.trim()},
+        token ?? '',
+        timeout: const Duration(seconds: 8),
+      );
+      final raw = response?.data;
+      if (raw is Map && raw['error'] != true && raw['data'] is Map) {
+        return Map<String, dynamic>.from(raw['data'] as Map);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching transcript: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> pollConsultationTranscript(
+      String recordingUuid) async {
+    Map<String, dynamic>? last;
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    for (var i = 0; i < 20; i++) {
+      if (i > 0) await Future.delayed(const Duration(seconds: 1));
+      last = await fetchConsultationTranscript(recordingUuid);
+      if (last == null) continue;
+      final status = (last['status'] ?? '').toString().toLowerCase();
+      final text = (last['formatted_transcript'] ??
+              last['transcript'] ??
+              last['raw_transcript'] ??
+              '')
+          .toString()
+          .trim();
+      if (status == 'completed' ||
+          status == 'failed' ||
+          status == 'error' ||
+          text.isNotEmpty) {
+        return last;
+      }
+    }
+    return last;
+  }
+
+  Future<List<Map<String, dynamic>>> fetchConsultationRecordings(
+      String appointmentUuid) async {
+    try {
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+      final q = patientQuery({'appointment_uuid': appointmentUuid.trim()});
+      final response = await ApiProvider().requestGetForApi(
+        Get.context,
+        WebApiConstant.API_URL_CONSULTATION_RECORDINGS,
+        q,
+        token ?? '',
+      );
+      final raw = response?.data;
+      if (raw is! Map || raw['error'] == true) return [];
+      final data = raw['data'];
+      if (data is List) {
+        return data
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+      if (data is Map) {
+        final results = data['results'];
+        if (results is List) {
+          return results
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error listing consultation recordings: $e');
+      return [];
+    }
   }
 }

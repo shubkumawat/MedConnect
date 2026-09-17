@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../core/widgets/powered_by_aira.dart';
+import '../../../core/widgets/healora_logo.dart';
+import '../../../core/Util/app_toast.dart';
 import '../controllers/qr_controller.dart';
 
 class QrScreen extends StatelessWidget {
@@ -66,6 +68,8 @@ class QrScreen extends StatelessWidget {
               initials: controller.initials ?? _initialsFromName(patientName),
               displayId: qr?.displayId,
               onBack: () => Get.back(),
+              onShare: expired ? null : () => controller.shareQr(),
+              sharing: controller.isSharing.value,
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -89,6 +93,19 @@ class QrScreen extends StatelessWidget {
                       expiresAt: controller.expiresAtLabel,
                     ),
                     const SizedBox(height: 14),
+                    _ActionBtn(
+                      label: 'Share QR',
+                      icon: Icons.share_rounded,
+                      filled: true,
+                      loading: controller.isSharing.value,
+                      onTap: expired
+                          ? () => AppToast.showToast(
+                                msg:
+                                    'This QR has expired. Generate a new one to share.',
+                              )
+                          : () => controller.shareQr(),
+                    ),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
@@ -188,6 +205,8 @@ class _QrHeader extends StatelessWidget {
   final String initials;
   final String? displayId;
   final VoidCallback onBack;
+  final VoidCallback? onShare;
+  final bool sharing;
 
   const _QrHeader({
     required this.topPad,
@@ -196,6 +215,8 @@ class _QrHeader extends StatelessWidget {
     required this.initials,
     required this.displayId,
     required this.onBack,
+    this.onShare,
+    this.sharing = false,
   });
 
   @override
@@ -231,19 +252,7 @@ class _QrHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                width: 40,
-                height: 40,
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Image.asset(
-                  'assets/logo/ic_logo_icon.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
+              const HealoraLogo.chip(),
               const SizedBox(width: 12),
               const Expanded(
                 child: Column(
@@ -284,6 +293,29 @@ class _QrHeader extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Material(
+                color: Colors.white.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: sharing ? null : onShare,
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: sharing
+                        ? const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.share_rounded,
+                            color: Colors.white, size: 20),
                   ),
                 ),
               ),

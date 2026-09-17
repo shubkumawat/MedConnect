@@ -1,12 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../theme/app_colors.dart';
+import 'app_toast.dart';
 
 /// Requests camera / gallery permission, then opens the picker.
 class ImagePickHelper {
@@ -61,55 +61,46 @@ class ImagePickHelper {
         source == ImageSource.camera ? 'Camera' : 'Photos',
       );
     } else {
-      Fluttertoast.showToast(msg: 'Could not pick image');
+      AppToast.showToast(msg: 'Could not pick image');
     }
   }
 
   static Permission _permissionFor(ImageSource source) {
     if (source == ImageSource.camera) return Permission.camera;
+    if (Platform.isAndroid) return Permission.photos;
     return Permission.photos;
   }
 
   static Future<bool> _ensurePermission(ImageSource source) async {
-    // Android system photo picker often works without a runtime grant,
-    // but camera always needs an explicit permission.
     final permission = _permissionFor(source);
+    final kind = source == ImageSource.camera ? 'Camera' : 'Photos';
     var status = await permission.status;
 
+    // "While using the app" / Allow — already saved, do not prompt again.
     if (status.isGranted || status.isLimited) return true;
 
-    if (status.isDenied) {
-      status = await permission.request();
-      if (status.isGranted || status.isLimited) return true;
-    }
-
-    // Gallery on Android: still try the system picker if storage/photos
-    // isn't strictly granted (Photo Picker doesn't always need it).
-    if (source == ImageSource.gallery && Platform.isAndroid) {
-      if (!status.isPermanentlyDenied && !status.isRestricted) {
-        return true;
-      }
-    }
-
-    if (status.isPermanentlyDenied || status.isDenied || status.isRestricted) {
-      await _showOpenSettingsDialog(
-        source == ImageSource.camera ? 'Camera' : 'Photos',
-      );
+    if (status.isPermanentlyDenied || status.isRestricted) {
+      await _showOpenSettingsDialog(kind);
       return false;
     }
 
-    Fluttertoast.showToast(
-      msg: source == ImageSource.camera
-          ? 'Camera permission is required'
-          : 'Photos permission is required',
-    );
+    // Denied, or Android "Only this time" expired — ask again.
+    status = await permission.request();
+    if (status.isGranted || status.isLimited) return true;
+
+    if (status.isPermanentlyDenied) {
+      await _showOpenSettingsDialog(kind);
+      return false;
+    }
+
+    AppToast.showToast(msg: '$kind permission is required');
     return false;
   }
 
   static Future<void> _showOpenSettingsDialog(String kind) async {
     final ctx = Get.context;
     if (ctx == null) {
-      Fluttertoast.showToast(
+      AppToast.showToast(
         msg: '$kind access denied. Enable it in Settings.',
       );
       return;

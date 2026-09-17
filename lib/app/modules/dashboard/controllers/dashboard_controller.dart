@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import '../../find/controllers/find_controller.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../records/controllers/records_controller.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 class DashboardController extends GetxController {
   var currentIndex = 0.obs;
@@ -16,11 +17,21 @@ class DashboardController extends GetxController {
     if (index == 1 && Get.isRegistered<RecordsController>()) {
       final records = Get.find<RecordsController>();
       records.syncSelectedPatientFromHome().then((_) async {
-        // Prefer live Home selection (scroll) over any stale state.
         if (Get.isRegistered<HomeController>()) {
           final home = Get.find<HomeController>();
-          final p = home.selectedPatient;
-          if (p != null) {
+          var p = home.selectedPatient;
+          if (p != null && p.recordsLocked) {
+            AppToast.showToast(
+              msg: p.needsLoginAccess
+                  ? '${p.fullName ?? 'This member'} is 18 or older. Give them login access so they can grant you permission.'
+                  : 'Waiting for permission to open this adult’s health records.',
+            );
+            p = home.patients.firstWhereOrNull((m) => m.isSelf) ??
+                home.patients.firstWhereOrNull((m) => !m.recordsLocked);
+            if (p != null) {
+              records.applySelectedMember(p);
+            }
+          } else if (p != null) {
             records.applySelectedMember(p);
           }
         }

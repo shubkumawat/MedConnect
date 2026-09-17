@@ -9,10 +9,11 @@
         android:maxSdkVersion="32" />
     <!-- Required on Android 13+ to show FCM/local notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
-        android:label="HealAura"
+        android:label="Healora"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

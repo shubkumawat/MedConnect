@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/healora_logo.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../core/Util/display_value.dart';
 import '../../../data/models/family_member_model.dart';
@@ -13,6 +14,7 @@ import '../../family/views/add_family_member_screen.dart';
 import '../controllers/home_controller.dart';
 import 'bmi_calculator_screen.dart';
 import 'health_tips_screen.dart';
+import '../controllers/health_tips_controller.dart';
 import 'notifications_screen.dart';
 import 'qr_view.dart';
 import 'video_series_screen.dart';
@@ -222,26 +224,7 @@ class _TopBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(20, topPad + 10, 16, 8),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(13),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.teal.withValues(alpha: 0.12),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Image.asset(
-              'assets/logo/ic_logo_icon.png',
-              fit: BoxFit.contain,
-            ),
-          ),
+          const HealoraLogo.chip(elevated: true),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -260,7 +243,7 @@ class _TopBar extends StatelessWidget {
                   final name =
                       controller.selectedPatient?.fullName?.trim() ?? '';
                   return Text(
-                    name.isNotEmpty ? name : 'HealAura',
+                    name.isNotEmpty ? name : 'Healora',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.heading3.copyWith(
@@ -1583,20 +1566,27 @@ class _HealthTipsStrip extends StatelessWidget {
         const SizedBox(height: 14),
         SizedBox(
           height: 168,
-          child: ListView.separated(
+          child: Obx(() {
+            final ctrl = Get.isRegistered<HealthTipsController>()
+                ? Get.find<HealthTipsController>()
+                : Get.put(HealthTipsController());
+            final list =
+                ctrl.tips.isNotEmpty ? ctrl.tips.toList() : kHealthTips;
+            return ListView.separated(
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.none,
             padding: const EdgeInsets.only(right: 4, bottom: 4),
-            itemCount: kHealthTips.length,
+            itemCount: list.length,
             separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (context, i) {
               return _HealthTipCard(
-                tip: kHealthTips[i],
+                tip: list[i],
                 index: i + 1,
                 onTap: () => Get.to(() => const HealthTipsScreen()),
               );
             },
-          ),
+          );
+          }),
         ),
       ],
     );

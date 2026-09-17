@@ -1,7 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:healaura/DataProvider/web_api_constant.dart';
 import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
@@ -15,6 +14,7 @@ import '../../../core/widgets/live_text_field.dart';
 import '../../../core/widgets/otp_input_row.dart';
 import '../../../core/widgets/powered_by_aira.dart';
 import '../controllers/login_controller.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -146,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Center(
       child: Image.asset(
         'assets/logo/ic_logo_full.png',
-        height: 96,
+        height: 118,
         fit: BoxFit.contain,
       ),
     );
@@ -336,7 +336,8 @@ class _PhoneStepState extends State<_PhoneStep> {
               Obx(() {
                 final loading = controller.isCountryLoading.value &&
                     controller.countryList.isEmpty;
-                final selected = controller.selectedCountry.value;
+                final selected = controller.selectedCountry.value ??
+                    CountryModel.indiaFallback;
                 return InkWell(
                   borderRadius: const BorderRadius.horizontal(
                       left: Radius.circular(12)),
@@ -348,7 +349,7 @@ class _PhoneStepState extends State<_PhoneStep> {
                           }
                           if (!context.mounted) return;
                           if (controller.countryList.isEmpty) {
-                            Fluttertoast.showToast(
+                            AppToast.showToast(
                                 msg: 'Could not load countries. Try again.');
                             return;
                           }
@@ -374,22 +375,11 @@ class _PhoneStepState extends State<_PhoneStep> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 14),
-                    child: loading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.teal,
-                            ),
-                          )
-                        : Row(
+                    child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                selected != null
-                                    ? '${selected.flagEmoji} ${selected.phoneCode}'
-                                    : '🌐',
+                                '${selected.flagEmoji} ${selected.phoneCode}',
                                 style: const TextStyle(
                                   fontSize: 15,
                                   color: AppColors.textDark,

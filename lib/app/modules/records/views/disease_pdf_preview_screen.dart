@@ -11,6 +11,7 @@ import 'package:healaura/app/data/models/medical_record_model.dart';
 import 'package:healaura/app/modules/profile/controllers/profile_controller.dart';
 import 'package:healaura/app/core/theme/app_colors.dart';
 import 'package:healaura/app/core/theme/app_text_theme.dart';
+import 'package:healaura/app/core/widgets/healora_logo.dart';
 
 class DiseasePdfPreviewScreen extends StatefulWidget {
   final DiseaseResult disease;
@@ -126,7 +127,7 @@ class _DiseasePdfPreviewScreenState extends State<DiseasePdfPreviewScreen> {
       if (bytes == null) throw 'Capture failed';
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'HealAura_Medical_Report_$_reportId.pdf',
+        filename: 'Healora_Medical_Report_$_reportId.pdf',
       );
     } catch (e) {
       Get.snackbar(
@@ -351,19 +352,7 @@ class _Header extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                width: 40,
-                height: 40,
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Image.asset(
-                  'assets/logo/ic_logo_icon.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
+              const HealoraLogo.chip(),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -522,26 +511,14 @@ class _ReportDocument extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Image.asset(
-                    'assets/logo/ic_logo_icon.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
+                const HealoraLogo.chip(),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'HealAura',
+                        'Healora',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
@@ -755,7 +732,7 @@ class _ReportDocument extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Generated securely by HealAura',
+                        'Generated securely by Healora',
                         style: AppTextStyles.caption.copyWith(
                           fontSize: 10,
                           color: AppColors.textGray,

@@ -28,4 +28,30 @@ phoneCode: json['phone_code']?.toString() ?? '',
 flagEmoji: json['flag_emoji']?.toString() ?? '',
 );
 }
+
+bool get isIndia {
+  final n = name.trim().toLowerCase();
+  final code = phoneCode.replaceAll(RegExp(r'[^0-9]'), '');
+  return n == 'india' ||
+      iso2.trim().toUpperCase() == 'IN' ||
+      iso3.trim().toUpperCase() == 'IND' ||
+      code == '91';
+}
+
+static CountryModel get indiaFallback => CountryModel(
+      id: 0,
+      countryId: '',
+      name: 'India',
+      iso2: 'IN',
+      iso3: 'IND',
+      phoneCode: '91',
+      flagEmoji: '🇮🇳',
+    );
+
+static CountryModel indiaFrom(Iterable<CountryModel> list) {
+  for (final c in list) {
+    if (c.isIndia) return c;
+  }
+  return indiaFallback;
+}
 }

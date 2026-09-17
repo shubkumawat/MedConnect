@@ -1,3 +1,5 @@
+import 'appointment_model.dart';
+
 class DiseaseResponseModel {
   bool? error;
   int? errorCode;
@@ -78,6 +80,9 @@ class DiseaseResult {
   String? aiInsights;
   int? medicationsCount;
   int? documentsCount;
+  int? appointmentsCount;
+  DiseaseAppointment? nextAppointment;
+  List<DiseaseAppointment>? appointments;
 
   DiseaseResult(
       {this.uuid,
@@ -102,7 +107,10 @@ class DiseaseResult {
       this.category,
       this.aiInsights,
       this.medicationsCount,
-      this.documentsCount});
+      this.documentsCount,
+      this.appointmentsCount,
+      this.nextAppointment,
+      this.appointments});
 
   DiseaseResult.fromJson(Map<String, dynamic> json) {
     uuid = json['uuid'];
@@ -130,5 +138,20 @@ class DiseaseResult {
     aiInsights = json['ai_insights'];
     medicationsCount = json['medications_count'];
     documentsCount = json['documents_count'];
+    appointmentsCount = json['appointments_count'];
+    final counts = json['counts'];
+    if (appointmentsCount == null && counts is Map) {
+      final raw = counts['appointments'];
+      if (raw is int) {
+        appointmentsCount = raw;
+      } else if (raw != null) {
+        appointmentsCount = int.tryParse(raw.toString());
+      }
+    }
+    nextAppointment = DiseaseAppointment.tryParse(json['next_appointment']);
+    appointments = DiseaseAppointment.listFrom(json['appointments']);
+    if (appointmentsCount == null && appointments != null) {
+      appointmentsCount = appointments!.length;
+    }
   }
 }

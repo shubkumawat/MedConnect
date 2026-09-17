@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/widgets/healora_logo.dart';
 import '../../../data/models/family_member_model.dart';
 import '../../home/controllers/home_controller.dart';
 import '../controllers/family_member_controller.dart';
@@ -208,19 +209,7 @@ class _Header extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Image.asset(
-                  'assets/logo/ic_logo_icon.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
+              const HealoraLogo.chip(),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -571,13 +560,7 @@ class _AccessChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final has = member.hasAccess;
-    final color = member.fullAccess == true
-        ? AppColors.tealDark
-        : member.emergencyOnly == true
-            ? AppColors.orange
-            : has
-                ? AppColors.accentBlue
-                : AppColors.textGray;
+    final color = has ? AppColors.tealDark : AppColors.textGray;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(

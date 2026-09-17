@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
@@ -11,6 +10,8 @@ import '../../../core/theme/app_text_theme.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../controllers/profile_controller.dart';
 import 'widgets/profile_form_shell.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
+import '../../../core/Util/CustomLoading/custom_loading.dart';
 
 class EmergencyInfoScreen extends StatefulWidget {
   final bool isFromLogin;
@@ -32,6 +33,7 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      CustomLoading().forceHide();
       if (controller.relationList.isEmpty) {
         controller.getMasterRelationAPI(context);
       }
@@ -68,13 +70,13 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
             ProfilePrimaryButton(
               text: widget.isFromLogin ? 'Complete setup' : 'Save',
               color: AppColors.tealDark,
-              isLoading: controller.isLoading.value,
+              isLoading: controller.isSaving.value,
               onTap: _onComplete,
             ),
             if (widget.isFromLogin) ...[
               const SizedBox(height: 10),
               TextButton(
-                onPressed: controller.isLoading.value ? null : _goToDashboard,
+                onPressed: controller.isSaving.value ? null : _goToDashboard,
                 child: Text(
                   'Skip for now',
                   style: AppTextStyles.body.copyWith(
@@ -271,30 +273,36 @@ class _EmergencyInfoScreenState extends State<EmergencyInfoScreen> {
     final nameErr =
         TxtValidation.personNameError(controller.emergencyNameCtrl.text);
     if (nameErr != null) {
-      Fluttertoast.showToast(msg: nameErr);
+      AppToast.showToast(msg: nameErr);
       return;
     }
     if (controller.selectedEmergencyRelationModel.value == null &&
         controller.emergencyRelation.value.isEmpty) {
-      Fluttertoast.showToast(msg: 'Please select relationship');
+      AppToast.showToast(msg: 'Please select relationship');
       return;
     }
     final mobileErr =
         TxtValidation.mobileError(controller.emergencyMobileCtrl.text);
     if (mobileErr != null) {
-      Fluttertoast.showToast(msg: mobileErr);
+      AppToast.showToast(msg: mobileErr);
       return;
     }
     if (controller.cityCtrl.text.trim().isEmpty) {
-      Fluttertoast.showToast(msg: 'Please enter city');
+      AppToast.showToast(msg: 'Please enter city');
       return;
     }
     if (controller.selectedState.value.isEmpty) {
-      Fluttertoast.showToast(msg: 'Please select state');
+      AppToast.showToast(msg: 'Please select state');
       return;
     }
     controller.updateEmergencyAPI(context, () {
-      _goToDashboard();
+      if (widget.isFromLogin) {
+        _goToDashboard();
+      } else if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        _goToDashboard();
+      }
     });
   }
 }

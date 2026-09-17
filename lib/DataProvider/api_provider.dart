@@ -1,17 +1,18 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 
 import 'package:healaura/app/core/Util/CustomLoading/custom_loading.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
 import '../app/data/models/disease_response_model.dart';
 import 'web_api_constant.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 
 
 
 class ApiProvider {
   Dio _dio = new Dio();
+  static const Duration _timeout = Duration(seconds: 90);
 
   Map<String, String> headers = {
     "Content-type": "application/json",
@@ -35,13 +36,13 @@ class ApiProvider {
   //     }catch(e){
   //       CustomLoading().hide(context);
   //       PrintLog.printLog("Exception..........$e.........");
-  //       Fluttertoast.showToast(msg: "Something went wrong");
+  //       AppToast.showToast(msg: "Something went wrong");
   //       return result;
   //     }
   //   }else{
   //     CustomLoading().hide(context);
   //     // Navigator.pushNamed(context, networkErrorScreenRoute);
-  //     // Fluttertoast.showToast( msg: 'Please check network connection and try again !');
+  //     // AppToast.showToast( msg: 'Please check network connection and try again !');
   //   }
   //   return null;
   // }
@@ -75,7 +76,7 @@ class ApiProvider {
     }catch(e){
       CustomLoading().hide(context);
       PrintLog.printLog("Exception..........$e.........");
-      Fluttertoast.showToast(msg: "Something went wrong");
+      AppToast.showToast(msg: "Something went wrong");
       return result;
     }
 
@@ -107,7 +108,7 @@ class ApiProvider {
     }catch(e){
       CustomLoading().hide(context);
       PrintLog.printLog("Exception..........$e.........");
-      Fluttertoast.showToast(msg: "Something went wrong");
+      AppToast.showToast(msg: "Something went wrong");
       return result;
     }
 
@@ -183,7 +184,6 @@ class ApiProvider {
   Future<Map<String, dynamic>?> getPatientProfileAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
     Map<String, dynamic>? result;
     try {
-      CustomLoading().show(context);
       final Response? response = await requestGetForApi(context, url, dictParameter, token);
 
       if (response != null && (response.statusCode == 200 || response.statusCode == 201)) {
@@ -196,10 +196,8 @@ class ApiProvider {
           } catch (_) {}
         }
       }
-      CustomLoading().hide(context);
       return result;
     } catch (e) {
-      CustomLoading().hide(context);
       PrintLog.printLog("Exception getPatientProfileAPI..........$e.........");
       return result;
     }
@@ -222,7 +220,7 @@ class ApiProvider {
     } catch (e) {
       CustomLoading().hide(context);
       PrintLog.printLog("Exception updateFamilyMemberAPI: $e");
-      Fluttertoast.showToast(msg: "Something went wrong");
+      AppToast.showToast(msg: "Something went wrong");
       return result;
     }
   }
@@ -241,7 +239,7 @@ class ApiProvider {
     } catch (e) {
       CustomLoading().hide(context);
       PrintLog.printLog("Exception addFamilyMemberMultipartAPI: $e");
-      Fluttertoast.showToast(msg: "Something went wrong");
+      AppToast.showToast(msg: "Something went wrong");
       return result;
     }
   }
@@ -266,29 +264,20 @@ class ApiProvider {
 
     Future<Map<String, dynamic>?> updateMedicalApi(context, String url, Map<String, dynamic> dictParameter, String token) async {
     Map<String, dynamic>? result;
-    // if(await ConnectionValidator().check()){
       try{
-       CustomLoading().show(context);
         final Response? response = await requestPostForApi(context, url, dictParameter, token);
 
-        if(response != null && response.statusCode == 200){
+        if(response != null &&
+            (response.statusCode == 200 || response.statusCode == 201) &&
+            response.data is Map){
           result = Map<String, dynamic>.from(response.data);
         }
-       CustomLoading().hide(context);
         return result;
       }catch(e){
-        CustomLoading().hide(context);
         PrintLog.printLog("Exception..........$e.........");
-        Fluttertoast.showToast(msg: "Something went wrong");
+        AppToast.showToast(msg: "Something went wrong");
         return result;
       }
-    //}
-    // else{
-    //  CustomLoading().hide(context);
-    //   // Navigator.pushNamed(context, networkErrorScreenRoute);
-    //   Fluttertoast.showToast( msg: 'Please check network connection and try again !');
-    // }
-    return null;
   }
 
   // Future<Map<String, dynamic>?> getFamilyMemberListAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
@@ -311,29 +300,20 @@ class ApiProvider {
 
     Future<Map<String, dynamic>?> updateEmergencyAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
     Map<String, dynamic>? result;
-    // if(await ConnectionValidator().check()){
       try{
-       CustomLoading().show(context);
         final Response? response = await requestPostForApi(context, url, dictParameter, token);
 
-        if(response != null && response.statusCode == 200){
+        if(response != null &&
+            (response.statusCode == 200 || response.statusCode == 201) &&
+            response.data is Map){
           result = Map<String, dynamic>.from(response.data);
         }
-       CustomLoading().hide(context);
         return result;
       }catch(e){
-        CustomLoading().hide(context);
         PrintLog.printLog("Exception..........$e.........");
-        Fluttertoast.showToast(msg: "Something went wrong");
+        AppToast.showToast(msg: "Something went wrong");
         return result;
       }
-    //}
-    // else{
-    //  CustomLoading().hide(context);
-    //   // Navigator.pushNamed(context, networkErrorScreenRoute);
-    //   Fluttertoast.showToast( msg: 'Please check network connection and try again !');
-    // }
-    return null;
   }
 
   // Future<Map<String, dynamic>?> getFamilyMemberListAPI(context, String url, Map<String, dynamic> dictParameter, String token) async {
@@ -369,14 +349,14 @@ class ApiProvider {
       }catch(e){
         CustomLoading().hide(context);
         PrintLog.printLog("Exception..........$e.........");
-        Fluttertoast.showToast(msg: "Something went wrong");
+        AppToast.showToast(msg: "Something went wrong");
         return result;
       }
     //}
     // else{
     //  CustomLoading().hide(context);
     //   // Navigator.pushNamed(context, networkErrorScreenRoute);
-    //   Fluttertoast.showToast( msg: 'Please check network connection and try again !');
+    //   AppToast.showToast( msg: 'Please check network connection and try again !');
     // }
     return null;
   }
@@ -451,14 +431,14 @@ class ApiProvider {
       }catch(e){
         CustomLoading().hide(context);
         PrintLog.printLog("Exception..........$e.........");
-        Fluttertoast.showToast(msg: "Something went wrong");
+        AppToast.showToast(msg: "Something went wrong");
         return result;
       }
     //}
     // else{
     //  CustomLoading().hide(context);
     //   // Navigator.pushNamed(context, networkErrorScreenRoute);
-    //   Fluttertoast.showToast( msg: 'Please check network connection and try again !');
+    //   AppToast.showToast( msg: 'Please check network connection and try again !');
     // }
     return null;
   }
@@ -568,7 +548,7 @@ class ApiProvider {
   //   }catch(e){
   //     CustomLoading().hide(context);
   //     PrintLog.printLog("Exception..........$e.........");
-  //     Fluttertoast.showToast(msg: "Something went wrong");
+  //     AppToast.showToast(msg: "Something went wrong");
   //     return result;
   //
   //     return null;
@@ -588,7 +568,7 @@ class ApiProvider {
   //     return result;
   //   }catch(e) {
   //     PrintLog.printLog("Exception..........$e.........");
-  //     Fluttertoast.showToast(msg: "Something went wrong");
+  //     AppToast.showToast(msg: "Something went wrong");
   //     return result;
   //   }
   // }
@@ -608,7 +588,7 @@ class ApiProvider {
   //     }catch(e){
   //       CustomLoading().hide(context);
   //       PrintLog.printLog("Exception..........$e.........");
-  //       Fluttertoast.showToast(msg: "Something went wrong");
+  //       AppToast.showToast(msg: "Something went wrong");
   //       return result;
   //     }
   // }
@@ -630,14 +610,14 @@ class ApiProvider {
   //     }catch(e){
   //       CustomLoading().hide(context);
   //       PrintLog.printLog("Exception..........$e.........");
-  //       Fluttertoast.showToast(msg: "Something went wrong");
+  //       AppToast.showToast(msg: "Something went wrong");
   //       return result;
   //     }
   //  // }
   //   // else{
   //   //   CustomLoading().hide(context);
   //   //   // Navigator.pushNamed(context, networkErrorScreenRoute);
-  //   //   // Fluttertoast.showToast( msg: 'Please check network connection and try again !');
+  //   //   // AppToast.showToast( msg: 'Please check network connection and try again !');
   //   // }
   //   return null;
   // }
@@ -921,7 +901,7 @@ class ApiProvider {
     }
   }
 
-  Future<Response?> requestGetForApi(context, String url, Map<String, dynamic> dictParameter,String token) async {
+  Future<Response?> requestGetForApi(context, String url, Map<String, dynamic> dictParameter,String token, {Duration? timeout}) async {
     try {
       Map<String, String> headers = {
         "Content-type": "application/json",
@@ -936,10 +916,12 @@ class ApiProvider {
       PrintLog.printLog("Token:  $token");
       PrintLog.printLog("DictParameter: $dictParameter");
 
+      final t = timeout ?? _timeout;
       BaseOptions options = BaseOptions(
           baseUrl: WebApiConstant.BASE_URL,
-          receiveTimeout: Duration(seconds: 30),
-          connectTimeout: Duration(seconds: 30),
+          receiveTimeout: t,
+          connectTimeout: t,
+          sendTimeout: t,
           headers: headers);
 
       _dio.options = options;
@@ -954,6 +936,7 @@ class ApiProvider {
       );
       
       PrintLog.printLog("Response Status Code: ${response.statusCode}");
+      PrintLog.printLog("Response: ${response.data}");
       
       Map<String, dynamic>? result;
       if (response.data is Map) {
@@ -997,8 +980,9 @@ class ApiProvider {
 
       // Create a new Dio instance without baseUrl for this request
       Dio dio = Dio(BaseOptions(
-          receiveTimeout: Duration(seconds: 30),
-          connectTimeout: Duration(seconds: 30),
+          receiveTimeout: _timeout,
+          connectTimeout: _timeout,
+          sendTimeout: _timeout,
           headers: headers));
 
       dictParameter['demo'] = true;
@@ -1052,8 +1036,9 @@ class ApiProvider {
 
       BaseOptions options = BaseOptions(
           baseUrl: WebApiConstant.BASE_URL,
-          receiveTimeout: Duration(seconds: 30),
-          connectTimeout: Duration(seconds: 30),
+          receiveTimeout: _timeout,
+          connectTimeout: _timeout,
+          sendTimeout: _timeout,
           headers: headers);
       _dio.options = options;
       Response response = await _dio.post(url.contains('?') ? "$url&demo=true" : "$url?demo=true", data: dictParameter, options: Options(
@@ -1114,8 +1099,9 @@ class ApiProvider {
 
       BaseOptions options = BaseOptions(
           baseUrl: WebApiConstant.BASE_URL,
-          receiveTimeout: Duration(seconds: 30),
-          connectTimeout: Duration(seconds: 30),
+          receiveTimeout: _timeout,
+          connectTimeout: _timeout,
+          sendTimeout: _timeout,
           headers: headers);
 
       _dio.options = options;
@@ -1149,8 +1135,9 @@ class ApiProvider {
 
       BaseOptions options = BaseOptions(
           baseUrl: WebApiConstant.BASE_URL,
-          receiveTimeout: Duration(seconds: 30),
-          connectTimeout: Duration(seconds: 30),
+          receiveTimeout: _timeout,
+          connectTimeout: _timeout,
+          sendTimeout: _timeout,
           headers: headers);
       _dio.options = options;
 
@@ -1186,8 +1173,9 @@ class ApiProvider {
 
       BaseOptions options = BaseOptions(
           baseUrl: WebApiConstant.BASE_URL,
-          receiveTimeout: Duration(seconds: 30),
-          connectTimeout: Duration(seconds: 30),
+          receiveTimeout: _timeout,
+          connectTimeout: _timeout,
+          sendTimeout: _timeout,
           headers: headers);
       _dio.options = options;
 

@@ -52,6 +52,11 @@ class Hospital {
   final int totalReviews;
   final String? latitude;
   final String? longitude;
+  /// Optional tags from API for smarter client filters.
+  final List<String> specializationTags;
+  final List<String> consultationTypes;
+  final String? genderPreference;
+  final List<String> languages;
 
   Hospital({
     required this.hospitalId,
@@ -69,6 +74,10 @@ class Hospital {
     required this.totalReviews,
     this.latitude,
     this.longitude,
+    this.specializationTags = const [],
+    this.consultationTypes = const [],
+    this.genderPreference,
+    this.languages = const [],
   });
 
   factory Hospital.fromJson(Map<String, dynamic> json) {
@@ -88,7 +97,42 @@ class Hospital {
       totalReviews: json['total_reviews'] ?? 0,
       latitude: json['latitude']?.toString(),
       longitude: json['longitude']?.toString(),
+      specializationTags: _stringList(
+        json['specializations'] ??
+            json['specialization_tags'] ??
+            json['departments'],
+      ),
+      consultationTypes: _stringList(
+        json['consultation_types'] ??
+            json['consultation_type'] ??
+            json['modes'],
+      ),
+      genderPreference: json['gender_preference']?.toString() ??
+          json['doctor_gender']?.toString(),
+      languages: _stringList(json['languages'] ?? json['language']),
     );
+  }
+
+  static List<String> _stringList(dynamic raw) {
+    if (raw == null) return const [];
+    if (raw is String) {
+      final s = raw.trim();
+      if (s.isEmpty) return const [];
+      return s.split(RegExp(r'[,|/]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
+    if (raw is List) {
+      return raw
+          .map((e) {
+            if (e is Map) {
+              return (e['name'] ?? e['label'] ?? e['title'] ?? '').toString();
+            }
+            return e.toString();
+          })
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    return const [];
   }
 }
 

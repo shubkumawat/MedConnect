@@ -1,5 +1,5 @@
 name: healaura
-description: "HealAura — family health companion."
+description: "Healora — family health companion."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -90,6 +90,8 @@ dependencies:
   google_mlkit_text_recognition: ^0.16.0
   # 13.x pulls permission_handler_android 14 (needs AGP 9 / built-in Kotlin)
   permission_handler: 12.0.1
+  audioplayers: ^6.5.0
+  record: ^6.0.0
   firebase_analytics: ^11.6.0
 
 

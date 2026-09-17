@@ -1,3 +1,3 @@
-# HealAura
+# Healora
 
 Family health companion app.

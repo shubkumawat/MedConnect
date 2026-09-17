@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
@@ -12,6 +11,7 @@ import '../../../core/theme/app_text_theme.dart';
 import 'medical_info_view.dart';
 import '../controllers/profile_controller.dart';
 import 'widgets/profile_form_shell.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
   final bool isFromLogin;
@@ -113,7 +113,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         bottomBar: Obx(
           () => ProfilePrimaryButton(
             text: widget.isFromLogin ? 'Save & continue' : 'Continue to medical',
-            isLoading: controller.isLoading.value,
+            isLoading: controller.isSaving.value,
             onTap: _onContinue,
           ),
         ),
@@ -287,18 +287,15 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               ),
               const SizedBox(height: 18),
               Obx(() {
-                if (controller.isCountryLoading.value) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(12),
-                      child: CircularProgressIndicator(color: AppColors.teal),
-                    ),
-                  );
-                }
+                final selected = controller.selectedCountry.value ??
+                    CountryModel.indiaFallback;
+                final items = controller.countryList.isEmpty
+                    ? <CountryModel>[selected]
+                    : controller.countryList.toList();
                 return McDropdown<CountryModel>(
                   hint: 'Nationality',
-                  value: controller.selectedCountry.value,
-                  items: controller.countryList,
+                  value: selected,
+                  items: items,
                   selectedItemBuilder: (c) => Text(
                     '${c.flagEmoji}  ${c.name}',
                     style:
@@ -321,20 +318,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   void _onContinue() {
     final nameErr = TxtValidation.personNameError(controller.fullNameCtrl.text);
     if (nameErr != null) {
-      Fluttertoast.showToast(msg: nameErr);
+      AppToast.showToast(msg: nameErr);
       return;
     }
     final emailErr = TxtValidation.emailError(controller.emailCtrl.text);
     if (emailErr != null) {
-      Fluttertoast.showToast(msg: emailErr);
+      AppToast.showToast(msg: emailErr);
       return;
     }
     if (controller.selectedDob.value == null) {
-      Fluttertoast.showToast(msg: 'Please select date of birth');
+      AppToast.showToast(msg: 'Please select date of birth');
       return;
     }
     if (controller.selectedGender.value.isEmpty) {
-      Fluttertoast.showToast(msg: 'Please select gender');
+      AppToast.showToast(msg: 'Please select gender');
       return;
     }
     controller.updateProfileAPI(

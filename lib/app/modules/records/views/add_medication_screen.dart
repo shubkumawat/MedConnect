@@ -2,15 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
 import 'package:healaura/app/data/models/medical_record_model.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/widgets/healora_logo.dart';
 import '../controllers/records_controller.dart';
 import '../services/medication_ocr_service.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 class AddMedicationScreen extends StatefulWidget {
   final String? diseaseUuid;
@@ -20,6 +21,7 @@ class AddMedicationScreen extends StatefulWidget {
   /// When true (or diseaseUuid is null): Current Medication flow.
   /// When false with diseaseUuid: Disease Medication flow.
   final bool isCurrentMedication;
+  final String? appointmentUuid;
 
   const AddMedicationScreen({
     super.key,
@@ -27,6 +29,7 @@ class AddMedicationScreen extends StatefulWidget {
     this.medication,
     this.initialData,
     this.isCurrentMedication = false,
+    this.appointmentUuid,
   });
 
   @override
@@ -712,33 +715,33 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
   Future<void> _save() async {
     if (_medNameCtrl.text.trim().isEmpty) {
-      Fluttertoast.showToast(msg: 'Please enter a medication name.');
+      AppToast.showToast(msg: 'Please enter a medication name.');
       return;
     }
     if (_dosageForm == null || _dosageForm!.isEmpty) {
-      Fluttertoast.showToast(msg: 'Please select dosage form.');
+      AppToast.showToast(msg: 'Please select dosage form.');
       return;
     }
     if (_frequency == null) {
-      Fluttertoast.showToast(msg: 'Please select frequency.');
+      AppToast.showToast(msg: 'Please select frequency.');
       return;
     }
     if (_isCustomDaysFrequency) {
       final days = int.tryParse(_customDaysCtrl.text.trim());
       if (days == null || days < 1) {
-        Fluttertoast.showToast(
+        AppToast.showToast(
           msg: 'Enter how many days between doses (e.g. 3).',
         );
         return;
       }
     }
     if (_withFood == null || _withFood!.isEmpty) {
-      Fluttertoast.showToast(msg: 'Please select With Food option.');
+      AppToast.showToast(msg: 'Please select With Food option.');
       return;
     }
 
     if (!_isCurrentFlow && (_diseaseUuid == null || _diseaseUuid!.isEmpty)) {
-      Fluttertoast.showToast(msg: 'Disease not selected.');
+      AppToast.showToast(msg: 'Disease not selected.');
       return;
     }
 
@@ -757,14 +760,17 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     } else {
       success = await controller.addDiseaseMedication(
         body: body,
+        appointmentUuid: widget.appointmentUuid,
       );
+
+      // );
     }
 
     if (!mounted) return;
 
     if (success) {
       Get.back();
-      Fluttertoast.showToast(
+      AppToast.showToast(
         msg: _isEdit
             ? 'Medication updated successfully'
             : 'Medication added successfully',
@@ -1297,19 +1303,7 @@ class _Header extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                width: 40,
-                height: 40,
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Image.asset(
-                  'assets/logo/ic_logo_icon.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
+              const HealoraLogo.chip(),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

@@ -111,7 +111,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                   children: [
                     Image.asset(
                       'assets/logo/ic_logo_full.png',
-                      width: 220,
+                      width: 300,
                       fit: BoxFit.contain,
                     ),
                     const SizedBox(height: 36),

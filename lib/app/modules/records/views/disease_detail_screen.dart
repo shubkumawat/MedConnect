@@ -1,4 +1,7 @@
+import 'package:healaura/app/data/models/appointment_model.dart';
 import 'package:healaura/app/modules/records/views/ai_prescription_screen.dart';
+import 'add_appointment_screen.dart';
+import 'appointment_detail_screen.dart';
 import 'add_disease_screen.dart';
 import 'add_disease_document_screen.dart';
 import 'add_medication_screen.dart';
@@ -9,6 +12,7 @@ import 'package:get/get.dart';
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/widgets/healora_logo.dart';
 import '../controllers/records_controller.dart';
 import 'package:healaura/app/data/models/disease_document_model.dart';
 import 'package:healaura/app/data/models/medical_record_model.dart';
@@ -66,6 +70,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
       controller.diseaseDocuments.clear();
       controller.documentTypeFilter.value = 'prescription';
       controller.fetchDiseaseDetail(widget.uuid);
+      controller.fetchDiseaseAppointments(widget.uuid);
     });
   }
 
@@ -83,9 +88,11 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
   }
 
   Future<void> _openUploadDocument() async {
+    final next = controller.selectedDisease.value?.nextAppointment;
     final result = await Get.to(() => AddDiseaseDocumentScreen(
           diseaseUuid: widget.uuid,
           initialDocType: controller.documentTypeFilter.value,
+          appointmentUuid: next?.uuid,
         ));
     if (result == true) {
       await controller.fetchDiseaseDocuments(widget.uuid);
@@ -147,7 +154,11 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
                 : TabBarView(
                     controller: _tabCtrl,
                     children: [
-                      _OverviewTab(statusColor: _statusColor),
+                      _OverviewTab(
+                        statusColor: _statusColor,
+                        diseaseUuid: widget.uuid,
+                        diseaseName: widget.diseaseName,
+                      ),
                       _buildMedicationsTab(),
                       _buildDocumentsTab(),
                       _buildTimelineTab(),
@@ -156,12 +167,29 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen>
           ),
         ],
       ),
-      floatingActionButton: _tabCtrl.index == 1
+      floatingActionButton: _tabCtrl.index == 0
+          ? _Fab(
+              icon: Icons.event_available_rounded,
+              label: 'Appointment',
+              onTap: () async {
+                final ok = await Get.to(() => AddAppointmentScreen(
+                      diseaseUuid: widget.uuid,
+                      diseaseName: widget.diseaseName,
+                    ));
+                if (ok == true) {
+                  await controller.fetchDiseaseAppointments(widget.uuid);
+                }
+              },
+            )
+          : _tabCtrl.index == 1
           ? _Fab(
               icon: Icons.add_rounded,
               onTap: () async {
-                await Get.to(
-                    () => AddMedicationScreen(diseaseUuid: widget.uuid));
+                final next = controller.selectedDisease.value?.nextAppointment;
+                await Get.to(() => AddMedicationScreen(
+                      diseaseUuid: widget.uuid,
+                      appointmentUuid: next?.uuid,
+                    ));
                 await controller.fetchDiseaseMedications(widget.uuid);
               },
             )
@@ -573,19 +601,7 @@ class _DetailHeader extends StatelessWidget {
                 onTap: onBack,
               ),
               const SizedBox(width: 10),
-              Container(
-                width: 40,
-                height: 40,
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Image.asset(
-                  'assets/logo/ic_logo_icon.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
+              const HealoraLogo.chip(),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -749,7 +765,23 @@ class _IconBtn extends StatelessWidget {
 
 class _OverviewTab extends StatelessWidget {
   final Color statusColor;
-  const _OverviewTab({required this.statusColor});
+  final String diseaseUuid;
+  final String diseaseName;
+  const _OverviewTab({
+    required this.statusColor,
+    required this.diseaseUuid,
+    required this.diseaseName,
+  });
+
+  Future<void> _openAdd(RecordsController controller) async {
+    final ok = await Get.to(() => AddAppointmentScreen(
+          diseaseUuid: diseaseUuid,
+          diseaseName: diseaseName,
+        ));
+    if (ok == true) {
+      await controller.fetchDiseaseAppointments(diseaseUuid);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -759,8 +791,111 @@ class _OverviewTab extends StatelessWidget {
 
     return ListView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       children: [
+        Obx(() {
+          final loading = controller.isAppointmentsLoading.value;
+          final items = controller.diseaseAppointments.toList();
+          final next = d.nextAppointment ??
+              items.where((a) => a.isScheduled).firstOrNull;
+          return _WhiteCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Appointments',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => _openAdd(controller),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.tealDark,
+                      ),
+                    ),
+                  ],
+                ),
+                if (loading && items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: AppColors.teal,
+                        ),
+                      ),
+                    ),
+                  )
+                else if (items.isEmpty && next == null)
+                  Text(
+                    'No visits scheduled. Add a follow-up so Healora can remind you a day before.',
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.textGray,
+                      height: 1.4,
+                      fontSize: 13.5,
+                    ),
+                  )
+                else ...[
+                  if (next != null && next.uuid.isNotEmpty) ...[
+                    Text(
+                      'Next visit',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textGray,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _AppointmentTile(
+                      appointment: next,
+                      onTap: () async {
+                        await Get.to(() => AppointmentDetailScreen(
+                              appointmentUuid: next.uuid,
+                              diseaseUuid: diseaseUuid,
+                              diseaseName: diseaseName,
+                            ));
+                        await controller.fetchDiseaseAppointments(diseaseUuid);
+                      },
+                    ),
+                    if (items.where((a) => a.uuid != next.uuid).isNotEmpty)
+                      const SizedBox(height: 12),
+                  ],
+                  ...items
+                      .where((a) => a.uuid != next?.uuid)
+                      .map(
+                        (a) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _AppointmentTile(
+                            appointment: a,
+                            onTap: () async {
+                              await Get.to(() => AppointmentDetailScreen(
+                                    appointmentUuid: a.uuid,
+                                    diseaseUuid: diseaseUuid,
+                                    diseaseName: diseaseName,
+                                  ));
+                              await controller
+                                  .fetchDiseaseAppointments(diseaseUuid);
+                            },
+                          ),
+                        ),
+                      ),
+                ],
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 12),
         _WhiteCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1356,6 +1491,63 @@ class _ActionBtn extends StatelessWidget {
               child: Text(label,
                   style: const TextStyle(fontWeight: FontWeight.w800)),
             ),
+    );
+  }
+}
+
+class _AppointmentTile extends StatelessWidget {
+  final DiseaseAppointment appointment;
+  final VoidCallback onTap;
+
+  const _AppointmentTile({required this.appointment, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cancelled = appointment.isCancelled;
+    return Material(
+      color: const Color(0xFFF7FBFA),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                cancelled
+                    ? Icons.event_busy_rounded
+                    : Icons.event_available_rounded,
+                color: cancelled ? AppColors.statusRed : AppColors.tealDark,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appointment.whenLabel,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13.5,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${appointment.kindLabel} · ${appointment.statusLabel}',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textGray,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.textGray),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

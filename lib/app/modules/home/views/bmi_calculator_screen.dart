@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:healaura/DataProvider/api_provider.dart';
 import 'package:healaura/DataProvider/app_shared_preferences.dart';
@@ -12,6 +11,7 @@ import 'package:healaura/app/core/widgets/live_text_field.dart';
 import 'package:healaura/app/data/models/bmi_result_model.dart';
 import 'package:healaura/app/modules/home/controllers/home_controller.dart';
 import 'bmi_result_screen.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 class BmiCalculatorScreen extends StatefulWidget {
   const BmiCalculatorScreen({super.key});
@@ -42,19 +42,19 @@ class _BmiCalculatorScreenState extends State<BmiCalculatorScreen> {
     final weight = double.tryParse(_weightCtrl.text.trim());
 
     if (_gender != 'male' && _gender != 'female') {
-      Fluttertoast.showToast(msg: 'Select gender');
+      AppToast.showToast(msg: 'Select gender');
       return;
     }
     if (age == null || age <= 0 || age > 120) {
-      Fluttertoast.showToast(msg: 'Enter a valid age');
+      AppToast.showToast(msg: 'Enter a valid age');
       return;
     }
     if (height == null || height < 50 || height > 250) {
-      Fluttertoast.showToast(msg: 'Enter height in cm (50–250)');
+      AppToast.showToast(msg: 'Enter height in cm (50–250)');
       return;
     }
     if (weight == null || weight < 10 || weight > 400) {
-      Fluttertoast.showToast(msg: 'Enter a valid weight in kg');
+      AppToast.showToast(msg: 'Enter a valid weight in kg');
       return;
     }
 

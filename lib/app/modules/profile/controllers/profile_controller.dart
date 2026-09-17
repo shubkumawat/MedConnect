@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:dio/dio.dart' as dio;
 import 'package:healaura/app/data/services/storage_service.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -12,11 +11,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
+import '../../../data/models/risk_factor_model.dart';
 import 'package:healaura/app/core/Util/Print/print_log.dart';
 import '../../../core/Util/home_address.dart';
 import '../../../core/Util/image_pick_helper.dart';
+import '../../../core/Util/CustomLoading/custom_loading.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/models/menstrual_cycle_model.dart';
+import '../../../data/models/upcoming_appointment_model.dart';
+import '../../../core/Util/appointment_prompts.dart';
 import '../../home/controllers/home_controller.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 /// Master relation list ka model
 class RelationModel {
@@ -82,6 +87,9 @@ class ProfileController extends GetxController {
   String? userAccessToken;
 
   RxBool isLoading = false.obs;
+  RxBool isSaving = false.obs;
+  final profilePatientId = ''.obs;
+  final upcomingAppointments = <UpcomingAppointment>[].obs;
 
   // ==================================================================
   // ---------------------  PERSONAL INFO (Step 1)  ------------------
@@ -147,7 +155,7 @@ class ProfileController extends GetxController {
       }
     } catch (e) {
       PrintLog.printLog('Pick profile image error: $e');
-      Fluttertoast.showToast(msg: 'Could not pick image');
+      AppToast.showToast(msg: 'Could not pick image');
     }
   }
 
@@ -355,6 +363,17 @@ class ProfileController extends GetxController {
             final List countries = data['countries'] ?? [];
             countryList.value = countries.map((e) => CountryModel.fromJson(e)).toList();
 
+            if (selectedNationalityId.value != null) {
+              selectedCountry.value = countryList.firstWhereOrNull(
+                (c) => c.id == selectedNationalityId.value,
+              );
+            }
+            if (selectedCountry.value == null ||
+                selectedCountry.value!.id == 0) {
+              selectedCountry.value = CountryModel.indiaFrom(countryList);
+            }
+            selectedNationalityId.value ??= selectedCountry.value?.id;
+
             // Occupations
             final List occupations = data['occupations'] ?? [];
             occupationList.value = occupations.map((e) => OccupationModel.fromJson(e)).toList();
@@ -368,12 +387,6 @@ class ProfileController extends GetxController {
               selectedEmergencyRelationModel.value = relationList.firstWhereOrNull(
                 (r) => r.code.toLowerCase() == emergencyRelation.value.toLowerCase() ||
                 r.name.toLowerCase() == emergencyRelation.value.toLowerCase(),
-              );
-            }
-
-            if (selectedNationalityId.value != null) {
-              selectedCountry.value = countryList.firstWhereOrNull(
-                (c) => c.id == selectedNationalityId.value,
               );
             }
 
@@ -465,20 +478,24 @@ class ProfileController extends GetxController {
           final List list = response['data'] ?? [];
           countryList.value = list.map((e) => CountryModel.fromJson(e)).toList();
 
-          // Agar profile me pehle se koi nationality id saved hai to usko yaha select kar do
           if (selectedNationalityId.value != null) {
             selectedCountry.value = countryList.firstWhereOrNull(
                   (c) => c.id == selectedNationalityId.value,
             );
           }
+          if (selectedCountry.value == null ||
+              selectedCountry.value!.id == 0) {
+            selectedCountry.value = CountryModel.indiaFrom(countryList);
+          }
+          selectedNationalityId.value ??= selectedCountry.value?.id;
         } else {
-          Fluttertoast.showToast(msg: response['message'] ?? '');
+          AppToast.showToast(msg: response['message'] ?? '');
         }
       }
     } catch (e) {
       isCountryLoading.value = false;
       PrintLog.printLog("Exception: $e");
-      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+      AppToast.showToast(msg: WebApiConstant.ApiError);
     }
   }
 
@@ -568,6 +585,43 @@ class ProfileController extends GetxController {
     } catch (e) {
       isDisabilityTypeLoading.value = false;
       PrintLog.printLog("Exception DisabilityType: $e");
+    }
+  }
+
+  RxBool isRiskFactorLoading = false.obs;
+  RxList<RiskFactor> riskFactorList = <RiskFactor>[].obs;
+  RxList<String> selectedRiskFactors = <String>[].obs;
+
+  void toggleRiskFactor(String value) {
+    if (selectedRiskFactors.contains(value)) {
+      selectedRiskFactors.remove(value);
+    } else {
+      selectedRiskFactors.add(value);
+    }
+  }
+
+  Future<void> getRiskFactorsAPI(BuildContext context) async {
+    try {
+      isRiskFactorLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
+      final response = await ApiProvider().requestGetForApi(
+        context,
+        WebApiConstant.API_URL_RISK_FACTORS,
+        {},
+        userAccessToken ?? '',
+      );
+      isRiskFactorLoading.value = false;
+      if (_isDisposed) return;
+      final raw = response?.data;
+      PrintLog.printLog(raw);
+      if (raw is Map && raw['error'] != true && raw['error_code'] == 0) {
+        final data = raw['data'];
+        final list = data is Map ? data['results'] : data;
+        riskFactorList.value = RiskFactor.listFrom(list);
+      }
+    } catch (e) {
+      isRiskFactorLoading.value = false;
+      PrintLog.printLog("Exception RiskFactors: $e");
     }
   }
 
@@ -663,9 +717,26 @@ class ProfileController extends GetxController {
   final remindersLoading = false.obs;
   final remindersSaving = false.obs;
 
+  final menstrualCycle = Rxn<MenstrualCycle>();
+  final menstrualLoading = false.obs;
+  final menstrualSaving = false.obs;
+  final parentPermission = Rxn<ParentPermission>();
+
+  bool get isFemaleGender {
+    final g = selectedGender.value.trim().toLowerCase();
+    return g == 'female' || g == 'f' || g == 'woman';
+  }
+
+  bool get showMenstrualCycle {
+    final cycle = menstrualCycle.value;
+    if (cycle != null) return cycle.available;
+    return isFemaleGender;
+  }
+
   @override
   void onInit() {
     super.onInit();
+    selectedCountry.value = CountryModel.indiaFallback;
     _initData();
   }
 
@@ -785,7 +856,7 @@ class ProfileController extends GetxController {
       await _loadToken();
       final token = userAccessToken ?? '';
       if (token.isEmpty) {
-        Fluttertoast.showToast(msg: 'Please sign in again');
+        AppToast.showToast(msg: 'Please sign in again');
         return;
       }
 
@@ -814,7 +885,7 @@ class ProfileController extends GetxController {
           qrAlerts.value = prevQr;
           await _persistCareRemindersLocally();
           _syncHomeReminderFlags();
-          Fluttertoast.showToast(
+          AppToast.showToast(
             msg: raw['message']?.toString() ?? 'Could not update reminders',
           );
           return;
@@ -826,7 +897,7 @@ class ProfileController extends GetxController {
         qrAlerts.value = prevQr;
         await _persistCareRemindersLocally();
         _syncHomeReminderFlags();
-        Fluttertoast.showToast(msg: 'Could not update reminders');
+        AppToast.showToast(msg: 'Could not update reminders');
       }
     } catch (e) {
       medReminders.value = prevMed;
@@ -835,9 +906,182 @@ class ProfileController extends GetxController {
       await _persistCareRemindersLocally();
       _syncHomeReminderFlags();
       PrintLog.printLog('setCareReminder: $e');
-      Fluttertoast.showToast(msg: 'Could not update reminders');
+      AppToast.showToast(msg: 'Could not update reminders');
     } finally {
       remindersSaving.value = false;
+    }
+  }
+
+  Map<String, dynamic> _patientQuery([String? patientId]) {
+    final q = <String, dynamic>{};
+    final id = (patientId ?? '').trim();
+    if (id.isNotEmpty) q['patient_id'] = id;
+    return q;
+  }
+
+  /// GET /notifications/menstrual-cycle/ — hide UI when available=false.
+  Future<MenstrualCycle?> loadMenstrualCycle({String? patientId}) async {
+    try {
+      menstrualLoading.value = true;
+      await _loadToken();
+      final token = userAccessToken ?? '';
+      if (token.isEmpty) return menstrualCycle.value;
+
+      final response = await ApiProvider().requestGetForApi(
+        Get.context,
+        WebApiConstant.API_URL_MENSTRUAL_CYCLE,
+        _patientQuery(patientId),
+        token,
+      );
+      PrintLog.printLog(
+          'Menstrual cycle GET [${response?.statusCode}]: ${response?.data}');
+      if (response != null &&
+          response.statusCode == 200 &&
+          response.data is Map) {
+        final raw = Map<String, dynamic>.from(response.data as Map);
+        if (raw['error'] == true) {
+          AppToast.showToast(
+            msg: raw['message']?.toString() ??
+                'Could not load cycle reminders',
+          );
+          return null;
+        }
+        final data = raw['data'];
+        if (data is Map) {
+          final cycle = MenstrualCycle.fromJson(Map<String, dynamic>.from(data));
+          if (patientId == null || patientId.trim().isEmpty) {
+            menstrualCycle.value = cycle;
+          }
+          return cycle;
+        }
+      }
+    } catch (e) {
+      PrintLog.printLog('loadMenstrualCycle: $e');
+    } finally {
+      menstrualLoading.value = false;
+    }
+    return menstrualCycle.value;
+  }
+
+  /// POST /notifications/menstrual-cycle/
+  Future<MenstrualCycle?> saveMenstrualCycle({
+    required String lastPeriodStart,
+    required int cycleLengthDays,
+    required int periodLengthDays,
+    required String reminderTime,
+    required bool isEnabled,
+    required bool remindDayBefore,
+    required bool remindOnStart,
+    String? patientId,
+  }) async {
+    try {
+      menstrualSaving.value = true;
+      await _loadToken();
+      final token = userAccessToken ?? '';
+      if (token.isEmpty) {
+        AppToast.showToast(msg: 'Please sign in again');
+        return null;
+      }
+      final body = <String, dynamic>{
+        'last_period_start': lastPeriodStart,
+        'cycle_length_days': cycleLengthDays,
+        'period_length_days': periodLengthDays,
+        'reminder_time': reminderTime,
+        'is_enabled': isEnabled,
+        'remind_day_before': remindDayBefore,
+        'remind_on_start': remindOnStart,
+      };
+      final pid = (patientId ?? '').trim();
+      if (pid.isNotEmpty) body['patient_id'] = pid;
+
+      final response = await ApiProvider().requestPostForApi(
+        Get.context,
+        WebApiConstant.API_URL_MENSTRUAL_CYCLE,
+        body,
+        token,
+      );
+      PrintLog.printLog(
+          'Menstrual cycle POST [${response?.statusCode}]: ${response?.data}');
+      if (response != null && response.data is Map) {
+        final raw = Map<String, dynamic>.from(response.data as Map);
+        if (raw['error'] == true) {
+          AppToast.showToast(
+            msg: raw['message']?.toString() ??
+                'Could not save cycle reminders',
+          );
+          return null;
+        }
+        AppToast.showToast(
+          msg: raw['message']?.toString() ?? 'Cycle reminders saved.',
+        );
+        final data = raw['data'];
+        if (data is Map) {
+          final cycle = MenstrualCycle.fromJson(Map<String, dynamic>.from(data));
+          if (pid.isEmpty) menstrualCycle.value = cycle;
+          return cycle;
+        }
+      }
+      return await loadMenstrualCycle(patientId: patientId);
+    } catch (e) {
+      PrintLog.printLog('saveMenstrualCycle: $e');
+      AppToast.showToast(msg: 'Could not save cycle reminders');
+      return null;
+    } finally {
+      menstrualSaving.value = false;
+    }
+  }
+
+  /// POST /notifications/menstrual-cycle/log/
+  Future<MenstrualCycle?> logPeriodStart({
+    String? startedOn,
+    String? patientId,
+  }) async {
+    try {
+      menstrualSaving.value = true;
+      await _loadToken();
+      final token = userAccessToken ?? '';
+      if (token.isEmpty) {
+        AppToast.showToast(msg: 'Please sign in again');
+        return null;
+      }
+      final body = <String, dynamic>{};
+      if ((startedOn ?? '').trim().isNotEmpty) {
+        body['started_on'] = startedOn!.trim();
+      }
+      final pid = (patientId ?? '').trim();
+      if (pid.isNotEmpty) body['patient_id'] = pid;
+
+      final response = await ApiProvider().requestPostForApi(
+        Get.context,
+        WebApiConstant.API_URL_MENSTRUAL_CYCLE_LOG,
+        body,
+        token,
+      );
+      if (response != null && response.data is Map) {
+        final raw = Map<String, dynamic>.from(response.data as Map);
+        if (raw['error'] == true) {
+          AppToast.showToast(
+            msg: raw['message']?.toString() ?? 'Could not log period start',
+          );
+          return null;
+        }
+        AppToast.showToast(
+          msg: raw['message']?.toString() ?? 'Period start logged.',
+        );
+        final data = raw['data'];
+        if (data is Map) {
+          final cycle = MenstrualCycle.fromJson(Map<String, dynamic>.from(data));
+          if (pid.isEmpty) menstrualCycle.value = cycle;
+          return cycle;
+        }
+      }
+      return await loadMenstrualCycle(patientId: patientId);
+    } catch (e) {
+      PrintLog.printLog('logPeriodStart: $e');
+      AppToast.showToast(msg: 'Could not log period start');
+      return null;
+    } finally {
+      menstrualSaving.value = false;
     }
   }
 
@@ -868,6 +1112,7 @@ class ProfileController extends GetxController {
             if (_isDisposed) return;
             // Personal Info
             setProfileName(data['full_name'] ?? data['name']);
+            profilePatientId.value = data['patient_id']?.toString() ?? '';
             emailCtrl.text = data['email']?.toString() ?? '';
             mobileNumber.value = data['mobile_number']?.toString() ?? '';
             age.value = data['age'] ?? 0;
@@ -913,13 +1158,17 @@ class ProfileController extends GetxController {
 
             if (data['nationality'] != null) {
               selectedNationalityId.value = data['nationality']['id'];
-              // Agar country list pehle se loaded hai to select kar lo
               if (countryList.isNotEmpty) {
                 selectedCountry.value = countryList.firstWhereOrNull(
                       (c) => c.id == selectedNationalityId.value,
                 );
               }
             }
+            if (selectedCountry.value == null ||
+                selectedCountry.value!.id == 0) {
+              selectedCountry.value = CountryModel.indiaFrom(countryList);
+            }
+            selectedNationalityId.value ??= selectedCountry.value?.id;
 
             // Medical Info
             // Handle Blood Group (String or Map)
@@ -1000,6 +1249,9 @@ class ProfileController extends GetxController {
               if (medications != null) {
                 selectedMedications.value = medications.map((e) => e.toString()).toList();
               }
+
+              selectedRiskFactors.value =
+                  RiskFactor.codesFrom(medical['risk_factors']);
             }
 
             maritalStatus.value = (data['marital_status']?.toString() ?? '').capitalizeFirst ?? '';
@@ -1070,9 +1322,29 @@ class ProfileController extends GetxController {
                 showInsurance.value = true;
               }
             }
+
+            if (data['menstrual_cycle'] is Map) {
+              menstrualCycle.value = MenstrualCycle.fromJson(
+                Map<String, dynamic>.from(data['menstrual_cycle'] as Map),
+              );
+            }
+            parentPermission.value =
+                ParentPermission.tryParse(data['parent_permission']);
+
+            upcomingAppointments.value =
+                UpcomingAppointment.listFrom(data['upcoming_appointments']);
+            final pid = profilePatientId.value.trim().isNotEmpty
+                ? profilePatientId.value
+                : upcomingAppointments
+                    .firstWhereOrNull((e) => e.isSelf)
+                    ?.patientId;
+            AppointmentPrompts.maybeShow(
+              upcoming: upcomingAppointments.toList(),
+              patientId: pid,
+            );
           }
         } else {
-          Fluttertoast.showToast(msg: response['message'] ?? '');
+          AppToast.showToast(msg: response['message'] ?? '');
         }
       }
     } catch (e) {
@@ -1091,7 +1363,7 @@ class ProfileController extends GetxController {
     bool markLoggedIn = true,
   }) async {
     try {
-      isLoading.value = true;
+      isSaving.value = true;
 
       final Map<String, dynamic> dictParameter = <String, dynamic>{
         "full_name": fullNameCtrl.text.trim(),
@@ -1135,13 +1407,13 @@ class ProfileController extends GetxController {
         );
       }
 
-      isLoading.value = false;
+      isSaving.value = false;
       if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          Fluttertoast.showToast(msg: response['message'] ?? 'Profile updated successfully.');
+          AppToast.showToast(msg: response['message'] ?? 'Profile updated successfully.');
           // Keep Profile screen name in sync after edit
           profileDisplayName.value = fullNameCtrl.text.trim();
 
@@ -1175,13 +1447,13 @@ class ProfileController extends GetxController {
 
           onSuccess();
         } else {
-          Fluttertoast.showToast(msg: response['message'] ?? '');
+          AppToast.showToast(msg: response['message'] ?? '');
         }
       }
     } catch (e) {
-      isLoading.value = false;
+      isSaving.value = false;
       PrintLog.printLog("Exception: $e");
-      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+      AppToast.showToast(msg: WebApiConstant.ApiError);
     }
   }
 
@@ -1190,7 +1462,7 @@ class ProfileController extends GetxController {
   // ==================================================================
   Future<void> updateMedicalAPI(BuildContext context, VoidCallback onSuccess) async {
     try {
-      isLoading.value = true;
+      isSaving.value = true;
       userAccessToken = await StorageService().getString(StorageService.token);
 
       final Map<String, dynamic> dictParameter = <String, dynamic>{
@@ -1210,6 +1482,7 @@ class ProfileController extends GetxController {
         "organ_donor": isOrganDonor.value,
         "allergies": selectedAllergies.toList(),
         "medications": selectedMedications.toList(),
+        "risk_factors": selectedRiskFactors.toList(),
       };
 
       final response = await ApiProvider().updateMedicalApi(
@@ -1219,22 +1492,22 @@ class ProfileController extends GetxController {
         userAccessToken ?? '',
       );
 
-      isLoading.value = false;
       if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          Fluttertoast.showToast(msg: response['message'] ?? 'Medical information updated successfully.');
+          AppToast.showToast(msg: response['message'] ?? 'Medical information updated successfully.');
           onSuccess();
         } else {
-          Fluttertoast.showToast(msg: response['message'] ?? '');
+          AppToast.showToast(msg: response['message'] ?? '');
         }
       }
     } catch (e) {
-      isLoading.value = false;
       PrintLog.printLog("Exception: $e");
-      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+      AppToast.showToast(msg: WebApiConstant.ApiError);
+    } finally {
+      if (!_isDisposed) isSaving.value = false;
     }
   }
 
@@ -1243,7 +1516,8 @@ class ProfileController extends GetxController {
   // ==================================================================
   Future<void> updateEmergencyAPI(BuildContext context, VoidCallback onSuccess) async {
     try {
-      isLoading.value = true;
+      await CustomLoading().forceHide();
+      isSaving.value = true;
       userAccessToken = await StorageService().getString(StorageService.token);
 
       final home = HomeAddress(
@@ -1271,23 +1545,23 @@ class ProfileController extends GetxController {
         userAccessToken ?? '',
       );
 
-      isLoading.value = false;
       if (_isDisposed) return;
       PrintLog.printLog(response);
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          Fluttertoast.showToast(
+          AppToast.showToast(
               msg: response['message'] ?? 'Emergency & Insurance details updated successfully.');
           onSuccess();
         } else {
-          Fluttertoast.showToast(msg: response['message'] ?? '');
+          AppToast.showToast(msg: response['message'] ?? '');
         }
       }
     } catch (e) {
-      isLoading.value = false;
       PrintLog.printLog("Exception: $e");
-      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+      AppToast.showToast(msg: WebApiConstant.ApiError);
+    } finally {
+      if (!_isDisposed) isSaving.value = false;
     }
   }
 

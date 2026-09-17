@@ -3,12 +3,14 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
 import 'package:healaura/app/core/theme/app_colors.dart';
+import 'package:healaura/app/core/widgets/healora_logo.dart';
 import 'package:healaura/app/core/theme/app_text_theme.dart';
 import 'package:healaura/app/data/models/family_member_model.dart';
 import 'package:healaura/app/data/services/storage_service.dart';
 
 import '../controllers/family_member_controller.dart';
 import 'add_family_member_screen.dart';
+import '../../settings/views/menstrual_cycle_screen.dart';
 
 class FamilyMemberDetailScreen extends StatelessWidget {
   const FamilyMemberDetailScreen({super.key});
@@ -139,6 +141,10 @@ class FamilyMemberDetailScreen extends StatelessWidget {
                             _AccessStatusCard(controller: controller)
                                 .animate()
                                 .fadeIn(delay: 180.ms, duration: 300.ms),
+                            if (member.isFemale) ...[
+                              const SizedBox(height: 12),
+                              _CycleRemindersCard(member: member),
+                            ],
                           ],
                         ),
                       ),
@@ -164,25 +170,23 @@ class FamilyMemberDetailScreen extends StatelessWidget {
                   ],
                 ),
                 child: Obx(() {
-                  final hasAccess = controller.fullAccess.value ||
-                      controller.emergencyOnly.value ||
-                      (controller.familyMemberDetail.value?.hasAccess ?? false);
+                  final detail = controller.familyMemberDetail.value ?? member;
+                  final hasAccess = detail.hasAccess;
+                  final label = hasAccess ? 'Revoke Access' : 'Give Access';
                   return SizedBox(
                     height: 52,
                     child: ElevatedButton(
                       onPressed: controller.isLoading.value
                           ? null
                           : () async {
-                              final id = member.patientId;
+                              final id = detail.patientId;
                               if (id == null) return;
                               if (hasAccess) {
-                                // Turn off both access modes via access-control API.
-                                await controller.updateAccessControl(
-                                    context, true, false);
-                                if (controller.emergencyOnly.value) {
-                                  await controller.updateAccessControl(
-                                      context, false, false);
-                                }
+                                await controller.giveAccessAPI(
+                                  context,
+                                  id,
+                                  type: 'remove',
+                                );
                               } else {
                                 await controller.giveAccessAPI(context, id);
                               }
@@ -219,7 +223,7 @@ class FamilyMemberDetailScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  hasAccess ? 'Revoke Access' : 'Give Access',
+                                  label,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w800,
@@ -359,19 +363,7 @@ class _Header extends StatelessWidget {
         children: [
           _HBtn(icon: Icons.arrow_back_ios_new_rounded, onTap: onBack),
           const SizedBox(width: 10),
-          Container(
-            width: 40,
-            height: 40,
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Image.asset(
-              'assets/logo/ic_logo_icon.png',
-              fit: BoxFit.contain,
-            ),
-          ),
+          const HealoraLogo.chip(),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -574,13 +566,9 @@ class _ProfileHeaderCard extends StatelessWidget {
                           Builder(
                             builder: (_) {
                               final has = member.hasAccess;
-                              final color = member.fullAccess == true
+                              final color = has
                                   ? AppColors.tealDark
-                                  : member.emergencyOnly == true
-                                      ? AppColors.orange
-                                      : has
-                                          ? AppColors.accentBlue
-                                          : AppColors.textGray;
+                                  : AppColors.textGray;
                               return Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 9, vertical: 3),
@@ -827,6 +815,9 @@ class _MedicalSection extends StatelessWidget {
             .toList() ??
         [];
     final meds = member.medical?.currentMedications ?? [];
+    final risks = (member.medical?.riskFactorLabels?.isNotEmpty ?? false)
+        ? member.medical!.riskFactorLabels!
+        : (member.medical?.riskFactors ?? []);
 
     return Container(
       width: double.infinity,
@@ -905,6 +896,11 @@ class _MedicalSection extends StatelessWidget {
               title: 'Allergies',
               items: allergies,
               color: AppColors.statusRed),
+          const SizedBox(height: 12),
+          _Chips(
+              title: 'Risk factors',
+              items: risks,
+              color: AppColors.orange),
           const SizedBox(height: 12),
           _Chips(title: 'Medications', items: meds, color: AppColors.teal),
         ],
@@ -1031,23 +1027,9 @@ class _AccessStatusCard extends StatelessWidget {
       final name = member?.fullName?.trim().isNotEmpty == true
           ? member!.fullName!
           : 'this member';
-      final full = controller.fullAccess.value;
-      final emergency = controller.emergencyOnly.value;
-      final has = full || emergency || (member?.hasAccess ?? false);
-      final statusColor = full
-          ? AppColors.tealDark
-          : emergency
-              ? AppColors.orange
-              : has
-                  ? AppColors.accentBlue
-                  : AppColors.textGray;
-      final statusText = full
-          ? 'Full access granted'
-          : emergency
-              ? 'Emergency-only access'
-              : has
-                  ? 'Access given'
-                  : 'No access yet';
+      final has = member?.hasAccess ?? false;
+      final statusColor = has ? AppColors.tealDark : AppColors.textGray;
+      final statusText = has ? 'Access given' : 'No access yet';
 
       return Container(
         width: double.infinity,
@@ -1122,32 +1104,14 @@ class _AccessStatusCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               has
-                  ? '$name can currently view health records with the access type below.'
-                  : 'Share $name’s health records securely. Choose access type, then tap Give Access.',
+                  ? '$name can currently view shared health records.'
+                  : 'Share $name’s health records securely with Give Access.',
               style: const TextStyle(
                 fontSize: 12.5,
                 height: 1.4,
                 color: AppColors.textMuted,
                 fontWeight: FontWeight.w500,
               ),
-            ),
-            const SizedBox(height: 14),
-            _AccessToggleTile(
-              title: 'Full access',
-              subtitle: 'Complete records, meds and documents',
-              value: full,
-              activeColor: AppColors.tealDark,
-              onChanged: (v) =>
-                  controller.updateAccessControl(context, true, v),
-            ),
-            const SizedBox(height: 8),
-            _AccessToggleTile(
-              title: 'Emergency only',
-              subtitle: 'Limited emergency details only',
-              value: emergency,
-              activeColor: AppColors.orange,
-              onChanged: (v) =>
-                  controller.updateAccessControl(context, false, v),
             ),
           ],
         ),
@@ -1156,70 +1120,72 @@ class _AccessStatusCard extends StatelessWidget {
   }
 }
 
-class _AccessToggleTile extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final bool value;
-  final Color activeColor;
-  final ValueChanged<bool> onChanged;
-
-  const _AccessToggleTile({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.activeColor,
-    required this.onChanged,
-  });
+class _CycleRemindersCard extends StatelessWidget {
+  final FamilyMember member;
+  const _CycleRemindersCard({required this.member});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-      decoration: BoxDecoration(
-        color: value
-            ? activeColor.withValues(alpha: 0.08)
-            : const Color(0xFFF3F7F5),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: value
-              ? activeColor.withValues(alpha: 0.28)
-              : const Color(0xFFE3EBE7),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => Get.to(() => MenstrualCycleScreen(
+              patientId: member.patientId,
+              patientName: member.fullName,
+            )),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE3EBE7)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.orange.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.water_drop_outlined,
+                    color: AppColors.orange, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Cycle reminders',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Set period alerts for this member',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textGray,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.textGray),
+            ],
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13.5,
-                    color: value ? activeColor : AppColors.textDark,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: AppColors.textGray,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch.adaptive(
-            value: value,
-            activeColor: activeColor,
-            onChanged: onChanged,
-          ),
-        ],
       ),
     );
   }
 }
+
 

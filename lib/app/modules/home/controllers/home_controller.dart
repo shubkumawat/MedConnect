@@ -8,7 +8,11 @@ import '../../../data/models/video_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
+import '../controllers/health_tips_controller.dart';
+import '../../family/controllers/family_member_controller.dart';
+import '../../family/views/parent_permission_prompt.dart';
 import '../../records/controllers/records_controller.dart';
+import '../../../data/models/menstrual_cycle_model.dart';
 
 int access_type = 0;
 class HomeController extends GetxController {
@@ -17,6 +21,8 @@ class HomeController extends GetxController {
   var isLoading = false.obs;
 
   RxList<FamilyMember> patients = <FamilyMember>[].obs;
+  final parentPermission = Rxn<ParentPermission>();
+  bool _parentPromptShown = false;
 
   FamilyMember? get selectedPatient {
     if (patients.isEmpty) return null;
@@ -64,6 +70,11 @@ class HomeController extends GetxController {
     Future.delayed(const Duration(milliseconds: 300), () {
       fetchVideoTopics();
       fetchTrendingVideos();
+      if (!Get.isRegistered<HealthTipsController>()) {
+        Get.put(HealthTipsController());
+      } else {
+        Get.find<HealthTipsController>().fetch();
+      }
     });
 
     // Phase 3: Secondary data
@@ -119,8 +130,19 @@ class HomeController extends GetxController {
       // Family members — same list parsing as before.
       final family = <FamilyMember>[];
       if (response != null && response['error'] != true) {
-        final List list = response['data']?['family_members'] ?? [];
-        family.addAll(list.map((e) => FamilyMember.fromJson(e)).toList());
+        final data = response['data'];
+        List list = const [];
+        if (data is Map) {
+          list = data['family_members'] ??
+              data['members'] ??
+              data['results'] ??
+              [];
+        } else if (data is List) {
+          list = data;
+        }
+        family.addAll(list
+            .whereType<Map>()
+            .map((e) => FamilyMember.fromJson(Map<String, dynamic>.from(e))));
       }
 
       // Passport order: Me (profile API) first, then family as-is.
@@ -137,6 +159,7 @@ class HomeController extends GetxController {
       patients.value = members;
       await _restoreSelectedPatient();
       patients.refresh();
+      await loadParentPermission();
     } catch (e) {
       print("Home Fetch Error: $e");
     } finally {
@@ -169,6 +192,29 @@ class HomeController extends GetxController {
     }
     // Keep Records in sync with the passport card that is selected.
     _syncRecordsSelection(member, refreshIfChanged: true);
+  }
+
+  Future<void> loadParentPermission() async {
+    try {
+      final family = Get.isRegistered<FamilyMemberController>()
+          ? Get.find<FamilyMemberController>()
+          : Get.put(FamilyMemberController());
+      final permission = await family.fetchParentPermission(Get.context);
+      if (permission != null) {
+        parentPermission.value = permission;
+        if (!_parentPromptShown &&
+            permission.required &&
+            permission.canRespond &&
+            permission.isPending) {
+          _parentPromptShown = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            showParentPermissionPrompt(permission);
+          });
+        }
+      }
+    } catch (e) {
+      print('loadParentPermission: $e');
+    }
   }
 
   /// Select by tap only (not scroll). Moves that member to first position.

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/widgets/healora_logo.dart';
 import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
 import '../../../data/models/disease_response_model.dart';
 import '../../../data/models/medical_record_model.dart';
@@ -316,19 +317,7 @@ class _RecordsHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Image.asset(
-                  'assets/logo/ic_logo_icon.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
+              const HealoraLogo.chip(),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -889,6 +878,9 @@ class _DiseasesTab extends StatelessWidget {
                 diagnosed: d.diagnosedOn ?? '',
                 doctor: d.category ?? 'Primary Care',
                 type: d.conditionType,
+                appointmentLabel: d.nextAppointment == null
+                    ? null
+                    : 'Next · ${d.nextAppointment!.whenLabel}',
                 heroTag: heroTag,
                 onTap: () {
                   Get.to(() => DiseaseDetailScreen(
@@ -1481,19 +1473,7 @@ class _PremiumActionSheet extends StatelessWidget {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(13),
-                        ),
-                        child: Image.asset(
-                          'assets/logo/ic_logo_icon.png',
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+                      const HealoraLogo.chip(),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(

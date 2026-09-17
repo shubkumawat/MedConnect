@@ -11,6 +11,12 @@ import 'package:healaura/app/core/Util/web_page_helper.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../core/widgets/powered_by_aira.dart';
+import '../../../core/widgets/healora_logo.dart';
+import '../../family/controllers/family_member_controller.dart';
+import '../../family/views/parent_permission_prompt.dart';
+import '../../records/controllers/records_controller.dart';
+import '../../settings/views/menstrual_cycle_screen.dart';
+import '../../settings/views/settings_view.dart';
 import '../controllers/profile_controller.dart';
 import 'emergency_info_view.dart';
 import 'medical_info_view.dart';
@@ -31,6 +37,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     controller.getPatientProfileAPI(context);
     controller.loadCareReminders();
+    controller.loadMenstrualCycle();
+    _ensureHealthCounts();
+  }
+
+  Future<void> _ensureHealthCounts() async {
+    final records = Get.isRegistered<RecordsController>()
+        ? Get.find<RecordsController>()
+        : Get.put(RecordsController());
+    final family = Get.isRegistered<FamilyMemberController>()
+        ? Get.find<FamilyMemberController>()
+        : Get.put(FamilyMemberController());
+    if (records.diseases.isEmpty) {
+      await records.fetchDiseases();
+    }
+    if (records.medications.isEmpty) {
+      await records.fetchCurrentMedications();
+    }
+    if (family.familyMemberList.isEmpty && mounted) {
+      await family.getFamilyMemberListAPI(context);
+    }
   }
 
   double _completeness() {
@@ -62,12 +88,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   String _initials(String name) {
     final clean = name.trim();
-    if (clean.isEmpty || clean == 'Complete your profile') return 'HA';
+    if (clean.isEmpty || clean == 'Complete your profile') return 'HO';
     final parts = clean.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
     return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+  }
+
+  String _completenessTip(double progress) {
+    if (controller.selectedAllergies.isEmpty) {
+      return 'Add your allergies for better doctor views.';
+    }
+    if (controller.emergencyNameCtrl.text.trim().isEmpty) {
+      return 'Add an emergency contact for safer care.';
+    }
+    if (controller.bloodGroup.value.isEmpty) {
+      return 'Add your blood group to complete medical info.';
+    }
+    if (progress >= 1) {
+      return 'Your profile looks complete — great job!';
+    }
+    return 'Keep filling details for better care recommendations.';
+  }
+
+  ({int diseases, int meds, int family}) _healthCounts() {
+    var diseases = 0;
+    var meds = 0;
+    var family = 0;
+    if (Get.isRegistered<RecordsController>()) {
+      final r = Get.find<RecordsController>();
+      diseases = r.diseases.length;
+      meds = r.medications.length;
+    }
+    if (Get.isRegistered<FamilyMemberController>()) {
+      family = Get.find<FamilyMemberController>().familyMemberList.length;
+    }
+    return (diseases: diseases, meds: meds, family: family);
   }
 
   @override
@@ -91,6 +148,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final progress = _completeness();
         final pct = (progress * 100).round();
         final firstName = rawName.isEmpty ? '' : _formatName(rawName.split(RegExp(r'\s+')).first);
+        final counts = _healthCounts();
+        final tip = _completenessTip(progress);
 
         return RefreshIndicator(
           color: AppColors.teal,
@@ -128,6 +187,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         gender: gender,
                         progress: progress,
                         percent: pct,
+                        tip: tip,
+                        diseaseCount: counts.diseases,
+                        medCount: counts.meds,
+                        familyCount: counts.family,
                         loading: loading,
                         onEdit: () async {
                           await Get.to(() => const PersonalInfoScreen(null));
@@ -152,12 +215,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Get.to(() => const MedicalInfoScreen(null)),
                         onEmergency: () =>
                             Get.to(() => const EmergencyInfoScreen(null)),
+                        onInsurance: () {
+                          controller.showInsurance.value = true;
+                          Get.to(() => const EmergencyInfoScreen(null));
+                        },
                         allergyCount: allergies,
                         hasEmergency:
                             controller.emergencyNameCtrl.text.trim().isNotEmpty,
+                        hasInsurance: controller
+                                .insuranceProviderCtrl.text
+                                .trim()
+                                .isNotEmpty ||
+                            controller.policyNumberCtrl.text.trim().isNotEmpty,
                       )
                           .animate()
                           .fadeIn(delay: 120.ms, duration: 380.ms),
+
+                      if (controller.parentPermission.value != null &&
+                          controller.parentPermission.value!.required &&
+                          controller.parentPermission.value!.canRespond &&
+                          controller.parentPermission.value!.isPending) ...[
+                        const SizedBox(height: 16),
+                        _InsetGroup(
+                          children: [
+                            _LinkTile(
+                              icon: Icons.family_restroom_rounded,
+                              title: 'Parent access request',
+                              subtitle:
+                                  '${controller.parentPermission.value!.parentName ?? 'A parent'} wants to manage your records',
+                              onTap: () => showParentPermissionPrompt(
+                                controller.parentPermission.value!,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
 
                       const SizedBox(height: 22),
                       _SectionLabel('Care reminders'),
@@ -195,29 +287,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           .animate()
                           .fadeIn(delay: 160.ms, duration: 380.ms),
 
+                      if (controller.showMenstrualCycle) ...[
+                        const SizedBox(height: 22),
+                        _SectionLabel('Menstrual cycle'),
+                        const SizedBox(height: 10),
+                        _InsetGroup(
+                          children: [
+                            _LinkTile(
+                              icon: Icons.water_drop_outlined,
+                              title: 'Menstrual cycle',
+                              subtitle: controller.menstrualCycle.value
+                                          ?.isConfigured ==
+                                      true
+                                  ? 'Period alerts are set'
+                                  : 'Set last period, cycle length and reminders',
+                              onTap: () =>
+                                  Get.to(() => const MenstrualCycleScreen()),
+                            ),
+                          ],
+                        )
+                            .animate()
+                            .fadeIn(delay: 180.ms, duration: 380.ms),
+                      ],
+
                       const SizedBox(height: 22),
                       _SectionLabel('Preferences'),
                       const SizedBox(height: 10),
                       _InsetGroup(
                         children: [
-                          // _LinkTile(
-                          //   icon: Icons.verified_user_outlined,
-                          //   title: 'Insurance details',
-                          //   onTap: () {},
-                          // ),
-                          // _LinkTile(
-                          //   icon: Icons.ios_share_rounded,
-                          //   title: 'Export health records',
-                          //   onTap: () {},
-                          //   showDivider: true,
-                          // ),
-                          // _LinkTile(
-                          //   icon: Icons.translate_rounded,
-                          //   title: 'Language',
-                          //   trailing: 'English',
-                          //   onTap: () {},
-                          //   showDivider: true,
-                          // ),
+                          _LinkTile(
+                            icon: Icons.settings_outlined,
+                            title: 'Settings',
+                            subtitle: 'Privacy, export & legal',
+                            onTap: () => Get.to(() => const SettingsScreen()),
+                          ),
                           _LinkTile(
                             icon: Icons.lock_outline_rounded,
                             title: 'Privacy policy',
@@ -275,17 +378,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Center(
                         child: Column(
                           children: [
-                            Opacity(
-                              opacity: 0.55,
-                              child: Image.asset(
-                                'assets/logo/ic_logo_icon.png',
-                                width: 28,
-                                height: 28,
-                              ),
-                            ),
+                            const HealoraLogo(height: 52),
                             const SizedBox(height: 6),
                             Text(
-                              'HealAura  ·  v1.0.0',
+                              'Healora  ·  v1.0.0',
                               style: AppTextStyles.caption.copyWith(
                                 color: AppColors.textGray.withValues(alpha: 0.8),
                                 fontSize: 11,
@@ -348,26 +444,7 @@ class _TopBar extends StatelessWidget {
             ],
           ),
         ),
-        Container(
-          width: 44,
-          height: 44,
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.teal.withValues(alpha: 0.1),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Image.asset(
-            'assets/logo/ic_logo_icon.png',
-            fit: BoxFit.contain,
-          ),
-        ),
+        const HealoraLogo.chip(elevated: true),
       ],
     );
   }
@@ -394,7 +471,7 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-// ─── Brand teal member card (same HealAura theme) ───────────────────────────
+// ─── Brand teal member card (same Healora theme) ───────────────────────────
 
 class _MemberCard extends StatelessWidget {
   final String name;
@@ -407,6 +484,10 @@ class _MemberCard extends StatelessWidget {
   final String gender;
   final double progress;
   final int percent;
+  final String tip;
+  final int diseaseCount;
+  final int medCount;
+  final int familyCount;
   final bool loading;
   final VoidCallback onEdit;
 
@@ -421,6 +502,10 @@ class _MemberCard extends StatelessWidget {
     required this.gender,
     required this.progress,
     required this.percent,
+    required this.tip,
+    required this.diseaseCount,
+    required this.medCount,
+    required this.familyCount,
     required this.loading,
     required this.onEdit,
   });
@@ -640,7 +725,39 @@ class _MemberCard extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            Text(
+              'Your profile is $percent% complete — $tip',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.82),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              ),
+              child: Text(
+                '$diseaseCount disease${diseaseCount == 1 ? '' : 's'}  ·  '
+                '$medCount medication${medCount == 1 ? '' : 's'}  ·  '
+                '$familyCount family member${familyCount == 1 ? '' : 's'}',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -722,15 +839,19 @@ class _IdentityRow extends StatelessWidget {
   final VoidCallback onPersonal;
   final VoidCallback onMedical;
   final VoidCallback onEmergency;
+  final VoidCallback onInsurance;
   final int allergyCount;
   final bool hasEmergency;
+  final bool hasInsurance;
 
   const _IdentityRow({
     required this.onPersonal,
     required this.onMedical,
     required this.onEmergency,
+    required this.onInsurance,
     required this.allergyCount,
     required this.hasEmergency,
+    required this.hasInsurance,
   });
 
   @override
@@ -739,7 +860,7 @@ class _IdentityRow extends StatelessWidget {
       children: [
         _IdentityCard(
           icon: Icons.person_outline_rounded,
-          title: 'Personal information',
+          title: 'Edit personal info',
           subtitle: 'Name, date of birth, gender, nationality',
           color: AppColors.teal,
           onTap: onPersonal,
@@ -747,7 +868,7 @@ class _IdentityRow extends StatelessWidget {
         const SizedBox(height: 8),
         _IdentityCard(
           icon: Icons.health_and_safety_outlined,
-          title: 'Medical information',
+          title: 'Medical info',
           subtitle: allergyCount > 0
               ? '$allergyCount allerg${allergyCount == 1 ? 'y' : 'ies'} on file'
               : 'Blood group, allergies, conditions',
@@ -757,12 +878,22 @@ class _IdentityRow extends StatelessWidget {
         const SizedBox(height: 8),
         _IdentityCard(
           icon: Icons.contact_phone_outlined,
-          title: 'Emergency contact',
+          title: 'Emergency contacts',
           subtitle: hasEmergency
               ? 'Emergency contact saved'
               : 'Add someone we can reach in an emergency',
           color: AppColors.statusRed,
           onTap: onEmergency,
+        ),
+        const SizedBox(height: 8),
+        _IdentityCard(
+          icon: Icons.verified_user_outlined,
+          title: 'Insurance details',
+          subtitle: hasInsurance
+              ? 'Insurance on file'
+              : 'Provider, policy number & expiry',
+          color: AppColors.accentBlue,
+          onTap: onInsurance,
         ),
       ],
     );
@@ -929,6 +1060,7 @@ class _SwitchTile extends StatelessWidget {
 class _LinkTile extends StatelessWidget {
   final IconData icon;
   final String title;
+  final String? subtitle;
   final String? trailing;
   final bool danger;
   final Color? accent;
@@ -938,6 +1070,7 @@ class _LinkTile extends StatelessWidget {
   const _LinkTile({
     required this.icon,
     required this.title,
+    this.subtitle,
     this.trailing,
     this.danger = false,
     this.accent,
@@ -974,12 +1107,29 @@ class _LinkTile extends StatelessWidget {
                   Icon(icon, color: color, size: 22),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      title,
-                      style: AppTextStyles.bodyBold.copyWith(
-                        fontSize: 14,
-                        color: danger ? AppColors.statusRed : AppColors.textDark,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: AppTextStyles.bodyBold.copyWith(
+                            fontSize: 14,
+                            color: danger
+                                ? AppColors.statusRed
+                                : AppColors.textDark,
+                          ),
+                        ),
+                        if (subtitle != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle!,
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.textGray,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   if (trailing != null) ...[

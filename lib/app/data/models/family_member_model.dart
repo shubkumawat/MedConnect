@@ -1,3 +1,5 @@
+import 'menstrual_cycle_model.dart';
+
 class FamilyMemberResponse {
   bool? error;
   int? errorCode;
@@ -22,14 +24,23 @@ class FamilyMemberData {
   FamilyMemberData({this.familyMembers, this.familyMemberCount, this.patient});
 
   FamilyMemberData.fromJson(Map<String, dynamic> json) {
-    if (json['family_members'] != null) {
+    final rawList = json['family_members'] ??
+        json['members'] ??
+        json['results'] ??
+        json['patients'];
+    if (rawList is List) {
       familyMembers = <FamilyMember>[];
-      json['family_members'].forEach((v) {
-        familyMembers!.add(FamilyMember.fromJson(v));
-      });
+      for (final v in rawList) {
+        if (v is Map) {
+          familyMembers!.add(FamilyMember.fromJson(Map<String, dynamic>.from(v)));
+        }
+      }
     }
     familyMemberCount = json['family_member_count'];
-    patient = json['patient'] != null ? FamilyMember.fromJson(json['patient']) : null;
+    final patientRaw = json['patient'] ?? json['member'];
+    if (patientRaw is Map) {
+      patient = FamilyMember.fromJson(Map<String, dynamic>.from(patientRaw));
+    }
   }
 }
 
@@ -59,6 +70,11 @@ class FamilyMember {
   bool? emergencyOnly;
   /// Whether this member has been granted access (API may send access_given).
   bool? accessGiven;
+  bool? hasLogin;
+  ParentPermission? parentPermission;
+
+  /// API `access_type`: 0 = none, 1+ / 2 = access given.
+  int? accessType;
 
   /// True when this card is the logged-in user's own profile.
   bool isSelf = false;
@@ -88,6 +104,9 @@ class FamilyMember {
     this.fullAccess,
     this.emergencyOnly,
     this.accessGiven,
+    this.hasLogin,
+    this.parentPermission,
+    this.accessType,
     this.isSelf = false,
   });
 
@@ -121,8 +140,9 @@ class FamilyMember {
     return url;
   }
 
-  FamilyMember.fromJson(Map<String, dynamic> json) {
+  FamilyMember.fromJson(Map<String, dynamic> source) {
     isSelf = false;
+    final json = _withNestedPatient(source);
     patientId = json['patient_id'];
     fullName = json['full_name'];
     profilePhoto = _normalizeMediaUrl(json['profile_photo']?.toString());
@@ -211,16 +231,128 @@ class FamilyMember {
         : null;
     maritalStatus = json['marital_status'] is Map ? json['marital_status']['name']?.toString() : json['marital_status']?.toString();
     vitals = json['vitals'] != null ? Vitals.fromJson(json['vitals']) : null;
-    fullAccess = _asBool(json['full_access'] ?? json['has_full_access']);
-    emergencyOnly = _asBool(
-      json['emergency_only'] ?? json['has_emergency_only'],
-    );
-    accessGiven = _asBool(
-      json['access_given'] ??
-          json['has_access'] ??
-          json['is_access_given'] ??
-          ((fullAccess == true || emergencyOnly == true) ? true : null),
-    );
+    _applyAccessFlags(json);
+  }
+
+  static Map<String, dynamic> _withNestedPatient(Map<String, dynamic> raw) {
+    final json = Map<String, dynamic>.from(raw);
+    for (final key in ['patient', 'member', 'profile']) {
+      final nested = raw[key];
+      if (nested is Map) {
+        nested.forEach((k, v) {
+          json.putIfAbsent(k.toString(), () => v);
+        });
+      }
+    }
+    return json;
+  }
+
+  void _applyAccessFlags(Map<String, dynamic> json) {
+    Map<String, dynamic>? box;
+    for (final key in [
+      'access',
+      'access_control',
+      'permissions',
+      'record_access',
+      'access_info',
+    ]) {
+      final v = json[key];
+      if (v is Map) {
+        box = Map<String, dynamic>.from(v);
+        break;
+      }
+    }
+
+    dynamic pick(List<String> keys) {
+      for (final k in keys) {
+        if (json[k] != null) return json[k];
+        if (box != null && box[k] != null) return box[k];
+      }
+      return null;
+    }
+
+    fullAccess = _asBool(pick([
+      'full_access',
+      'has_full_access',
+      'is_full_access',
+      'full',
+    ]));
+    emergencyOnly = _asBool(pick([
+      'emergency_only',
+      'has_emergency_only',
+      'is_emergency_only',
+      'emergency',
+    ]));
+    accessGiven = _asBool(pick([
+      'access_given',
+      'has_access',
+      'is_access_given',
+      'given',
+      'is_given',
+      'can_access',
+      'shared',
+      'is_shared',
+      'records_access',
+    ]));
+
+    final typeRaw = pick(['access_type', 'access_status', 'access_mode']);
+    if (typeRaw is num) {
+      accessType = typeRaw.toInt();
+    } else if (typeRaw != null) {
+      accessType = int.tryParse(typeRaw.toString().trim());
+    }
+
+    var type = typeRaw?.toString().trim().toLowerCase() ?? '';
+    if (type.isEmpty && json['access'] is String) {
+      type = json['access'].toString().trim().toLowerCase();
+    }
+    if (type.isEmpty && json['type'] is String) {
+      final t = json['type'].toString().trim().toLowerCase();
+      if (t == 'give' ||
+          t == 'revoke' ||
+          t == 'full' ||
+          t == 'full_access' ||
+          t == 'emergency' ||
+          t == 'emergency_only') {
+        type = t;
+      }
+    }
+    if (type.contains('full')) {
+      fullAccess = true;
+    } else if (type.contains('emergency')) {
+      emergencyOnly = true;
+    } else if (type == 'give' ||
+        type == 'given' ||
+        type == 'granted' ||
+        type == 'yes' ||
+        type == 'shared') {
+      accessGiven = true;
+    } else if (type == 'revoke' || type == 'revoked' || type == 'none') {
+      accessGiven = false;
+      accessType = 0;
+    }
+
+    // API sends numeric access_type (e.g. 2 = access given, 0 = none).
+    if (accessType != null && accessType! > 0) {
+      accessGiven = true;
+    } else if (accessType == 0) {
+      accessGiven ??= false;
+    }
+
+    hasLogin = _asBool(pick([
+      'has_login',
+      'login_given',
+      'has_account',
+      'can_login',
+      'login_access',
+    ]));
+    parentPermission = ParentPermission.tryParse(json['parent_permission']);
+    if (parentPermission?.isGranted == true) {
+      accessGiven = true;
+    }
+    if (fullAccess == true || emergencyOnly == true) {
+      accessGiven = true;
+    }
   }
 
   static bool? _asBool(dynamic value) {
@@ -228,22 +360,54 @@ class FamilyMember {
     if (value is bool) return value;
     if (value is num) return value != 0;
     final s = value.toString().trim().toLowerCase();
-    if (s == 'true' || s == '1' || s == 'yes') return true;
-    if (s == 'false' || s == '0' || s == 'no') return false;
+    if (s == 'true' ||
+        s == '1' ||
+        s == 'yes' ||
+        s == 'given' ||
+        s == 'granted' ||
+        s == 'full' ||
+        s == 'give') {
+      return true;
+    }
+    if (s == 'false' ||
+        s == '0' ||
+        s == 'no' ||
+        s == 'none' ||
+        s == 'revoke' ||
+        s == 'revoked') {
+      return false;
+    }
     return null;
   }
 
   /// True when any share/access flag is on.
   bool get hasAccess =>
-      accessGiven == true || fullAccess == true || emergencyOnly == true;
+      accessGiven == true ||
+      fullAccess == true ||
+      emergencyOnly == true ||
+      (accessType != null && accessType! > 0) ||
+      parentPermission?.isGranted == true;
 
   /// Short label for chips / cards.
-  String get accessLabel {
-    if (fullAccess == true) return 'Full access';
-    if (emergencyOnly == true) return 'Emergency only';
-    if (accessGiven == true) return 'Access given';
-    return 'No access';
+  String get accessLabel => hasAccess ? 'Access given' : 'No access';
+
+  bool get isAdult => (age ?? 0) >= 18;
+
+  bool get isFemale {
+    final g = (gender ?? '').trim().toLowerCase();
+    return g == 'female' || g == 'f' || g == 'woman';
   }
+
+  bool get needsLoginAccess => false;
+
+  bool get isWaitingForPermission => false;
+
+  bool get isPermissionDeclined => false;
+
+  /// Access is given via Give Access for any member — no waiting lock.
+  bool get recordsLocked => false;
+
+  String get parentPermissionLabel => '';
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
@@ -285,6 +449,7 @@ class FamilyMember {
     data['full_access'] = fullAccess;
     data['emergency_only'] = emergencyOnly;
     data['access_given'] = accessGiven;
+    data['access_type'] = accessType;
     return data;
   }
 }
@@ -389,6 +554,8 @@ class Occupation {
 class Medical {
   List<Allergy>? allergies;
   List<String>? currentMedications;
+  List<String>? riskFactors;
+  List<String>? riskFactorLabels;
   bool? chronicDisease;
   bool? physicallyHandicapped;
   String? disabilityType;
@@ -398,6 +565,8 @@ class Medical {
   Medical({
     this.allergies,
     this.currentMedications,
+    this.riskFactors,
+    this.riskFactorLabels,
     this.chronicDisease,
     this.physicallyHandicapped,
     this.disabilityType,
@@ -413,6 +582,28 @@ class Medical {
       });
     }
     currentMedications = json['current_medications']?.cast<String>();
+    if (json['risk_factors'] is List) {
+      final parsed = <String>[];
+      final labels = <String>[];
+      for (final e in json['risk_factors'] as List) {
+        if (e is Map) {
+          final v = (e['value'] ?? e['code'] ?? '').toString();
+          final l = (e['label'] ?? e['name'] ?? v).toString();
+          if (v.isNotEmpty) {
+            parsed.add(v);
+            labels.add(l.isEmpty ? v : l);
+          }
+        } else {
+          final v = e.toString();
+          if (v.isNotEmpty) {
+            parsed.add(v);
+            labels.add(v);
+          }
+        }
+      }
+      riskFactors = parsed;
+      riskFactorLabels = labels;
+    }
     chronicDisease = json['chronic_disease'];
     physicallyHandicapped = json['physically_handicapped'];
     disabilityType = json['disability_type'] is Map ? json['disability_type']['name']?.toString() : json['disability_type']?.toString();
@@ -426,6 +617,7 @@ class Medical {
       data['allergies'] = allergies!.map((v) => v.toJson()).toList();
     }
     data['current_medications'] = currentMedications;
+    data['risk_factors'] = riskFactors;
     data['chronic_disease'] = chronicDisease;
     data['physically_handicapped'] = physicallyHandicapped;
     data['disability_type'] = disabilityType;

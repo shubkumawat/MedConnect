@@ -18,11 +18,24 @@ class WebApiConstant {
   static const String API_URL_FAMILY_MEMBER_LIST           = BASE_URL + "patients/family-members/";
   static const String API_URL_FAMILY_MEMBER_DETAIL         = BASE_URL + "patients/family-member-detail/";
   static const String API_URL_GIVE_ACCESS                  = BASE_URL + "patients/give-access/";
+  /// GET current request · POST { action: grant|deny }
+  static const String API_URL_PARENT_PERMISSION            = BASE_URL + "patients/parent-permission/";
+  static const String API_URL_RISK_FACTORS                 = BASE_URL + "patients/risk-factors/";
+  static const String API_URL_CONSULTATION_RECORDINGS      = BASE_URL + "transcription/consultation-recordings/";
+  static const String API_URL_CONSULTATION_TRANSCRIPT      = BASE_URL + "transcription/consultation-recordings/transcript/";
+  static const String API_URL_RECORDING_CONSENT            = BASE_URL + "transcription/recording-consent/";
+  static const String API_URL_HEALTH_TIPS                  = BASE_URL + "health-tips/";
+  static const String API_URL_HEALTH_TIPS_DETAIL           = BASE_URL + "health-tips/detail/";
+  static const String API_URL_HEALTH_TIPS_HELPFUL          = BASE_URL + "health-tips/helpful/";
 
   // Notifications / care reminders
   /// GET current prefs · POST to update
   /// Body/query: device_id + medication_reminders / vaccination_reminders / qr_scan_alerts
   static const String API_URL_CARE_REMINDERS               = BASE_URL + "notifications/care-reminders/";
+  /// GET/POST female patients only. Optional patient_id for family members.
+  static const String API_URL_MENSTRUAL_CYCLE              = BASE_URL + "notifications/menstrual-cycle/";
+  /// POST { started_on } — log actual period start and reschedule.
+  static const String API_URL_MENSTRUAL_CYCLE_LOG          = BASE_URL + "notifications/menstrual-cycle/log/";
 
   // Health Records
   static const String API_URL_RECORDS_DISEASES             = BASE_URL + "health-records/diseases/";
@@ -30,6 +43,12 @@ class WebApiConstant {
   static const String API_URL_RECORDS_DISEASES_META        = BASE_URL + "health-records/diseases/meta";
   static const String API_URL_RECORDS_DISEASE_DOCUMENTS    = BASE_URL + "health-records/diseases/documents/";
   static const String API_URL_RECORDS_DISEASE_TIMELINE     = BASE_URL + "health-records/diseases/timeline/";
+  /// GET list ?disease_uuid= · POST schedule follow-up
+  static const String API_URL_RECORDS_APPOINTMENTS         = BASE_URL + "health-records/diseases/appointments/";
+  /// GET ?appointment_uuid=
+  static const String API_URL_RECORDS_APPOINTMENT_DETAIL   = BASE_URL + "health-records/diseases/appointments/detail/";
+  /// POST { appointment_uuid }
+  static const String API_URL_RECORDS_APPOINTMENT_CANCEL   = BASE_URL + "health-records/diseases/appointments/cancel/";
   static const String API_URL_MASTER_REPORT_TYPES         = BASE_URL + "master/report-types/";
   static const String API_URL_RECORDS_PRESCRIPTIONS        = BASE_URL + "health-records/prescriptions/";
   static const String API_URL_RECORDS_MEDICATIONS          = BASE_URL + "health-records/medications/";
@@ -53,6 +72,7 @@ class WebApiConstant {
   static const String WEB_PRIVACY_URL                     = "https://medconnect.airainnovations.com/privacy/";
   static const String WEB_TERMS_URL                       = "https://medconnect.airainnovations.com/terms/";
   static const String WEB_HELP_URL                        = "https://medconnect.airainnovations.com/help/";
+  static const String WEB_CONSULTATION_AUDIO              = "http://medconnect.airainnovations.com/consultation-audio/";
 
   // Access Management
   static const String API_URL_UPDATE_ACCESS_CONTROL        = BASE_URL + "patients/update-access-control/";

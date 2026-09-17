@@ -95,6 +95,7 @@ class DiseaseCard extends StatelessWidget {
   final String diagnosed;
   final String doctor;
   final String? type;
+  final String? appointmentLabel;
   final VoidCallback? onTap;
   final String? heroTag;
 
@@ -105,6 +106,7 @@ class DiseaseCard extends StatelessWidget {
     required this.diagnosed,
     required this.doctor,
     this.type,
+    this.appointmentLabel,
     this.onTap,
     this.heroTag,
   });
@@ -207,6 +209,29 @@ class DiseaseCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (appointmentLabel != null &&
+                          appointmentLabel!.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.event_available_outlined,
+                                size: 12,
+                                color: AppColors.tealDark.withValues(alpha: 0.9)),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                appointmentLabel!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.tealDark,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         children: [

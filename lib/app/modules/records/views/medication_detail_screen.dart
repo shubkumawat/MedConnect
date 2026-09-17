@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:healaura/app/data/models/medical_record_model.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/healora_logo.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../controllers/records_controller.dart';
 import 'add_medication_screen.dart';
@@ -141,19 +142,7 @@ class _Header extends StatelessWidget {
             onTap: onBack,
           ),
           const SizedBox(width: 10),
-          Container(
-            width: 40,
-            height: 40,
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Image.asset(
-              'assets/logo/ic_logo_icon.png',
-              fit: BoxFit.contain,
-            ),
-          ),
+          const HealoraLogo.chip(),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
@@ -9,6 +8,7 @@ import '../../../core/theme/app_text_theme.dart';
 import 'emergency_info_view.dart';
 import '../controllers/profile_controller.dart';
 import 'widgets/profile_form_shell.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 class MedicalInfoScreen extends StatefulWidget {
   final bool isFromLogin;
@@ -35,6 +35,9 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
       }
       if (controller.disabilityTypeList.isEmpty) {
         controller.getMasterDisabilityTypeAPI(context);
+      }
+      if (controller.riskFactorList.isEmpty) {
+        controller.getRiskFactorsAPI(context);
       }
     });
   }
@@ -66,13 +69,13 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
           children: [
             ProfilePrimaryButton(
               text: 'Continue to emergency',
-              isLoading: controller.isLoading.value,
+              isLoading: controller.isSaving.value,
               onTap: _onContinue,
             ),
             if (widget.isFromLogin) ...[
               const SizedBox(height: 10),
               TextButton(
-                onPressed: controller.isLoading.value ? null : _goToEmergency,
+                onPressed: controller.isSaving.value ? null : _goToEmergency,
                 child: Text(
                   'Skip for now',
                   style: AppTextStyles.body.copyWith(
@@ -292,6 +295,43 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                 }).toList(),
               ),
             ),
+            const SizedBox(height: 18),
+            Text(
+              'Risk factors',
+              style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            Obx(() {
+              if (controller.isRiskFactorLoading.value &&
+                  controller.riskFactorList.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.teal,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: controller.riskFactorList.map((rf) {
+                  final sel = controller.selectedRiskFactors.contains(rf.value);
+                  return ProfileChoiceChip(
+                    label: (sel ? '✓  ' : '+  ') + rf.label,
+                    selected: sel,
+                    activeColor: AppColors.orange,
+                    onTap: () => controller.toggleRiskFactor(rf.value),
+                  );
+                }).toList(),
+              );
+            }),
           ],
         ),
         ProfileSectionCard(
@@ -352,29 +392,29 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
 
   void _onContinue() {
     if (controller.bloodGroup.value.isEmpty) {
-      Fluttertoast.showToast(msg: 'Please select blood group');
+      AppToast.showToast(msg: 'Please select blood group');
       return;
     }
     if (controller.heightCtrl.text.trim().isEmpty) {
-      Fluttertoast.showToast(msg: 'Please enter height');
+      AppToast.showToast(msg: 'Please enter height');
       return;
     }
     if (controller.weightCtrl.text.trim().isEmpty) {
-      Fluttertoast.showToast(msg: 'Please enter weight');
+      AppToast.showToast(msg: 'Please enter weight');
       return;
     }
     if (controller.maritalStatus.value.isEmpty) {
-      Fluttertoast.showToast(msg: 'Please select marital status');
+      AppToast.showToast(msg: 'Please select marital status');
       return;
     }
     if (controller.selectedOccupationModel.value == null) {
-      Fluttertoast.showToast(msg: 'Please select occupation');
+      AppToast.showToast(msg: 'Please select occupation');
       return;
     }
     if (controller.isPhysicallyHandicapped.value &&
         controller.selectedDisabilityTypeModel.value == null &&
         controller.disabilityTypeCtrl.text.trim().isEmpty) {
-      Fluttertoast.showToast(msg: 'Please select disability type');
+      AppToast.showToast(msg: 'Please select disability type');
       return;
     }
     controller.updateMedicalAPI(context, () {

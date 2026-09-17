@@ -1,7 +1,7 @@
 import 'package:healaura/app/data/services/storage_service.dart';
 import 'package:healaura/app/modules/login/views/login_view.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 DateTime? currentBackPressTime;
 
@@ -10,7 +10,7 @@ Future<bool> onWillPop() {
   if (currentBackPressTime == null ||
       now.difference(currentBackPressTime!) > Duration(seconds: 1)) {
     currentBackPressTime = now;
-    Fluttertoast.showToast(msg: "Are you sure want to exit app?");
+    AppToast.showToast(msg: "Are you sure want to exit app?");
     return Future.value(false);
   }
   return Future.value(true);

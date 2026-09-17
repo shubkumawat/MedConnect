@@ -104,7 +104,7 @@ class PdfGenerator {
             
             pw.Footer(
               margin: const pw.EdgeInsets.only(top: 20),
-              trailing: pw.Text("Generated via HealAura", style: pw.TextStyle(fontSize: 10, color: PdfColors.grey500)),
+              trailing: pw.Text("Generated via Healora", style: pw.TextStyle(fontSize: 10, color: PdfColors.grey500)),
             )
           ];
         },

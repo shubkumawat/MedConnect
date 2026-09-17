@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:dio/dio.dart' as dio;
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -16,8 +15,12 @@ import 'package:healaura/app/core/Util/image_pick_helper.dart';
 import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
 import 'package:healaura/app/data/services/storage_service.dart';
 import 'package:healaura/app/data/models/family_member_model.dart';
+import 'package:healaura/app/data/models/menstrual_cycle_model.dart';
 
 import '../../../data/models/GetCountryApiResponseModel.dart';
+import '../../../data/models/risk_factor_model.dart';
+import '../../home/controllers/home_controller.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 
 /// Master relation list ka model
@@ -98,7 +101,7 @@ class FamilyMemberController extends GetxController {
       }
     } catch (e) {
       PrintLog.printLog("Pick Image Error: $e");
-      Fluttertoast.showToast(msg: 'Could not pick image');
+      AppToast.showToast(msg: 'Could not pick image');
     }
   }
 
@@ -162,9 +165,9 @@ class FamilyMemberController extends GetxController {
             familyMemberList.refresh();
           }
         }
-        Fluttertoast.showToast(msg: response['message'] ?? "Access updated");
+        AppToast.showToast(msg: response['message'] ?? "Access updated");
       } else {
-        Fluttertoast.showToast(msg: response?['message'] ?? "Failed to update access");
+        AppToast.showToast(msg: response?['message'] ?? "Failed to update access");
       }
     } catch (e) {
       isLoading.value = false;
@@ -233,6 +236,9 @@ class FamilyMemberController extends GetxController {
 
   final allergyTags = ['Penicillin', 'Peanuts', 'Latex', 'Dust', 'Milk', 'Dairy'];
   RxList<String> selectedAllergies = <String>[].obs;
+  RxList<RiskFactor> riskFactorList = <RiskFactor>[].obs;
+  RxList<String> selectedRiskFactors = <String>[].obs;
+  RxBool isRiskFactorLoading = false.obs;
 
   final medicationInputCtrl = TextEditingController();
   RxList<String> selectedMedications = <String>[].obs;
@@ -242,6 +248,14 @@ class FamilyMemberController extends GetxController {
       selectedAllergies.remove(tag);
     } else {
       selectedAllergies.add(tag);
+    }
+  }
+
+  void toggleRiskFactor(String value) {
+    if (selectedRiskFactors.contains(value)) {
+      selectedRiskFactors.remove(value);
+    } else {
+      selectedRiskFactors.add(value);
     }
   }
 
@@ -285,11 +299,37 @@ class FamilyMemberController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    selectedCountry.value = CountryModel.indiaFallback;
     _loadToken();
   }
 
   Future<void> _loadToken() async {
     userAccessToken = await AppSharedPreferences().getString(AppSharedPreferences.token);
+  }
+
+  Future<void> getRiskFactorsAPI(BuildContext context) async {
+    try {
+      isRiskFactorLoading.value = true;
+      userAccessToken =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+      final response = await ApiProvider().requestGetForApi(
+        context,
+        WebApiConstant.API_URL_RISK_FACTORS,
+        {},
+        userAccessToken ?? '',
+      );
+      isRiskFactorLoading.value = false;
+      final raw = response?.data;
+      PrintLog.printLog(raw);
+      if (raw is Map && raw['error'] != true && raw['error_code'] == 0) {
+        final data = raw['data'];
+        final list = data is Map ? data['results'] : data;
+        riskFactorList.value = RiskFactor.listFrom(list);
+      }
+    } catch (e) {
+      isRiskFactorLoading.value = false;
+      PrintLog.printLog("Exception RiskFactors: $e");
+    }
   }
 
   Future<void> getAllMasterDataAPI(BuildContext context) async {
@@ -326,6 +366,12 @@ class FamilyMemberController extends GetxController {
             // Countries
             final List countries = data['countries'] ?? [];
             countryList.value = countries.map((e) => CountryModel.fromJson(e)).toList();
+            if (familyMemberDetail.value != null) {
+              _populateFields(familyMemberDetail.value!);
+            } else if (selectedCountry.value == null ||
+                selectedCountry.value!.id == 0) {
+              selectedCountry.value = CountryModel.indiaFrom(countryList);
+            }
 
             // Occupations
             final List occupations = data['occupations'] ?? [];
@@ -334,13 +380,11 @@ class FamilyMemberController extends GetxController {
             // Disability Types
             final List disabilities = data['disability_types'] ?? [];
             disabilityTypeList.value = disabilities.map((e) => DisabilityTypeModel.fromJson(e)).toList();
-
-            // Sync selections if needed
-            if (familyMemberDetail.value != null) {
-               _populateFields(familyMemberDetail.value!);
-            }
           }
         }
+      }
+      if (Get.context != null) {
+        await getRiskFactorsAPI(Get.context!);
       }
     } catch (e) {
       isRelationLoading.value = false;
@@ -371,7 +415,7 @@ class FamilyMemberController extends GetxController {
           final List list = response['data']?['relations'] ?? [];
           relationList.value = list.map((e) => RelationModel.fromJson(e)).toList();
         } else {
-          Fluttertoast.showToast(msg: response['message']?.toString() ?? '');
+          AppToast.showToast(msg: response['message']?.toString() ?? '');
         }
       }
     } catch (e) {
@@ -399,17 +443,23 @@ class FamilyMemberController extends GetxController {
         if (response['error'] != true && response['error_code'] == 0) {
           final List list = response['data'] ?? [];
           countryList.value = list.map((e) => CountryModel.fromJson(e)).toList();
+          if (familyMemberDetail.value == null) {
+            if (selectedCountry.value == null ||
+                selectedCountry.value!.id == 0) {
+              selectedCountry.value = CountryModel.indiaFrom(countryList);
+            }
+          }
         } else {
-          Fluttertoast.showToast(msg: response['message']?.toString() ?? '');
+          AppToast.showToast(msg: response['message']?.toString() ?? '');
         }
       } else {
         PrintLog.printLog("Unexpected response (not JSON): $response");
-        Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+        AppToast.showToast(msg: WebApiConstant.ApiError);
       }
     } catch (e) {
       isCountryLoading.value = false;
       PrintLog.printLog("Exception: $e");
-      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+      AppToast.showToast(msg: WebApiConstant.ApiError);
     }
   }
 
@@ -495,7 +545,7 @@ class FamilyMemberController extends GetxController {
     selectedGender.value = '';
     selectedRelation.value = '';
     selectedRelationModel.value = null;
-    selectedCountry.value = null;
+    selectedCountry.value = CountryModel.indiaFrom(countryList);
 
     bloodGroup.value = '';
     heightCtrl.clear();
@@ -511,6 +561,7 @@ class FamilyMemberController extends GetxController {
     isOrganDonor.value = false;
 
     selectedAllergies.clear();
+    selectedRiskFactors.clear();
     selectedMedications.clear();
     medicationInputCtrl.clear();
 
@@ -563,10 +614,22 @@ class FamilyMemberController extends GetxController {
       isLoading.value = false;
       if (response != null && response is Map) {
         if (response['error'] != true && response['error_code'] == 0) {
-          final List list = response['data']?['family_members'] ?? [];
-          familyMemberList.value = list.map((e) => FamilyMember.fromJson(e)).toList();
+          final data = response['data'];
+          List list = const [];
+          if (data is Map) {
+            list = data['family_members'] ??
+                data['members'] ??
+                data['results'] ??
+                [];
+          } else if (data is List) {
+            list = data;
+          }
+          familyMemberList.value = list
+              .whereType<Map>()
+              .map((e) => FamilyMember.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
         } else {
-          Fluttertoast.showToast(msg: response['message']?.toString() ?? '');
+          AppToast.showToast(msg: response['message']?.toString() ?? '');
         }
       }
     } catch (e) {
@@ -594,9 +657,10 @@ class FamilyMemberController extends GetxController {
             fullAccess.value = familyMemberDetail.value!.fullAccess ?? false;
             emergencyOnly.value = familyMemberDetail.value!.emergencyOnly ?? false;
             _populateFields(familyMemberDetail.value!);
+            debugPrint("response...${response.toString()}");
           }
         } else {
-          Fluttertoast.showToast(msg: response['message']?.toString() ?? '');
+          AppToast.showToast(msg: response['message']?.toString() ?? '');
         }
       }
     } catch (e) {
@@ -631,18 +695,18 @@ class FamilyMemberController extends GetxController {
       isLoading.value = false;
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          Fluttertoast.showToast(msg: response['message'] ?? 'Family member deleted successfully.');
+          AppToast.showToast(msg: response['message'] ?? 'Family member deleted successfully.');
           onSuccess();
         } else {
-          Fluttertoast.showToast(msg: response['message']?.toString() ?? '');
+          AppToast.showToast(msg: response['message']?.toString() ?? '');
         }
       } else {
-        Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+        AppToast.showToast(msg: WebApiConstant.ApiError);
       }
     } catch (e) {
       isLoading.value = false;
       PrintLog.printLog("Delete Exception: $e");
-      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+      AppToast.showToast(msg: WebApiConstant.ApiError);
     }
   }
 
@@ -664,7 +728,10 @@ class FamilyMemberController extends GetxController {
     }
 
     if (member.nationality != null) {
-      selectedCountry.value = countryList.firstWhereOrNull((c) => c.id == member.nationality?.id);
+      selectedCountry.value = countryList.firstWhereOrNull((c) => c.id == member.nationality?.id)
+          ?? CountryModel.indiaFrom(countryList);
+    } else {
+      selectedCountry.value = CountryModel.indiaFrom(countryList);
     }
 
     bloodGroup.value = member.bloodGroup ?? '';
@@ -693,6 +760,7 @@ class FamilyMemberController extends GetxController {
     isOrganDonor.value = member.medical?.organDonor ?? false;
 
     selectedAllergies.value = member.medical?.allergies?.map((e) => e.allergyName ?? '').toList() ?? [];
+    selectedRiskFactors.value = member.medical?.riskFactors ?? [];
     selectedMedications.value = member.medical?.currentMedications ?? [];
 
     final home = HomeAddress.parse(member.homeAddress);
@@ -721,30 +789,30 @@ class FamilyMemberController extends GetxController {
   bool _validate() {
     final nameErr = TxtValidation.personNameError(fullNameCtrl.text);
     if (nameErr != null) {
-      Fluttertoast.showToast(msg: nameErr);
+      AppToast.showToast(msg: nameErr);
       return false;
     }
     final mobileErr = TxtValidation.mobileError(mobileNumberCtrl.text);
     if (mobileErr != null) {
-      Fluttertoast.showToast(msg: mobileErr);
+      AppToast.showToast(msg: mobileErr);
       return false;
     }
     if (selectedDob.value == null) {
-      Fluttertoast.showToast(msg: 'Please select date of birth');
+      AppToast.showToast(msg: 'Please select date of birth');
       return false;
     }
     if (selectedGender.value.isEmpty) {
-      Fluttertoast.showToast(msg: 'Please select gender');
+      AppToast.showToast(msg: 'Please select gender');
       return false;
     }
     if (selectedRelationModel.value == null) {
-      Fluttertoast.showToast(msg: 'Please select relation');
+      AppToast.showToast(msg: 'Please select relation');
       return false;
     }
     final contactName = contactNameCtrl.text.trim();
     final contactNameErr = TxtValidation.personNameError(contactName);
     if (contactNameErr != null) {
-      Fluttertoast.showToast(
+      AppToast.showToast(
         msg: contactName.isEmpty
             ? 'Please enter emergency contact name'
             : contactNameErr,
@@ -754,7 +822,7 @@ class FamilyMemberController extends GetxController {
     final contactMobileErr =
         TxtValidation.mobileError(contactMobileCtrl.text, required: true);
     if (contactMobileErr != null) {
-      Fluttertoast.showToast(msg: contactMobileErr);
+      AppToast.showToast(msg: contactMobileErr);
       return false;
     }
     return true;
@@ -823,6 +891,7 @@ class FamilyMemberController extends GetxController {
         // API expects JSON arrays (same as Postman), not jsonEncode strings.
         "allergies": selectedAllergies.toList(),
         "medications": selectedMedications.toList(),
+        "risk_factors": selectedRiskFactors.toList(),
       };
 
       dynamic response;
@@ -855,22 +924,22 @@ class FamilyMemberController extends GetxController {
         final data = (response is dio.Response) ? response.data : response;
         if (data != null && data is Map) {
           if (data['error'] != true && data['error_code'] == 0) {
-            Fluttertoast.showToast(msg: data['message'] ?? 'Family member added successfully.');
+            AppToast.showToast(msg: data['message'] ?? 'Family member added successfully.');
             onSuccess();
           } else {
-            Fluttertoast.showToast(msg: data['message']?.toString() ?? '');
+            AppToast.showToast(msg: data['message']?.toString() ?? '');
           }
         } else {
           PrintLog.printLog("Unexpected response format: $response");
-          Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+          AppToast.showToast(msg: WebApiConstant.ApiError);
         }
       } else {
-        Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+        AppToast.showToast(msg: WebApiConstant.ApiError);
       }
     } catch (e) {
       isLoading.value = false;
       PrintLog.printLog("Exception: $e");
-      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+      AppToast.showToast(msg: WebApiConstant.ApiError);
     }
   }
 
@@ -931,6 +1000,7 @@ class FamilyMemberController extends GetxController {
         // API expects JSON arrays (same as Postman), not jsonEncode strings.
         "allergies": selectedAllergies.toList(),
         "medications": selectedMedications.toList(),
+        "risk_factors": selectedRiskFactors.toList(),
       };
 
       dynamic response;
@@ -963,22 +1033,22 @@ class FamilyMemberController extends GetxController {
         final data = (response is dio.Response) ? response.data : response;
         if (data != null && data is Map) {
           if (data['error'] != true && data['error_code'] == 0) {
-            Fluttertoast.showToast(msg: data['message'] ?? 'Family member updated successfully.');
+            AppToast.showToast(msg: data['message'] ?? 'Family member updated successfully.');
             onSuccess();
           } else {
-            Fluttertoast.showToast(msg: data['message']?.toString() ?? '');
+            AppToast.showToast(msg: data['message']?.toString() ?? '');
           }
         } else {
           PrintLog.printLog("Unexpected response format: $response");
-          Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+          AppToast.showToast(msg: WebApiConstant.ApiError);
         }
       } else {
-        Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+        AppToast.showToast(msg: WebApiConstant.ApiError);
       }
     } catch (e) {
       isLoading.value = false;
       PrintLog.printLog("Exception: $e");
-      Fluttertoast.showToast(msg: WebApiConstant.ApiError);
+      AppToast.showToast(msg: WebApiConstant.ApiError);
     }
   }
 
@@ -1002,16 +1072,42 @@ class FamilyMemberController extends GetxController {
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          Fluttertoast.showToast(
+          AppToast.showToast(
             msg: response['message'] ??
                 (type == 'revoke'
                     ? 'Access revoked successfully'
                     : 'Access given successfully'),
           );
+          final granted = type != 'revoke';
+          final i = familyMemberList.indexWhere((e) => e.patientId == patientId);
+          if (i >= 0) {
+            familyMemberList[i].accessGiven = granted;
+            familyMemberList[i].accessType = granted ? 2 : 0;
+            if (!granted) {
+              familyMemberList[i].fullAccess = false;
+              familyMemberList[i].emergencyOnly = false;
+            }
+            familyMemberList.refresh();
+          }
+          final detail = familyMemberDetail.value;
+          if (detail?.patientId == patientId) {
+            detail!.accessGiven = granted;
+            detail.accessType = granted ? 2 : 0;
+            if (!granted) {
+              detail.fullAccess = false;
+              detail.emergencyOnly = false;
+              fullAccess.value = false;
+              emergencyOnly.value = false;
+            }
+            familyMemberDetail.refresh();
+          }
           await getFamilyMemberDetailAPI(context, patientId);
           await getFamilyMemberListAPI(context);
+          if (Get.isRegistered<HomeController>()) {
+            await Get.find<HomeController>().fetchFamilyMembers();
+          }
         } else {
-          Fluttertoast.showToast(msg: response['message'] ?? 'Failed to give access');
+          AppToast.showToast(msg: response['message'] ?? 'Failed to give access');
         }
       }
 
@@ -1019,6 +1115,69 @@ class FamilyMemberController extends GetxController {
       isLoading.value = false;
       PrintLog.printLog("Exception giveAccessAPI: $e");
     }
+  }
+
+  /// GET /patients/parent-permission/ — child's pending request.
+  Future<ParentPermission?> fetchParentPermission(BuildContext? context) async {
+    try {
+      userAccessToken = await StorageService().getString(StorageService.token);
+      final response = await ApiProvider().requestGetForApi(
+        context ?? Get.context,
+        WebApiConstant.API_URL_PARENT_PERMISSION,
+        {},
+        userAccessToken ?? '',
+      );
+      if (response != null &&
+          response.statusCode == 200 &&
+          response.data is Map) {
+        final raw = Map<String, dynamic>.from(response.data as Map);
+        if (raw['error'] == true) return null;
+        final data = raw['data'] is Map ? raw['data'] : raw;
+        if (data is Map) {
+          return ParentPermission.fromJson(Map<String, dynamic>.from(data));
+        }
+      }
+    } catch (e) {
+      PrintLog.printLog('fetchParentPermission: $e');
+    }
+    return null;
+  }
+
+  /// POST /patients/parent-permission/ { action: grant|deny }
+  Future<bool> respondParentPermission({
+    required BuildContext context,
+    required String action,
+  }) async {
+    try {
+      isLoading.value = true;
+      userAccessToken = await StorageService().getString(StorageService.token);
+      final response = await ApiProvider().requestPostForApi(
+        context,
+        WebApiConstant.API_URL_PARENT_PERMISSION,
+        {'action': action},
+        userAccessToken ?? '',
+      );
+      isLoading.value = false;
+      if (response != null && response.data is Map) {
+        final raw = Map<String, dynamic>.from(response.data as Map);
+        AppToast.showToast(
+          msg: raw['message']?.toString() ??
+              (action == 'grant'
+                  ? 'Permission granted.'
+                  : 'Permission declined.'),
+        );
+        final ok = raw['error'] != true;
+        if (ok && Get.isRegistered<HomeController>()) {
+          await Get.find<HomeController>().loadParentPermission();
+        }
+        return ok;
+      }
+    } catch (e) {
+      isLoading.value = false;
+      PrintLog.printLog('respondParentPermission: $e');
+      AppToast.showToast(msg: WebApiConstant.ApiError);
+    }
+    return false;
   }
 
   @override

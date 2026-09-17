@@ -21,11 +21,11 @@ void main() async {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
-  runApp(const HealAuraApp());
+  runApp(const HealoraApp());
 }
 
-class HealAuraApp extends StatelessWidget {
-  const HealAuraApp({super.key});
+class HealoraApp extends StatelessWidget {
+  const HealoraApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +47,9 @@ class HealAuraApp extends StatelessWidget {
     );
 
     return GetMaterialApp(
-      title: 'HealAura',
+      title: 'Healora',
+      locale: const Locale('en'),
+      fallbackLocale: const Locale('en'),
       debugShowCheckedModeBanner: false,
       theme: base.copyWith(
         textTheme: textTheme,

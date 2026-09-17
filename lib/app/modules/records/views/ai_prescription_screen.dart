@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
@@ -14,10 +13,12 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../controllers/records_controller.dart';
 import 'add_medication_screen.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 class AiPrescriptionScreen extends StatefulWidget {
   final String? diseaseUuid;
-  const AiPrescriptionScreen({super.key, this.diseaseUuid});
+  final String? appointmentUuid;
+  const AiPrescriptionScreen({super.key, this.diseaseUuid, this.appointmentUuid});
 
   @override
   State<AiPrescriptionScreen> createState() => _AiPrescriptionScreenState();
@@ -75,6 +76,7 @@ class _AiPrescriptionScreenState extends State<AiPrescriptionScreen>
     final result = await controller.scanPrescription(
       _image!.path,
       diseaseUuid: widget.diseaseUuid,
+      appointmentUuid: widget.appointmentUuid,
     );
 
     if (result != null) {
@@ -192,7 +194,7 @@ class _AiPrescriptionScreenState extends State<AiPrescriptionScreen>
     final hospital = _hospitalCtrl.text.trim();
 
     if (doctor.isEmpty && hospital.isEmpty && _medications.isEmpty) {
-      Fluttertoast.showToast(
+      AppToast.showToast(
         msg: 'Add doctor/hospital details or at least one medicine before continuing.',
       );
       return false;
@@ -201,7 +203,7 @@ class _AiPrescriptionScreenState extends State<AiPrescriptionScreen>
     for (var i = 0; i < _medications.length; i++) {
       final name = (_medications[i]['name'] ?? '').toString().trim();
       if (name.isEmpty) {
-        Fluttertoast.showToast(
+        AppToast.showToast(
           msg: 'Medication ${i + 1}: name is required. Edit or delete it.',
         );
         return false;
@@ -389,7 +391,7 @@ class _AiPrescriptionScreenState extends State<AiPrescriptionScreen>
                         onTap: () {
                           final name = nameCtrl.text.trim();
                           if (name.isEmpty) {
-                            Fluttertoast.showToast(
+                            AppToast.showToast(
                                 msg: 'Medicine name is required.');
                             return;
                           }

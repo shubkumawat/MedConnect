@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart' as dio;
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -14,6 +13,7 @@ import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/app_shared_preferences.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/qr_code_model.dart';
+import 'package:healaura/app/core/Util/app_toast.dart';
 
 class QrController extends GetxController {
   final String patientName;
@@ -37,6 +37,7 @@ class QrController extends GetxController {
   final isLoading = false.obs;
   final isRegenerating = false.obs;
   final isDeleting = false.obs;
+  final isSharing = false.obs;
   final qrData = Rxn<QrCodeData>();
   final secondsLeft = 0.obs;
 
@@ -147,18 +148,18 @@ class QrController extends GetxController {
         _timer?.cancel();
         qrData.value = null;
         secondsLeft.value = 0;
-        Fluttertoast.showToast(
+        AppToast.showToast(
           msg: raw is Map
               ? (raw['message']?.toString() ?? 'QR deleted')
               : 'QR deleted',
         );
       } else {
         final msg = raw is Map ? raw['message']?.toString() : null;
-        Fluttertoast.showToast(msg: msg ?? 'Failed to delete QR');
+        AppToast.showToast(msg: msg ?? 'Failed to delete QR');
       }
     } catch (e) {
       debugPrint('QR expire/delete error: $e');
-      Fluttertoast.showToast(msg: 'Failed to delete QR');
+      AppToast.showToast(msg: 'Failed to delete QR');
     } finally {
       isDeleting.value = false;
     }
@@ -191,7 +192,7 @@ class QrController extends GetxController {
           response.data['error'] != true) {
         _applyResponse(Map<String, dynamic>.from(response.data as Map));
         if (!silent) {
-          Fluttertoast.showToast(
+          AppToast.showToast(
             msg: response.data['message']?.toString() ??
                 'QR generated successfully',
           );
@@ -201,13 +202,13 @@ class QrController extends GetxController {
             ? response!.data['message']?.toString()
             : null;
         if (!silent) {
-          Fluttertoast.showToast(msg: msg ?? 'Failed to generate QR');
+          AppToast.showToast(msg: msg ?? 'Failed to generate QR');
         }
       }
     } catch (e) {
       debugPrint('QR generate error: $e');
       if (!silent) {
-        Fluttertoast.showToast(msg: 'Failed to generate QR');
+        AppToast.showToast(msg: 'Failed to generate QR');
       }
     } finally {
       isRegenerating.value = false;
@@ -242,38 +243,59 @@ class QrController extends GetxController {
   }
 
   Future<void> shareQr() async {
-    final imageUrl = qrData.value?.qr?.resolvedImageUrl;
-    if (imageUrl == null || imageUrl.isEmpty) {
-      Fluttertoast.showToast(msg: 'QR image not available to share');
+    if (isExpired) {
+      AppToast.showToast(msg: 'This QR has expired. Generate a new one to share.');
+      return;
+    }
+    final qr = qrData.value?.qr;
+    final imageUrl = qr?.resolvedImageUrl;
+    final scanUrl = (qr?.scanUrl ?? qr?.payloadUrl ?? '').trim();
+    final text =
+        "${patientName}'s Healora Health QR — valid for $activeExpiryMinutes minutes"
+        "${scanUrl.isNotEmpty ? '\n$scanUrl' : ''}";
+
+    if ((imageUrl == null || imageUrl.isEmpty) && scanUrl.isEmpty) {
+      AppToast.showToast(msg: 'QR is not available to share yet');
       return;
     }
 
     try {
-      isLoading.value = true;
-      final response = await dio.Dio().get<List<int>>(
-        imageUrl,
-        options: dio.Options(responseType: dio.ResponseType.bytes),
-      );
-      final bytes = Uint8List.fromList(response.data ?? []);
-      if (bytes.isEmpty) {
-        Fluttertoast.showToast(msg: 'Could not download QR image');
-        return;
+      isSharing.value = true;
+      Rect? origin;
+      final box = Get.context?.findRenderObject();
+      if (box is RenderBox && box.hasSize) {
+        origin = box.localToGlobal(Offset.zero) & box.size;
       }
 
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/healaura_health_qr.png');
-      await file.writeAsBytes(bytes);
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        final response = await dio.Dio().get<List<int>>(
+          imageUrl,
+          options: dio.Options(responseType: dio.ResponseType.bytes),
+        );
+        final bytes = Uint8List.fromList(response.data ?? []);
+        if (bytes.isNotEmpty) {
+          final dir = await getTemporaryDirectory();
+          final file = File('${dir.path}/healora_health_qr.png');
+          await file.writeAsBytes(bytes);
+          await Share.shareXFiles(
+            [XFile(file.path, mimeType: 'image/png', name: 'Healora_Health_QR.png')],
+            text: text,
+            sharePositionOrigin: origin,
+          );
+          return;
+        }
+      }
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text:
-            "${patientName}'s HealAura Health QR — valid for $activeExpiryMinutes minutes",
-      );
+      if (scanUrl.isNotEmpty) {
+        await Share.share(text, sharePositionOrigin: origin);
+        return;
+      }
+      AppToast.showToast(msg: 'Could not download QR image');
     } catch (e) {
       debugPrint('Share QR error: $e');
-      Fluttertoast.showToast(msg: 'Failed to share QR');
+      AppToast.showToast(msg: 'Failed to share QR');
     } finally {
-      isLoading.value = false;
+      isSharing.value = false;
     }
   }
 }
