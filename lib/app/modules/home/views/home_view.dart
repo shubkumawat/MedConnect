@@ -5,13 +5,16 @@ import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/healora_logo.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../core/Util/appointment_prompts.dart';
 import '../../../core/Util/display_value.dart';
 import '../../../data/models/family_member_model.dart';
 import '../../../data/models/video_model.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../family/controllers/family_member_controller.dart';
 import '../../family/views/add_family_member_screen.dart';
+import '../../profile/controllers/profile_controller.dart';
 import '../controllers/home_controller.dart';
+import '../controllers/notifications_controller.dart';
 import 'bmi_calculator_screen.dart';
 import 'health_tips_screen.dart';
 import '../controllers/health_tips_controller.dart';
@@ -41,9 +44,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     controller = Get.put(HomeController());
+    if (!Get.isRegistered<NotificationsController>()) {
+      Get.put(NotificationsController());
+    }
     _passportPage = PageController(viewportFraction: 0.88);
     // Selected member is always index 0 — keep PageView on it after restore/select.
     _passportIndexWorker = ever<int>(controller.activePatientIndex, (i) {
+      if (Get.isRegistered<NotificationsController>()) {
+        Get.find<NotificationsController>().fetch(reset: true);
+      }
       if (!_passportPage.hasClients) return;
       final page = _passportPage.page?.round();
       if (page == i) return;
@@ -67,7 +76,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _onRefresh() async {
-    await controller.fetchFamilyMembers();
+    if (Get.isRegistered<ProfileController>()) {
+      await Get.find<ProfileController>().getPatientProfileAPI(context);
+    }
+    await controller.refreshHome();
+    if (Get.isRegistered<NotificationsController>()) {
+      await Get.find<NotificationsController>().fetch(reset: true);
+    }
     await Future.wait([
       controller.fetchVideoTopics(),
       controller.fetchTrendingVideos(),
@@ -161,10 +176,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // _TodaysCare(controller: controller)
-                    //     .animate()
-                    //     .fadeIn(delay: 120.ms, duration: 420.ms)
-                    //     .slideY(begin: 0.06, end: 0),
+                    _UpcomingVisits(controller: controller)
+                        .animate()
+                        .fadeIn(delay: 120.ms, duration: 420.ms)
+                        .slideY(begin: 0.06, end: 0),
                     const SizedBox(height: 18),
                     _BmiCalculatorCard(
                       onTap: () => Get.to(() => const BmiCalculatorScreen()),
@@ -256,8 +271,7 @@ class _TopBar extends StatelessWidget {
               ],
             ),
           ),
-          _IconBtn(
-            icon: Icons.notifications_none_rounded,
+          _NotificationBell(
             onTap: () => Get.to(() => const NotificationsScreen()),
           ),
         ],
@@ -266,6 +280,62 @@ class _TopBar extends StatelessWidget {
         .animate()
         .fadeIn(duration: 350.ms)
         .slideY(begin: -0.1, end: 0, curve: Curves.easeOut);
+  }
+}
+
+class _NotificationBell extends StatelessWidget {
+  final VoidCallback onTap;
+  const _NotificationBell({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const Icon(Icons.notifications_none_rounded,
+                  color: AppColors.tealDark, size: 22),
+              if (Get.isRegistered<NotificationsController>())
+                Obx(() {
+                  final n = Get.find<NotificationsController>().unreadCount.value;
+                  if (n <= 0) return const SizedBox.shrink();
+                  return Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      height: 14,
+                      constraints: const BoxConstraints(minWidth: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.orange,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          n > 9 ? '9+' : '$n',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -788,6 +858,60 @@ class _QrFab extends StatelessWidget {
           duration: 1600.ms,
           curve: Curves.easeInOut,
         );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UPCOMING VISITS — today & tomorrow from profile API
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _UpcomingVisits extends StatelessWidget {
+  final HomeController controller;
+  const _UpcomingVisits({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final items = controller.upcomingAppointments;
+      if (items.isEmpty) return const SizedBox.shrink();
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Upcoming visits', style: AppTextStyles.heading3),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Today & tomorrow',
+                  style: AppTextStyles.captionBold.copyWith(
+                    color: AppColors.tealDark,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...items.map(
+            (a) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: UpcomingVisitCard(
+                appointment: a,
+                onTap: () => openUpcomingAppointment(a),
+              ),
+            ),
+          ),
+        ],
+      );
+    });
   }
 }
 

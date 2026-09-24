@@ -146,12 +146,17 @@ class NotificationService {
   }
 
   /// Best-effort current FCM token for use in API calls (e.g. login/verify
-  /// OTP) — the in-memory value set by [init], falling back to the last
-  /// value persisted to storage in case this is called before [init]
-  /// finishes fetching a fresh one.
+  /// OTP) — the in-memory value set by [init], falling back to storage, then
+  /// a live `getToken()` so verify-OTP is not sent without a token.
   Future<String> currentToken() async {
-    if (fcmToken != null && fcmToken!.isNotEmpty) return fcmToken!;
-    return StorageService().getString(StorageService.fcmToken);
+    if (fcmToken != null && fcmToken!.trim().isNotEmpty) return fcmToken!.trim();
+    final stored = (await StorageService().getString(StorageService.fcmToken)).trim();
+    if (stored.isNotEmpty) {
+      fcmToken = stored;
+      return stored;
+    }
+    await _fetchAndStoreToken();
+    return (fcmToken ?? '').trim();
   }
 
   void _onTokenRefresh(String token) {

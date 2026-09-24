@@ -1,12 +1,39 @@
 import 'package:get/get.dart';
+import 'package:flutter/widgets.dart';
 import '../../find/controllers/find_controller.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../records/controllers/records_controller.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import '../../profile/controllers/profile_controller.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 class DashboardController extends GetxController {
   var currentIndex = 0.obs;
   final loadedIndices = <int>{0}.obs;
+  bool _profileBootstrapped = false;
+
+  @override
+  void onInit() {
+    super.onInit();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadProfileOnFirstOpen();
+    });
+  }
+
+  /// Profile API on first dashboard open so Home can show today/tomorrow visits.
+  Future<void> _loadProfileOnFirstOpen() async {
+    if (_profileBootstrapped) return;
+    final ctx = Get.context;
+    if (ctx == null) return;
+    _profileBootstrapped = true;
+    try {
+      final profile = Get.isRegistered<ProfileController>()
+          ? Get.find<ProfileController>()
+          : Get.put(ProfileController());
+      await profile.getPatientProfileAPI(ctx);
+    } catch (_) {
+      _profileBootstrapped = false;
+    }
+  }
 
   void changeIndex(int index) {
     currentIndex.value = index;

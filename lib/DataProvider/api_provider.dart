@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 
-import 'package:healaura/app/core/Util/CustomLoading/custom_loading.dart';
-import 'package:healaura/app/core/Util/Print/print_log.dart';
+import 'package:healora/app/core/Util/CustomLoading/custom_loading.dart';
+import 'package:healora/app/core/Util/Print/print_log.dart';
 import '../app/data/models/disease_response_model.dart';
 import 'web_api_constant.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 
 
@@ -54,7 +54,7 @@ class ApiProvider {
       CustomLoading().show(context);
       final Response? response = await requestPostForApi(context, url, dictParameter, token);
 
-      if(response != null && (response.statusCode == 200|| response.statusCode == 403)){
+      if(response != null && (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 403)){
         if (response.data is Map) {
           result = Map<String, dynamic>.from(response.data);
         } else if (response.data is String && response.data.toString().isNotEmpty) {
@@ -67,6 +67,14 @@ class ApiProvider {
             PrintLog.printLog("Error decoding login response: $e");
           }
         }
+      } else if (response != null &&
+          (response.statusCode == 404 || response.statusCode == 405)) {
+        result = {
+          'error': true,
+          'error_code': response.statusCode,
+          'message':
+              'Google login is not on the server yet. Please use your mobile number.',
+        };
       }
       else{
 
@@ -1019,6 +1027,29 @@ class ApiProvider {
     }
   }
 
+  Map<String, dynamic> _redactForLog(Map<String, dynamic> raw) {
+    const keys = {
+      'id_token',
+      'idToken',
+      'access_token',
+      'accessToken',
+      'token',
+      'fcmToken',
+      'otp',
+      'password',
+      'refresh',
+      'access',
+    };
+    final copy = Map<String, dynamic>.from(raw);
+    for (final key in keys) {
+      final value = copy[key];
+      if (value is String && value.isNotEmpty) {
+        copy[key] = '***';
+      }
+    }
+    return copy;
+  }
+
   Future<Response?> requestPostForApi(context, String url, Map<String, dynamic> dictParameter,String token) async {
     try{
       Map<String, String> headers = {
@@ -1031,8 +1062,8 @@ class ApiProvider {
       dictParameter["versionNew"] = 1;
       PrintLog.printLog("Headers: $headers");
       PrintLog.printLog("Url:  $url");
-      PrintLog.printLog("Token:  $token");
-      PrintLog.printLog("DictParameter: $dictParameter");
+      PrintLog.printLog("Token:  ${token.isEmpty ? '' : '***'}");
+      PrintLog.printLog("DictParameter: ${_redactForLog(dictParameter)}");
 
       BaseOptions options = BaseOptions(
           baseUrl: WebApiConstant.BASE_URL,

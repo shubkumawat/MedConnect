@@ -7,20 +7,20 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../DataProvider/api_provider.dart';
-import 'package:healaura/DataProvider/app_shared_preferences.dart';
+import 'package:healora/DataProvider/app_shared_preferences.dart';
 import '../../../../DataProvider/web_api_constant.dart';
-import 'package:healaura/app/core/Util/Print/print_log.dart';
-import 'package:healaura/app/core/Util/home_address.dart';
-import 'package:healaura/app/core/Util/image_pick_helper.dart';
-import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
-import 'package:healaura/app/data/services/storage_service.dart';
-import 'package:healaura/app/data/models/family_member_model.dart';
-import 'package:healaura/app/data/models/menstrual_cycle_model.dart';
+import 'package:healora/app/core/Util/Print/print_log.dart';
+import 'package:healora/app/core/Util/home_address.dart';
+import 'package:healora/app/core/Util/image_pick_helper.dart';
+import 'package:healora/app/core/Util/TextValidator/text_validation.dart';
+import 'package:healora/app/data/services/storage_service.dart';
+import 'package:healora/app/data/models/family_member_model.dart';
+import 'package:healora/app/data/models/menstrual_cycle_model.dart';
 
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../data/models/risk_factor_model.dart';
 import '../../home/controllers/home_controller.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 
 /// Master relation list ka model
@@ -360,11 +360,11 @@ class FamilyMemberController extends GetxController {
           final data = response['data'];
           if (data != null) {
             // Relations
-            final List relations = data['relations'] ?? [];
+            final List relations = CountryModel.namedList(data, 'relations');
             relationList.value = relations.map((e) => RelationModel.fromJson(e)).toList();
 
             // Countries
-            final List countries = data['countries'] ?? [];
+            final List countries = CountryModel.namedList(data, 'countries');
             countryList.value = countries.map((e) => CountryModel.fromJson(e)).toList();
             if (familyMemberDetail.value != null) {
               _populateFields(familyMemberDetail.value!);
@@ -374,11 +374,11 @@ class FamilyMemberController extends GetxController {
             }
 
             // Occupations
-            final List occupations = data['occupations'] ?? [];
+            final List occupations = CountryModel.namedList(data, 'occupations');
             occupationList.value = occupations.map((e) => OccupationModel.fromJson(e)).toList();
 
             // Disability Types
-            final List disabilities = data['disability_types'] ?? [];
+            final List disabilities = CountryModel.namedList(data, 'disability_types');
             disabilityTypeList.value = disabilities.map((e) => DisabilityTypeModel.fromJson(e)).toList();
           }
         }
@@ -441,7 +441,7 @@ class FamilyMemberController extends GetxController {
 
       if (response != null && response is Map) {
         if (response['error'] != true && response['error_code'] == 0) {
-          final List list = response['data'] ?? [];
+          final List list = CountryModel.namedList(response['data'], 'countries');
           countryList.value = list.map((e) => CountryModel.fromJson(e)).toList();
           if (familyMemberDetail.value == null) {
             if (selectedCountry.value == null ||
@@ -1051,7 +1051,7 @@ class FamilyMemberController extends GetxController {
       AppToast.showToast(msg: WebApiConstant.ApiError);
     }
   }
-
+// ic_logo_fulls.png
   Future<void> giveAccessAPI(BuildContext context, String patientId, {String type = "give"}) async {
     try {
       isLoading.value = true;

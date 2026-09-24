@@ -1,7 +1,7 @@
-import 'package:healaura/app/data/services/storage_service.dart';
-import 'package:healaura/app/modules/login/views/login_view.dart';
+import 'package:healora/app/data/services/storage_service.dart';
+import 'package:healora/app/modules/login/views/login_view.dart';
 import 'package:get/get.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 DateTime? currentBackPressTime;
 

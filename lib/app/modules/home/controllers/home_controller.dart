@@ -13,6 +13,7 @@ import '../../family/controllers/family_member_controller.dart';
 import '../../family/views/parent_permission_prompt.dart';
 import '../../records/controllers/records_controller.dart';
 import '../../../data/models/menstrual_cycle_model.dart';
+import '../../../data/models/upcoming_appointment_model.dart';
 
 int access_type = 0;
 class HomeController extends GetxController {
@@ -21,6 +22,7 @@ class HomeController extends GetxController {
   var isLoading = false.obs;
 
   RxList<FamilyMember> patients = <FamilyMember>[].obs;
+  final upcomingAppointments = <UpcomingAppointment>[].obs;
   final parentPermission = Rxn<ParentPermission>();
   bool _parentPromptShown = false;
 
@@ -83,6 +85,10 @@ class HomeController extends GetxController {
     });
   }
 
+  Future<void> refreshHome() async {
+    await fetchFamilyMembers();
+  }
+
   Future<void> loadReminderSettings() async {
     final storage = StorageService();
     showMedReminders.value =
@@ -111,9 +117,13 @@ class HomeController extends GetxController {
             profileRes.data is Map) {
           final body = Map<String, dynamic>.from(profileRes.data as Map);
           if (body['error'] != true && body['data'] is Map) {
-            self = FamilyMember.fromProfileJson(
-              Map<String, dynamic>.from(body['data'] as Map),
-            );
+            final data = Map<String, dynamic>.from(body['data'] as Map);
+            self = FamilyMember.fromProfileJson(data);
+            if (upcomingAppointments.isEmpty) {
+              upcomingAppointments.assignAll(
+                UpcomingAppointment.listFrom(data['upcoming_appointments']),
+              );
+            }
           }
         }
       } catch (e) {

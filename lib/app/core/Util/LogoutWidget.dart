@@ -1,5 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:get/get.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../data/services/storage_service.dart';
 import '../../modules/login/views/login_view.dart';
@@ -68,13 +71,19 @@ class LogoutDialog {
   }
 
   static Future<void> _performLogout() async {
+    try {
+      await GoogleSignIn().signOut();
+    } catch (_) {}
+    try {
+      await FacebookAuth.instance.logOut();
+    } catch (_) {}
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
+
     final storage = StorageService();
-    
-    // Clear login status and token using our new StorageService
     await storage.setBool(StorageService.isLogin, false);
     await storage.setString(StorageService.token, "");
-    
-    // Using Get.offAll to navigate to the new LoginView path
     Get.offAll(() => const LoginScreen(), transition: Transition.fade);
   }
 }

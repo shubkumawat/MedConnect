@@ -13,7 +13,7 @@ import '../controllers/find_controller.dart';
 import 'hospital_detail_view.dart';
 
 /// Care discovery dashboard:
-/// Search → specialty → list/map of nearby hospitals (API data unchanged).
+/// Search doctor, clinic, or hospital anywhere (Google Places). No nearby list until search.
 class FindScreen extends StatefulWidget {
   const FindScreen({super.key});
 
@@ -24,16 +24,19 @@ class FindScreen extends StatefulWidget {
 class _FindScreenState extends State<FindScreen> {
   final FindController controller = Get.put(FindController());
   final TextEditingController _searchCtrl = TextEditingController();
-  final PageController _mapCardsPage = PageController(viewportFraction: 0.88);
+  final PageController _mapCardsPage = PageController();
   GoogleMapController? mapController;
   Worker? _userPosWorker;
-  Worker? _showMapWorker;
+  Worker? _searchQueryWorker;
 
   BitmapDescriptor? _hospitalMarker;
   BitmapDescriptor? _clinicMarker;
   BitmapDescriptor? _doctorMarker;
 
   static const double _myLocationZoom = 15;
+  /// Matches Dashboard floating nav: height 90 + bottom margin 28.
+  static const double _navClearance = 118;
+  static const double _mapCardHeight = 148;
 
   @override
   void initState() {
@@ -41,17 +44,17 @@ class _FindScreenState extends State<FindScreen> {
     _loadMarkerIcons();
     // Whenever location arrives (or map opens), keep camera on the user.
     _userPosWorker = ever(controller.userPosition, (_) => _goToMyLocation());
-    _showMapWorker = ever(controller.showMap, (show) {
-      if (show == true) {
-        _goToMyLocation();
-      } else {
-        mapController = null;
+    _searchQueryWorker = ever(controller.searchQuery, (q) {
+      if (_searchCtrl.text != q) {
+        _searchCtrl.value = TextEditingValue(
+          text: q,
+          selection: TextSelection.collapsed(offset: q.length),
+        );
       }
     });
   }
 
   Future<void> _goToMyLocation({double zoom = _myLocationZoom}) async {
-    if (!controller.showMap.value) return;
     final p = controller.userPosition.value;
     final map = mapController;
     if (p == null || map == null) return;
@@ -107,7 +110,7 @@ class _FindScreenState extends State<FindScreen> {
   @override
   void dispose() {
     _userPosWorker?.dispose();
-    _showMapWorker?.dispose();
+    _searchQueryWorker?.dispose();
     _searchCtrl.dispose();
     _mapCardsPage.dispose();
     mapController?.dispose();
@@ -115,10 +118,11 @@ class _FindScreenState extends State<FindScreen> {
   }
 
   Future<void> _refresh() async {
-    await Future.wait([
-      controller.fetchSpecializations(),
-      controller.fetchHospitals(requestLocation: true),
-    ]);
+    if (controller.hasSearched.value) {
+      await controller.submitSearch(controller.searchQuery.value);
+    } else {
+      await controller.locateUser(requestIfNeeded: true);
+    }
   }
 
   @override
@@ -132,55 +136,13 @@ class _FindScreenState extends State<FindScreen> {
           _HeroHeader(
             topPad: top,
             searchController: _searchCtrl,
-            onSearch: (query) => controller.setSearch(query),
+            onQueryChanged: (query) => controller.setSearch(query),
+            onSubmitted: (query) => controller.submitSearch(query),
             onRefreshLocation: () =>
-                controller.fetchHospitals(requestLocation: true),
+                controller.locateUser(requestIfNeeded: true),
           ),
           Expanded(
-            child: Obx(() {
-              if (controller.showMap.value) {
-                return _buildMapExperience();
-              }
-              return RefreshIndicator(
-                color: AppColors.teal,
-                onRefresh: _refresh,
-                child: CustomScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _ViewToggle(controller: controller)
-                                .animate()
-                                .fadeIn(duration: 350.ms)
-                                .slideY(begin: 0.06, end: 0),
-                            const SizedBox(height: 18),
-                            _SpecialtyStrip(controller: controller)
-                                .animate()
-                                .fadeIn(delay: 60.ms, duration: 350.ms),
-                            const SizedBox(height: 18),
-                            _ResultsHeader(
-                              controller: controller,
-                              onSort: _showSortSheet,
-                              onFilters: _showSmartFiltersSheet,
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                        ),
-                      ),
-                    ),
-                    _buildFeaturedRail(),
-                    _buildListSliver(),
-                    const SliverToBoxAdapter(child: SizedBox(height: 120)),
-                  ],
-                ),
-              );
-            }),
+            child: _buildMapExperience(),
           ),
         ],
       ),
@@ -189,7 +151,7 @@ class _FindScreenState extends State<FindScreen> {
 
   Widget _buildFeaturedRail() {
     return Obx(() {
-      if (controller.isHospitalLoading.value) {
+      if (!controller.hasSearched.value || controller.isHospitalLoading.value) {
         return const SliverToBoxAdapter(child: SizedBox.shrink());
       }
       final featured = controller.filteredHospitals
@@ -197,19 +159,11 @@ class _FindScreenState extends State<FindScreen> {
           .take(8)
           .toList();
       if (featured.isEmpty) {
-        // Fallback: top rated nearby as spotlight
-        final list = controller.filteredHospitals.take(5).toList();
-        if (list.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
-        return SliverToBoxAdapter(
-          child: _SpotlightRail(
-            title: 'Top nearby',
-            hospitals: list,
-          ),
-        );
+        return const SliverToBoxAdapter(child: SizedBox.shrink());
       }
       return SliverToBoxAdapter(
         child: _SpotlightRail(
-          title: 'Featured care',
+          title: 'Top matches',
           hospitals: featured,
         ),
       );
@@ -224,13 +178,25 @@ class _FindScreenState extends State<FindScreen> {
           child: Center(child: CircularProgressIndicator(color: AppColors.teal)),
         );
       }
+      if (!controller.hasSearched.value) {
+        return const SliverFillRemaining(
+          hasScrollBody: false,
+          child: _EmptyState(
+            hasLocation: true,
+            searched: false,
+            onRetry: null,
+          ),
+        );
+      }
       final list = controller.filteredHospitals;
       if (list.isEmpty) {
         return SliverFillRemaining(
           hasScrollBody: false,
           child: _EmptyState(
-            hasLocation: controller.userPosition.value != null,
-            onRetry: () => controller.fetchHospitals(requestLocation: true),
+            hasLocation: true,
+            searched: true,
+            onRetry: () =>
+                controller.submitSearch(controller.searchQuery.value),
           ),
         );
       }
@@ -324,6 +290,7 @@ class _FindScreenState extends State<FindScreen> {
                 mapController = c;
                 _goToMyLocation();
               },
+              padding: const EdgeInsets.only(bottom: _navClearance),
               myLocationEnabled: true,
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
@@ -331,42 +298,37 @@ class _FindScreenState extends State<FindScreen> {
               compassEnabled: false,
             ),
           ),
-          // Floating controls over map
-          Positioned(
-            top: 12,
-            left: 16,
-            right: 16,
-            child: Column(
-              children: [
-                _ViewToggle(controller: controller),
-                const SizedBox(height: 10),
-                _SpecialtyStrip(controller: controller, compact: true),
-              ],
-            ),
-          ),
           Positioned(
             right: 16,
-            bottom: withCoords.isEmpty ? 24 : 200,
+            bottom: (controller.hasSearched.value && withCoords.isNotEmpty)
+                ? _navClearance + _mapCardHeight + 20
+                : _navClearance + 16,
             child: Column(
               children: [
                 _MapFab(
                   icon: Icons.my_location_rounded,
                   onTap: () async {
-                    await controller.fetchHospitals(requestLocation: true);
+                    await controller.locateUser(requestIfNeeded: true);
                     await _goToMyLocation();
                   },
                 ),
                 const SizedBox(height: 10),
                 _MapFab(
                   icon: Icons.refresh_rounded,
-                  onTap: () => controller.fetchHospitals(requestLocation: true),
+                  onTap: () {
+                    if (controller.hasSearched.value) {
+                      controller.submitSearch(controller.searchQuery.value);
+                    } else {
+                      controller.locateUser(requestIfNeeded: true);
+                    }
+                  },
                 ),
               ],
             ),
           ),
           if (controller.isHospitalLoading.value)
             const Positioned(
-              top: 120,
+              top: 16,
               left: 0,
               right: 0,
               child: Center(
@@ -385,13 +347,13 @@ class _FindScreenState extends State<FindScreen> {
                 ),
               ),
             ),
-          if (withCoords.isNotEmpty)
+          if (controller.hasSearched.value && withCoords.isNotEmpty)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 100,
+              left: 16,
+              right: 16,
+              bottom: _navClearance + 8,
               child: SizedBox(
-                height: 148,
+                height: _mapCardHeight,
                 child: PageView.builder(
                   controller: _mapCardsPage,
                   onPageChanged: (i) {
@@ -411,7 +373,7 @@ class _FindScreenState extends State<FindScreen> {
                   },
                   itemCount: withCoords.length,
                   itemBuilder: (_, i) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: _MapHospitalCard(
                       hospital: withCoords[i],
                       onTap: () => Get.to(
@@ -424,14 +386,16 @@ class _FindScreenState extends State<FindScreen> {
                 ),
               ),
             )
-          else if (!controller.isHospitalLoading.value)
+          else if (controller.hasSearched.value &&
+              !controller.isHospitalLoading.value)
             Positioned(
               left: 20,
               right: 20,
-              bottom: 110,
+              bottom: _navClearance + 8,
               child: _EmptyState(
-                hasLocation: controller.userPosition.value != null,
-                onRetry: () => controller.fetchHospitals(requestLocation: true),
+                hasLocation: true,
+                onRetry: () =>
+                    controller.submitSearch(controller.searchQuery.value),
                 compact: true,
               ),
             ),
@@ -494,7 +458,7 @@ class _FindScreenState extends State<FindScreen> {
               ),
               Text('Sort results', style: AppTextStyles.heading3),
               const SizedBox(height: 8),
-              tile(FindSortMode.nearest, 'Nearest / Featured', 'Best nearby matches first', Icons.near_me_rounded),
+              tile(FindSortMode.nearest, 'Nearest / Featured', 'Closest matches first', Icons.near_me_rounded),
               tile(FindSortMode.rating, 'Top rated', 'Highest rating first', Icons.star_rounded),
               tile(FindSortMode.reviews, 'Most reviewed', 'Most patient reviews', Icons.reviews_rounded),
               tile(FindSortMode.name, 'Name A–Z', 'Alphabetical', Icons.sort_by_alpha_rounded),
@@ -800,13 +764,15 @@ class _FilterChoice extends StatelessWidget {
 class _HeroHeader extends StatefulWidget {
   final double topPad;
   final TextEditingController searchController;
-  final ValueChanged<String> onSearch;
+  final ValueChanged<String> onQueryChanged;
+  final ValueChanged<String> onSubmitted;
   final VoidCallback onRefreshLocation;
 
   const _HeroHeader({
     required this.topPad,
     required this.searchController,
-    required this.onSearch,
+    required this.onQueryChanged,
+    required this.onSubmitted,
     required this.onRefreshLocation,
   });
 
@@ -864,7 +830,7 @@ class _HeroHeaderState extends State<_HeroHeader> {
                       ),
                     ),
                     Text(
-                      'Hospitals & clinics near you',
+                      'Nearby doctor, clinic, or hospital',
                       style: AppTextStyles.caption.copyWith(
                         color: Colors.white.withValues(alpha: 0.75),
                       ),
@@ -906,10 +872,12 @@ class _HeroHeaderState extends State<_HeroHeader> {
             ),
             child: TextField(
               controller: widget.searchController,
-              onChanged: widget.onSearch,
+              textInputAction: TextInputAction.search,
+              onChanged: widget.onQueryChanged,
+              onSubmitted: widget.onSubmitted,
               style: AppTextStyles.body.copyWith(color: AppColors.textDark),
               decoration: InputDecoration(
-                hintText: 'Search hospital, city, specialty…',
+                hintText: 'Search nearby doctor, clinic, or hospital…',
                 hintStyle: AppTextStyles.body.copyWith(color: AppColors.textGray),
                 prefixIcon: const Icon(Icons.search_rounded, color: AppColors.teal),
                 suffixIcon: widget.searchController.text.isNotEmpty
@@ -917,7 +885,7 @@ class _HeroHeaderState extends State<_HeroHeader> {
                         icon: const Icon(Icons.close_rounded, size: 18),
                         onPressed: () {
                           widget.searchController.clear();
-                          widget.onSearch('');
+                          widget.onQueryChanged('');
                         },
                       )
                     : null,
@@ -932,167 +900,6 @@ class _HeroHeaderState extends State<_HeroHeader> {
         ],
       ),
     );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TOGGLE / CHIPS / HEADERS
-// ═══════════════════════════════════════════════════════════════════════════
-
-class _ViewToggle extends StatelessWidget {
-  final FindController controller;
-  const _ViewToggle({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(() {
-      final map = controller.showMap.value;
-      return Container(
-        height: 46,
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.teal.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            _toggleBtn(
-              label: 'List',
-              icon: Icons.view_agenda_rounded,
-              active: !map,
-              onTap: () => controller.showMap.value = false,
-            ),
-            _toggleBtn(
-              label: 'Map',
-              icon: Icons.map_rounded,
-              active: map,
-              onTap: () => controller.showMap.value = true,
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  Widget _toggleBtn({
-    required String label,
-    required IconData icon,
-    required bool active,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: 200.ms,
-          decoration: BoxDecoration(
-            gradient: active
-                ? const LinearGradient(
-                    colors: [Color(0xFF0B6E4F), Color(0xFF1B9E8E)],
-                  )
-                : null,
-            borderRadius: BorderRadius.circular(11),
-          ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 17, color: active ? Colors.white : AppColors.textGray),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: active ? Colors.white : AppColors.textMuted,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SpecialtyStrip extends StatelessWidget {
-  final FindController controller;
-  final bool compact;
-  const _SpecialtyStrip({required this.controller, this.compact = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(() {
-      if (controller.isLoading.value && controller.specializations.isEmpty) {
-        return const SizedBox(
-          height: 36,
-          child: Center(
-            child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal),
-            ),
-          ),
-        );
-      }
-      final labels = ['All', ...controller.specializations.map((e) => e.name)];
-      final selected = controller.selectedSpecIndex.value;
-
-      return SizedBox(
-        height: compact ? 36 : 40,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: labels.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (_, i) {
-            final active = selected == i;
-            return GestureDetector(
-              onTap: () => controller.selectSpecialty(i),
-              child: AnimatedContainer(
-                duration: 200.ms,
-                padding: EdgeInsets.symmetric(
-                  horizontal: compact ? 12 : 14,
-                  vertical: compact ? 7 : 9,
-                ),
-                decoration: BoxDecoration(
-                  color: active ? AppColors.tealDark : (compact ? Colors.white : Colors.white),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: active
-                        ? Colors.transparent
-                        : AppColors.border.withValues(alpha: 0.9),
-                  ),
-                  boxShadow: compact
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Text(
-                  labels[i],
-                  style: AppTextStyles.captionBold.copyWith(
-                    color: active ? Colors.white : AppColors.textMuted,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    });
   }
 }
 
@@ -1117,11 +924,13 @@ class _ResultsHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Nearby care', style: AppTextStyles.heading3),
+                Text('Search results', style: AppTextStyles.heading3),
                 Text(
                   controller.isHospitalLoading.value
-                      ? 'Locating hospitals…'
-                      : '$count ${count == 1 ? 'place' : 'places'} found',
+                      ? 'Searching…'
+                      : controller.hasSearched.value
+                          ? '$count ${count == 1 ? 'place' : 'places'} found'
+                          : 'Search nearby doctor, clinic, or hospital',
                   style: AppTextStyles.caption.copyWith(color: AppColors.textGray),
                 ),
               ],
@@ -1230,7 +1039,7 @@ class _SpotlightRail extends StatelessWidget {
         const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-          child: Text('All nearby', style: AppTextStyles.heading3),
+          child: Text('Results', style: AppTextStyles.heading3),
         ),
         const SizedBox(height: 8),
       ],
@@ -1748,16 +1557,28 @@ class _MapFab extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final bool hasLocation;
-  final VoidCallback onRetry;
+  final VoidCallback? onRetry;
   final bool compact;
+  final bool searched;
   const _EmptyState({
     required this.hasLocation,
-    required this.onRetry,
+    this.onRetry,
     this.compact = false,
+    this.searched = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    final title = !searched
+        ? 'Search to see results'
+        : hasLocation
+            ? 'No matching places'
+            : 'Location needed';
+    final subtitle = !searched
+        ? 'Type a name and press search to see places near you.'
+        : hasLocation
+            ? 'No matching doctor, clinic, or hospital within 20 km.'
+            : 'Enable location to see nearby results.';
     return Container(
       padding: EdgeInsets.all(compact ? 16 : 28),
       decoration: BoxDecoration(
@@ -1770,30 +1591,31 @@ class _EmptyState extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            hasLocation ? Icons.local_hospital_outlined : Icons.location_off_rounded,
+            !searched
+                ? Icons.search_rounded
+                : hasLocation
+                    ? Icons.local_hospital_outlined
+                    : Icons.location_off_rounded,
             size: compact ? 36 : 48,
             color: AppColors.teal.withValues(alpha: 0.7),
           ),
           const SizedBox(height: 12),
-          Text(
-            hasLocation ? 'No matching places' : 'Location needed',
-            style: AppTextStyles.bodyBold,
-          ),
+          Text(title, style: AppTextStyles.bodyBold),
           const SizedBox(height: 6),
           Text(
-            hasLocation
-                ? 'Try another specialty or clear your search.'
-                : 'Enable location to discover care near you.',
+            subtitle,
             textAlign: TextAlign.center,
             style: AppTextStyles.caption.copyWith(color: AppColors.textGray),
           ),
-          const SizedBox(height: 14),
-          TextButton.icon(
-            onPressed: onRetry,
-            style: TextButton.styleFrom(foregroundColor: AppColors.teal),
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: Text(hasLocation ? 'Refresh' : 'Enable & search'),
-          ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 14),
+            TextButton.icon(
+              onPressed: onRetry,
+              style: TextButton.styleFrom(foregroundColor: AppColors.teal),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: Text(searched ? 'Search again' : 'Search'),
+            ),
+          ],
         ],
       ),
     );

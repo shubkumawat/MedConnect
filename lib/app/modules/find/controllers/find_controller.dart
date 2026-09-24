@@ -1,13 +1,10 @@
-import 'package:get/get.dart';
-import 'package:healaura/app/data/models/doctor_model.dart';
-import 'package:healaura/DataProvider/api_provider.dart';
-import 'package:healaura/DataProvider/web_api_constant.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-
-import '../../../../DataProvider/app_shared_preferences.dart';
-import '../../../data/services/storage_service.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:get/get.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
+import 'package:healora/app/data/models/doctor_model.dart';
+import 'package:healora/app/data/services/places_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum FindSortMode { nearest, rating, reviews, name }
 
@@ -20,8 +17,10 @@ class FindController extends GetxController {
   var isHospitalLoading = false.obs;
   /// 0 = All specialties; 1..n map to specializations[i-1]
   var selectedSpecIndex = 0.obs;
-  var showMap = false.obs;
+  var showMap = true.obs;
   var searchQuery = ''.obs;
+  /// Results stay hidden until the user submits a valid search.
+  var hasSearched = false.obs;
   var sortMode = FindSortMode.nearest.obs;
 
   /// SMART FILTERS
@@ -66,6 +65,12 @@ class FindController extends GetxController {
   /// Current user already reviewed the open hospital/clinic.
   var hasUserReviewed = false.obs;
 
+  final PlacesService _places = PlacesService();
+
+  static final _hospitalWord = RegExp(r'\bhospitals?\b', caseSensitive: false);
+  static final _clinicWord = RegExp(r'\bclinics?\b', caseSensitive: false);
+  static final _doctorWord = RegExp(r'\bdoctors?\b', caseSensitive: false);
+
   List<String> get availableCities {
     final cities = hospitals
         .map((h) => h.cityName.trim())
@@ -97,7 +102,7 @@ class FindController extends GetxController {
   List<Hospital> get filteredHospitals {
     var list = List<Hospital>.from(hospitals);
     final q = searchQuery.value.trim().toLowerCase();
-    if (q.isNotEmpty) {
+    if (q.isNotEmpty && q.length < 2) {
       list = list.where((h) {
         return h.name.toLowerCase().contains(q) ||
             h.cityName.toLowerCase().contains(q) ||
@@ -106,18 +111,11 @@ class FindController extends GetxController {
       }).toList();
     }
 
-    // Multi-select specializations (or legacy single chip index).
+    // Multi-select from Filters sheet only. Category chips already scope Places.
     final specs = selectedSpecialties
         .map((e) => e.toLowerCase())
         .where((e) => e.isNotEmpty)
         .toSet();
-    if (specs.isEmpty &&
-        selectedSpecIndex.value > 0 &&
-        selectedSpecIndex.value <= specializations.length) {
-      specs.add(
-        specializations[selectedSpecIndex.value - 1].name.toLowerCase(),
-      );
-    }
     if (specs.isNotEmpty) {
       list = list.where((h) {
         final type = h.hospitalType.toLowerCase();
@@ -231,19 +229,17 @@ class FindController extends GetxController {
 
   void setSearch(String value) {
     searchQuery.value = value;
+    hasSearched.value = false;
+    hospitals.clear();
+    showMap.value = true;
   }
 
   void selectSpecialty(int index) {
     selectedSpecIndex.value = index;
-    // Keep multi-select in sync with strip taps.
-    if (index <= 0) {
-      selectedSpecialties.clear();
-    } else if (index <= specializations.length) {
-      final name = specializations[index - 1].name;
-      selectedSpecialties
-        ..clear()
-        ..add(name);
-    }
+    if (index <= 0 || index > specializations.length) return;
+    final name = specializations[index - 1].name;
+    searchQuery.value = name;
+    submitSearch(name);
   }
 
   void toggleSpecialtyFilter(String name) {
@@ -324,28 +320,52 @@ class FindController extends GetxController {
   void onInit() {
     super.onInit();
     fetchSpecializations();
-    // Do not pop the OS location dialog on tab load — splash gate / user tap handles that.
-    fetchHospitals(requestLocation: false);
+    locateUser(requestIfNeeded: false);
+  }
+
+  Future<void> locateUser({bool requestIfNeeded = false}) async {
+    final position = await _determinePosition(requestIfNeeded: requestIfNeeded);
+    userPosition.value = position;
   }
 
   Future<void> fetchSpecializations() async {
-    try {
-      isLoading(true);
-      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
-      final response = await ApiProvider().getSpecializationsAPI(null, token ?? '');
-      if (response != null && response['error'] == false) {
-        var rawData = response['data'];
-        List data = [];
-        if (rawData is List) {
-          data = rawData;
-        } else if (rawData is Map && rawData.containsKey('results')) {
-          data = rawData['results'];
-        }
-        specializations.value = data.map((e) => Specialization.fromJson(e)).toList();
-      }
-    } finally {
-      isLoading(false);
-    }
+    isLoading(true);
+    specializations.value = [
+      Specialization(
+        specializationId: 'hospital',
+        name: 'Hospital',
+        slug: 'hospital',
+        icon: '',
+        color: '#0B6E4F',
+        description: 'Hospitals',
+        isFeatured: true,
+        doctorCount: 0,
+        displayOrder: 1,
+      ),
+      Specialization(
+        specializationId: 'doctor',
+        name: 'Doctor',
+        slug: 'doctor',
+        icon: '',
+        color: '#1B9E8E',
+        description: 'Doctors',
+        isFeatured: true,
+        doctorCount: 0,
+        displayOrder: 2,
+      ),
+      Specialization(
+        specializationId: 'clinic',
+        name: 'Clinic',
+        slug: 'clinic',
+        icon: '',
+        color: '#E67E22',
+        description: 'Clinics',
+        isFeatured: false,
+        doctorCount: 0,
+        displayOrder: 3,
+      ),
+    ];
+    isLoading(false);
   }
 
   /// User ki current position lene aur permissions handle karne ke liye.
@@ -413,46 +433,138 @@ class FindController extends GetxController {
     return await Geolocator.getCurrentPosition();
   }
 
-  /// Nearby Doctors API ko fetch karne ke liye
+  static const _nearbyRadiusMeters = 20000;
+
+  /// Re-run last nearby search, or just refresh GPS.
   Future<void> fetchHospitals({bool requestLocation = false}) async {
+    if (hasSearched.value && searchQuery.value.trim().isNotEmpty) {
+      await submitSearch(searchQuery.value);
+      return;
+    }
+    await locateUser(requestIfNeeded: requestLocation);
+  }
+
+  Future<void> submitSearch(String rawQuery) async {
+    final q = rawQuery.trim();
+    searchQuery.value = q;
+    if (q.isEmpty) {
+      hasSearched.value = false;
+      hospitals.clear();
+      return;
+    }
+
     try {
       isHospitalLoading(true);
+      hasSearched.value = false;
+      hospitals.clear();
 
-      // Location hasil karein
-      Position? position =
-          await _determinePosition(requestIfNeeded: requestLocation);
-      userPosition.value = position;
-      
-      if (position == null) {
-        isHospitalLoading(false);
+      var pos = userPosition.value;
+      if (pos == null) {
+        await locateUser(requestIfNeeded: true);
+        pos = userPosition.value;
+      }
+      if (pos == null) {
+        AppToast.showToast(msg: 'Turn on location to see nearby results');
         return;
       }
 
-      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
-      
-      // Nearby API call with lat/lng
-      final response = await ApiProvider().getNearbyDoctorsAPI(
-        null, 
-        position.latitude, 
-        position.longitude, 
-        token ?? ''
+      final careType = _careTypeFromQuery(q);
+      final keyword = _nearbyKeyword(q);
+      final pages = await Future.wait(
+        _googleTypesForQuery(q).map(
+          (type) => _places.nearby(
+            lat: pos!.latitude,
+            lng: pos.longitude,
+            type: type,
+            keyword: keyword,
+            radiusMeters: _nearbyRadiusMeters,
+          ),
+        ),
       );
-      print("Hospital Response:.... ${response}");
 
-      if (response != null && response['error'] == false) {
-        var rawData = response['data'];
-        List data = [];
-        if (rawData is List) {
-          data = rawData;
-        } else if (rawData is Map && rawData.containsKey('results')) {
-          data = rawData['results'];
-        }
-        hospitals.value = data.map((e) => Hospital.fromJson(e)).toList();
+      final mapped = <String, Hospital>{};
+      for (final item in pages.expand((e) => e)) {
+        if (!_isAllowedPlace(item, careType)) continue;
+        final h = Hospital.fromPlace(item);
+        if (h.hospitalId.isEmpty) continue;
+        mapped[h.hospitalId] = h;
       }
+      hospitals.value = mapped.values.toList();
+      hasSearched.value = true;
+    } on PlacesException catch (e) {
+      debugPrint('Places search error: $e');
+      AppToast.showToast(msg: e.message);
     } catch (e) {
-      debugPrint("Error fetching nearby doctors: $e");
+      debugPrint('Error searching places: $e');
+      AppToast.showToast(msg: 'Could not search nearby places');
     } finally {
       isHospitalLoading(false);
+    }
+  }
+
+  /// Empty keyword + type = all nearby of that type (e.g. search "hospital").
+  String _nearbyKeyword(String query) {
+    var k = query
+        .replaceAll(_hospitalWord, ' ')
+        .replaceAll(_clinicWord, ' ')
+        .replaceAll(_doctorWord, ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return k;
+  }
+
+  List<String> _googleTypesForQuery(String query) {
+    final hospital = _hospitalWord.hasMatch(query);
+    final clinic = _clinicWord.hasMatch(query);
+    final doctor = _doctorWord.hasMatch(query);
+    if (hospital && !clinic && !doctor) return ['hospital'];
+    if ((clinic || doctor) && !hospital) return ['doctor'];
+    if (hospital || clinic || doctor) {
+      return [
+        if (hospital) 'hospital',
+        if (clinic || doctor) 'doctor',
+      ];
+    }
+    return ['hospital', 'doctor'];
+  }
+
+  String _careTypeFromQuery(String query) {
+    final hospital = _hospitalWord.hasMatch(query);
+    final clinic = _clinicWord.hasMatch(query);
+    final doctor = _doctorWord.hasMatch(query);
+    if (hospital && !clinic && !doctor) return 'hospital';
+    if (clinic && !hospital && !doctor) return 'clinic';
+    if (doctor && !hospital && !clinic) return 'doctor';
+    return 'any';
+  }
+
+  bool _isAllowedPlace(Map<String, dynamic> json, String careType) {
+    final types = (json['types'] is List)
+        ? (json['types'] as List).map((e) => e.toString().toLowerCase()).toSet()
+        : <String>{};
+    final name = (json['name'] ?? '').toString().toLowerCase();
+    if (types.contains('pharmacy') ||
+        types.contains('dentist') ||
+        types.contains('restaurant') ||
+        types.contains('lodging')) {
+      return false;
+    }
+    switch (careType) {
+      case 'hospital':
+        return types.contains('hospital') || name.contains('hospital');
+      case 'clinic':
+        return types.contains('clinic') ||
+            types.contains('doctor') ||
+            name.contains('clinic');
+      case 'doctor':
+        return types.contains('doctor') || name.contains('doctor');
+      default:
+        return types.contains('hospital') ||
+            types.contains('doctor') ||
+            types.contains('clinic') ||
+            name.contains('hospital') ||
+            name.contains('clinic') ||
+            name.contains('doctor');
     }
   }
 
@@ -460,81 +572,51 @@ class FindController extends GetxController {
     try {
       isDetailLoading(true);
       hasUserReviewed.value = false;
-      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
-      final response = await ApiProvider().getHospitalDetailAPI(null, hospitalId, token ?? '');
-      print("Hospital Detail Response: $response");
-      if (response != null && response['error'] == false) {
-        final detail = HospitalDetail.fromJson(response['data']);
-        hospitalDetail.value = detail;
-        final local = await StorageService().hasReviewedPlace(hospitalId);
-        hasUserReviewed.value = detail.hasReviewed || local;
-        if (detail.hasReviewed) {
-          await StorageService().markPlaceReviewed(hospitalId);
-        }
+      final result = await _places.details(hospitalId);
+      if (result != null) {
+        hospitalDetail.value = HospitalDetail.fromPlaceDetails(result);
+      } else {
+        AppToast.showToast(msg: 'Could not load place details');
       }
+    } on PlacesException catch (e) {
+      AppToast.showToast(msg: e.message);
+    } catch (e) {
+      debugPrint('Error fetching place details: $e');
+      AppToast.showToast(msg: 'Could not load place details');
     } finally {
       isDetailLoading(false);
     }
   }
 
-  bool _looksLikeAlreadyReviewed(String? message) {
-    final m = (message ?? '').toLowerCase();
-    return m.contains('already') ||
-        m.contains('already reviewed') ||
-        m.contains('duplicate') ||
-        m.contains('exist') ||
-        m.contains('once');
+  Future<void> openGooglePlace(HospitalDetail hospital) async {
+    final url = hospital.googleMapsUrl ??
+        hospital.website ??
+        (hospital.latitude != null && hospital.longitude != null
+            ? 'https://www.google.com/maps/search/?api=1&query=${hospital.latitude},${hospital.longitude}'
+            : 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(hospital.name)}');
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      AppToast.showToast(msg: 'Could not open Google Maps');
+      return;
+    }
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) {
+      AppToast.showToast(msg: 'Could not open Google Maps');
+    }
   }
 
-  /// Returns true when review was accepted (or already on file).
+  /// Reviews live on Google Maps for Places results.
   Future<bool> submitReview({
     required String id,
     required double rating,
     required String comment,
     required bool isHospital,
   }) async {
-    if (hasUserReviewed.value) {
-      AppToast.showToast(msg: 'You have already reviewed this place');
-      return false;
+    final detail = hospitalDetail.value;
+    if (detail != null) {
+      await openGooglePlace(detail);
     }
-    try {
-      String? token = await AppSharedPreferences().getString(AppSharedPreferences.token);
-      String url = isHospital
-          ? "${WebApiConstant.API_URL_HOSPITAL_REVIEW}$id/review/"
-          : "${WebApiConstant.API_URL_CLINIC_REVIEW}$id/review/";
-
-      final response = await ApiProvider().postReviewAPI(
-        null,
-        url,
-        {
-          "rating": rating.toInt(),
-          "comment": comment,
-        },
-        token ?? '',
-      );
-
-      if (response != null && response['error'] == false) {
-        await StorageService().markPlaceReviewed(id);
-        hasUserReviewed.value = true;
-        fetchHospitalDetail(id);
-        Get.snackbar("Success", "Review submitted successfully",
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
-        return true;
-      }
-
-      final msg = response?['message']?.toString() ?? 'Failed to submit review';
-      if (_looksLikeAlreadyReviewed(msg)) {
-        await StorageService().markPlaceReviewed(id);
-        hasUserReviewed.value = true;
-        AppToast.showToast(msg: 'You have already reviewed this place');
-        return false;
-      }
-      AppToast.showToast(msg: msg);
-      return false;
-    } catch (e) {
-      Get.snackbar("Error", "Something went wrong",
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
-      return false;
-    }
+    return false;
   }
 }
+

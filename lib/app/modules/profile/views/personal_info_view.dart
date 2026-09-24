@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
-import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
-import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
-import 'package:healaura/app/data/services/storage_service.dart';
+import 'package:healora/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healora/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healora/app/core/Util/TextValidator/text_validation.dart';
+import 'package:healora/app/data/services/storage_service.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import 'medical_info_view.dart';
 import '../controllers/profile_controller.dart';
 import 'widgets/profile_form_shell.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
   final bool isFromLogin;

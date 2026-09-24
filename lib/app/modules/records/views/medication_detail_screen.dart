@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:healaura/app/data/models/medical_record_model.dart';
+import 'package:healora/app/data/models/medical_record_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/healora_logo.dart';
 import '../../../core/theme/app_text_theme.dart';

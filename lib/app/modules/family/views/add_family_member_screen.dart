@@ -5,13 +5,13 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
-import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
-import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
-import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
-import 'package:healaura/app/core/theme/app_colors.dart';
-import 'package:healaura/app/core/theme/app_text_theme.dart';
-import 'package:healaura/app/core/widgets/healora_logo.dart';
-import 'package:healaura/app/data/models/GetCountryApiResponseModel.dart'
+import 'package:healora/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healora/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healora/app/core/Util/TextValidator/text_validation.dart';
+import 'package:healora/app/core/theme/app_colors.dart';
+import 'package:healora/app/core/theme/app_text_theme.dart';
+import 'package:healora/app/core/widgets/healora_logo.dart';
+import 'package:healora/app/data/models/GetCountryApiResponseModel.dart'
     show CountryModel;
 
 import '../../../core/Util/Print/print_log.dart';

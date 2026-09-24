@@ -2,16 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
-import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
-import 'package:healaura/app/data/models/medical_record_model.dart';
+import 'package:healora/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healora/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healora/app/data/models/medical_record_model.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../core/widgets/healora_logo.dart';
 import '../controllers/records_controller.dart';
 import '../services/medication_ocr_service.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 class AddMedicationScreen extends StatefulWidget {
   final String? diseaseUuid;

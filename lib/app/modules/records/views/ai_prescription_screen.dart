@@ -2,18 +2,18 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
-import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:healaura/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
-import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
-import 'package:healaura/app/core/Util/image_pick_helper.dart';
+import 'package:healora/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healora/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healora/app/core/Util/CustomCardWidgets/CustomCardWidgets.dart';
+import 'package:healora/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healora/app/core/Util/image_pick_helper.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../controllers/records_controller.dart';
 import 'add_medication_screen.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 class AiPrescriptionScreen extends StatefulWidget {
   final String? diseaseUuid;
@@ -1180,56 +1180,69 @@ class _StepSaveDone extends StatelessWidget {
             .map((e) => Map<String, dynamic>.from(e))
             .toList();
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 90,
-          height: 90,
-          decoration: BoxDecoration(
-            color: AppColors.green.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppColors.green.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_circle,
+                      color: AppColors.green, size: 40),
+                ),
+                const SizedBox(height: 12),
+                Text('Slip Saved!',
+                    style: AppTextStyles.heading2
+                        .copyWith(color: AppColors.green)),
+                const SizedBox(height: 6),
+                Text('What would you like to do next?',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomPrimaryButton(
+                        text: '+ Add Meds',
+                        color: AppColors.teal,
+                        onTap: () {
+                          if (meds.isNotEmpty) {
+                            Get.off(() => AddMedicationScreen(
+                                  diseaseUuid: diseaseUuid,
+                                  initialData:
+                                      Map<String, dynamic>.from(meds.first),
+                                ));
+                          } else {
+                            Get.off(() =>
+                                AddMedicationScreen(diseaseUuid: diseaseUuid));
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: CustomPrimaryButton(
+                        text: 'Return',
+                        color: AppColors.primary,
+                        onTap: () => Get.back(),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          child: const Icon(Icons.check_circle,
-              color: AppColors.green, size: 48),
-        ),
-        const SizedBox(height: 20),
-        Text('Slip Saved!',
-            style: AppTextStyles.heading2.copyWith(color: AppColors.green)),
-        const SizedBox(height: 8),
-        Text('What would you like to do next?', style: AppTextStyles.body),
-        const SizedBox(height: 28),
-        Row(
-          children: [
-            Expanded(
-              child: CustomPrimaryButton(
-                text: '+ Add Meds',
-                color: AppColors.teal,
-                onTap: () {
-                  if (meds.isNotEmpty) {
-                    Get.off(() => AddMedicationScreen(
-                          diseaseUuid: diseaseUuid,
-                          initialData: Map<String, dynamic>.from(meds.first),
-                        ));
-                  } else {
-                    Get.off(
-                        () => AddMedicationScreen(diseaseUuid: diseaseUuid));
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: CustomPrimaryButton(
-                text: 'Return',
-                color: AppColors.primary,
-                onTap: () => Get.back(),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-      ],
+        );
+      },
     );
   }
 }

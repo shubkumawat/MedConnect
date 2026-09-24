@@ -1,27 +1,29 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:healaura/app/modules/home/controllers/home_controller.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
-import 'package:healaura/app/core/Util/Print/print_log.dart';
-import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
+import 'package:healora/app/core/Util/Print/print_log.dart';
+import 'package:healora/app/core/Util/TextValidator/text_validation.dart';
+import 'package:healora/app/core/Util/social_auth_config.dart';
 import '../../../data/services/notification_service.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../profile/views/personal_info_view.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 class LoginController extends GetxController {
-  static const int resendCooldownSeconds = 30;
-  static const int maxOtpAttempts = 5;
+  static const int resendCooldownSeconds = 60;
+  static const int maxOtpAttempts = 3;
   static const int lockoutSeconds = 60;
 
   String? userAccessToken;
@@ -46,6 +48,13 @@ class LoginController extends GetxController {
   RxBool isCountryLoading = false.obs;
   RxList<CountryModel> countryList = <CountryModel>[].obs;
   Rx<CountryModel?> selectedCountry = Rx<CountryModel?>(null);
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: const ['email', 'profile'],
+    serverClientId: SocialAuthConfig.googleWebClientId.trim().isEmpty
+        ? null
+        : SocialAuthConfig.googleWebClientId.trim(),
+  );
 
   @override
   void onInit() {
@@ -121,11 +130,7 @@ class LoginController extends GetxController {
       if (response != null &&
           response['error'] != true &&
           response['error_code'] == 0) {
-        // countries API returns data as a list (not data.countries).
-        final dynamic data = response['data'];
-        final List list = data is List
-            ? data
-            : (data is Map ? (data['countries'] ?? []) : []);
+        final List list = CountryModel.namedList(response['data'], 'countries');
 
         countryList.value =
             list.map((e) => CountryModel.fromJson(e as Map<String, dynamic>)).toList();
@@ -223,17 +228,21 @@ class LoginController extends GetxController {
           .then((value) => userAccessToken = value);
       isLoading.value = true;
 
-      final fcmToken = await NotificationService.instance.currentToken();
+      final fcmToken = (await NotificationService.instance.currentToken()).trim();
+      final body = <String, dynamic>{
+        "mobile_number": phoneController.text.toString(),
+        "otp": otp.toString(),
+      };
+      // Backend requires fcmToken whenever platForm is sent.
+      if (fcmToken.isNotEmpty) {
+        body["fcmToken"] = fcmToken;
+        body["platForm"] = Platform.isIOS ? "ios" : "android";
+      }
 
       final response = await ApiProvider().loginApi(
         context,
         WebApiConstant.API_URL_VERIFY_OTP,
-        {
-          "mobile_number": phoneController.text.toString(),
-          "otp": otp.toString(),
-          "fcmToken": fcmToken,
-          "platForm": Platform.isIOS ? "ios" : "android",
-        },
+        body,
         userAccessToken ?? "",
       );
 
@@ -246,46 +255,19 @@ class LoginController extends GetxController {
           _lockoutTimer?.cancel();
           lockoutSecondsLeft.value = 0;
           otpAttempts.value = 0;
-
-          final storage = StorageService();
-          // await storage.setBool(StorageService.isLogin, true);
-          await storage.setString(StorageService.token, response['data']['access']);
-          await storage.setString(StorageService.userID, response['data']['user']['user_id']);
-          await storage.setString(StorageService.mobileNo, response['data']['user']['mobile_number'].toString());
-          await storage.setString(StorageService.email, response['data']['user']['email'].toString());
-          await storage.setString(StorageService.userName, response['data']['user']['full_name'].toString());
-
-          String fullName = response['data']['user']['full_name']?.toString() ?? "";
-          final dynamic newUserRaw = response['data']['is_new_user'];
-          final bool isNewUser = newUserRaw == true ||
-              newUserRaw == 1 ||
-              newUserRaw?.toString().toLowerCase() == 'true';
-          PrintLog.printLog('OTP verify is_new_user=$newUserRaw fullName=$fullName');
-
-          // Save access_type
-          String accessType = response['data']['user']!['access_type']?.toString() ??
-                             response['data']?['access_type']!.toString() ?? "";
-          await storage.setString(StorageService.accessType, accessType);
-
-          FocusManager.instance.primaryFocus?.unfocus();
-          SystemChannels.textInput.invokeMethod('TextInput.hide');
-          
-          await Future.delayed(const Duration(milliseconds: 350));
-
-          if (isNewUser) {
-            // 3-step onboarding: Personal → Medical → Emergency
-            await storage.setBool(StorageService.profileSetupDone, false);
-            Get.to(
-              () => const PersonalInfoScreen(null, isFromLogin: true),
-              transition: Transition.rightToLeft,
-            );
-          }
-          else {
-              await storage.setBool(StorageService.isLogin, true);
-              await storage.setBool(StorageService.profileSetupDone, true);
-            Get.offAll(() => const DashboardScreen(), transition: Transition.fadeIn);
-          }
+          await _completeLogin(response['data']);
         } else {
+          final apiMsg = (response['message'] ?? '').toString();
+          final tokenRequired = apiMsg.toLowerCase().contains('fcmtoken');
+
+          // Field/validation errors are not a wrong OTP — do not burn attempts.
+          if (tokenRequired) {
+            AppToast.showToast(
+              msg: 'Could not verify right now. Please try again.',
+            );
+            return;
+          }
+
           receivedOtp.value = "";
           otpRebuildKey.value++;
           otpAttempts.value++;
@@ -298,7 +280,7 @@ class LoginController extends GetxController {
           } else {
             final attemptsLeft = maxOtpAttempts - otpAttempts.value;
             AppToast.showToast(
-              msg: "${response['message'] ?? 'Incorrect OTP'} ($attemptsLeft attempt${attemptsLeft == 1 ? '' : 's'} left)",
+              msg: "${apiMsg.isEmpty ? 'Incorrect OTP' : apiMsg} ($attemptsLeft attempt${attemptsLeft == 1 ? '' : 's'} left)",
             );
           }
         }
@@ -307,6 +289,259 @@ class LoginController extends GetxController {
       PrintLog.printLog("Exception: $e");
       AppToast.showToast(msg: WebApiConstant.ApiError);
       isLoading.value = false;
+    }
+  }
+
+  Future<void> signInWithGoogle(BuildContext context) async {
+    if (isLoading.value) return;
+    try {
+      isLoading.value = true;
+      final account = await _googleSignIn.signIn();
+      if (account == null) {
+        isLoading.value = false;
+        return;
+      }
+      final googleAuth = await account.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+      if ((idToken == null || idToken.isEmpty) &&
+          (accessToken == null || accessToken.isEmpty)) {
+        isLoading.value = false;
+        AppToast.showToast(
+          msg:
+              'Google sign-in needs a Web client ID and SHA-1 in Firebase Console.',
+        );
+        return;
+      }
+
+      try {
+        final credential = GoogleAuthProvider.credential(
+          idToken: idToken,
+          accessToken: accessToken,
+        );
+        await FirebaseAuth.instance.signInWithCredential(credential);
+      } catch (e) {
+        PrintLog.printLog('Firebase Google credential: $e');
+      }
+
+      final firebaseToken =
+          await FirebaseAuth.instance.currentUser?.getIdToken();
+      await _socialLoginToBackend(
+        context,
+        url: WebApiConstant.API_URL_GOOGLE_LOGIN,
+        provider: 'google',
+        idToken: firebaseToken ?? idToken,
+        accessToken: accessToken,
+        email: account.email,
+        fullName: account.displayName ?? '',
+        photoUrl: account.photoUrl ?? '',
+      );
+    } on PlatformException catch (e) {
+      isLoading.value = false;
+      if (e.code == 'sign_in_canceled' || e.code == 'sign_in_cancelled') {
+        return;
+      }
+      PrintLog.printLog('Google sign-in: $e');
+      AppToast.showToast(msg: _googleSignInError(e));
+    } catch (e) {
+      isLoading.value = false;
+      PrintLog.printLog('Google sign-in: $e');
+      AppToast.showToast(msg: 'Google sign-in failed. Try again.');
+    }
+  }
+
+  String _googleSignInError(PlatformException e) {
+    final blob = '${e.code} ${e.message} ${e.details}'.toLowerCase();
+    if (blob.contains('7:') || blob.contains('network')) {
+      return 'No internet. Check your connection and try again.';
+    }
+    if (blob.contains('12500') || blob.contains('12501')) {
+      return 'Google sign-in was cancelled.';
+    }
+    return 'Could not sign in with Google. Please use your mobile number.';
+  }
+
+  Future<void> signInWithFacebook(BuildContext context) async {
+    if (isLoading.value) return;
+    if (!SocialAuthConfig.isFacebookConfigured) {
+      AppToast.showToast(
+        msg: 'Could not sign in with Facebook. Please use your mobile number.',
+      );
+      return;
+    }
+    try {
+      isLoading.value = true;
+      final result = await FacebookAuth.instance.login(
+        permissions: const ['email', 'public_profile'],
+      );
+      if (result.status == LoginStatus.cancelled) {
+        isLoading.value = false;
+        return;
+      }
+      if (result.status != LoginStatus.success ||
+          result.accessToken == null) {
+        isLoading.value = false;
+        AppToast.showToast(
+          msg: result.message?.toString().isNotEmpty == true
+              ? result.message!
+              : 'Facebook sign-in failed. Try again.',
+        );
+        return;
+      }
+
+      final fbToken = result.accessToken!.tokenString;
+      Map<String, dynamic> profile = {};
+      try {
+        profile = await FacebookAuth.instance.getUserData(
+          fields: 'name,email,picture',
+        );
+      } catch (_) {}
+
+      try {
+        final credential = FacebookAuthProvider.credential(fbToken);
+        await FirebaseAuth.instance.signInWithCredential(credential);
+      } catch (e) {
+        PrintLog.printLog('Firebase Facebook credential: $e');
+      }
+
+      final firebaseToken =
+          await FirebaseAuth.instance.currentUser?.getIdToken();
+      final picture = profile['picture'];
+      final photo = picture is Map
+          ? (picture['data'] is Map ? picture['data']['url'] : null)
+          : null;
+
+      await _socialLoginToBackend(
+        context,
+        url: WebApiConstant.API_URL_FACEBOOK_LOGIN,
+        provider: 'facebook',
+        idToken: firebaseToken,
+        accessToken: fbToken,
+        email: profile['email']?.toString() ?? '',
+        fullName: profile['name']?.toString() ?? '',
+        photoUrl: photo?.toString() ?? '',
+      );
+    } catch (e) {
+      isLoading.value = false;
+      PrintLog.printLog('Facebook sign-in: $e');
+      AppToast.showToast(msg: 'Facebook sign-in failed. Try again.');
+    }
+  }
+
+  Future<void> _socialLoginToBackend(
+    BuildContext context, {
+    required String url,
+    required String provider,
+    String? idToken,
+    String? accessToken,
+    required String email,
+    required String fullName,
+    required String photoUrl,
+  }) async {
+    try {
+      final fcmToken =
+          (await NotificationService.instance.currentToken()).trim();
+      final body = <String, dynamic>{
+        'provider': provider,
+        'email': email,
+        'full_name': fullName,
+        'photo_url': photoUrl,
+      };
+      if (idToken != null && idToken.isNotEmpty) {
+        body['id_token'] = idToken;
+        body['idToken'] = idToken;
+      }
+      if (accessToken != null && accessToken.isNotEmpty) {
+        body['access_token'] = accessToken;
+        body['accessToken'] = accessToken;
+        body['token'] = accessToken;
+      }
+      if (fcmToken.isNotEmpty) {
+        body['fcmToken'] = fcmToken;
+        body['platForm'] = Platform.isIOS ? 'ios' : 'android';
+      }
+
+      final response = await ApiProvider().loginApi(
+        context,
+        url,
+        body,
+        userAccessToken ?? '',
+      );
+      isLoading.value = false;
+      PrintLog.printLog(response);
+
+      if (response != null &&
+          response['error'] != true &&
+          response['error_code'] == 0) {
+        await _completeLogin(response['data']);
+        return;
+      }
+      AppToast.showToast(
+        msg: (response?['message'] ??
+                'Google login is not on the server yet. Please use your mobile number.')
+            .toString(),
+      );
+    } catch (e) {
+      isLoading.value = false;
+      PrintLog.printLog('Social backend: $e');
+      AppToast.showToast(msg: WebApiConstant.ApiError);
+    }
+  }
+
+  Future<void> _completeLogin(dynamic rawData) async {
+    final data = rawData is Map
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
+    final user = data['user'] is Map
+        ? Map<String, dynamic>.from(data['user'] as Map)
+        : <String, dynamic>{};
+    final access = (data['access'] ?? data['token'] ?? '').toString();
+    if (access.isEmpty) {
+      AppToast.showToast(msg: 'Login succeeded but no session was returned.');
+      return;
+    }
+
+    final storage = StorageService();
+    await storage.setString(StorageService.token, access);
+    await storage.setString(
+      StorageService.userID,
+      (user['user_id'] ?? data['user_id'] ?? '').toString(),
+    );
+    await storage.setString(
+      StorageService.mobileNo,
+      (user['mobile_number'] ?? '').toString(),
+    );
+    await storage.setString(
+      StorageService.email,
+      (user['email'] ?? '').toString(),
+    );
+    await storage.setString(
+      StorageService.userName,
+      (user['full_name'] ?? '').toString(),
+    );
+    final accessType =
+        (user['access_type'] ?? data['access_type'] ?? '').toString();
+    await storage.setString(StorageService.accessType, accessType);
+
+    final dynamic newUserRaw = data['is_new_user'];
+    final bool isNewUser = newUserRaw == true ||
+        newUserRaw == 1 ||
+        newUserRaw?.toString().toLowerCase() == 'true';
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+    await Future.delayed(const Duration(milliseconds: 350));
+
+    if (isNewUser) {
+      await storage.setBool(StorageService.profileSetupDone, false);
+      Get.to(
+        () => const PersonalInfoScreen(null, isFromLogin: true),
+        transition: Transition.rightToLeft,
+      );
+    } else {
+      await storage.setBool(StorageService.isLogin, true);
+      await storage.setBool(StorageService.profileSetupDone, true);
+      Get.offAll(() => const DashboardScreen(), transition: Transition.fadeIn);
     }
   }
 }

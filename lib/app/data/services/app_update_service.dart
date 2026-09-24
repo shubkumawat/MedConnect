@@ -21,7 +21,7 @@ class AppUpdateService {
   AppUpdateService._();
   static final AppUpdateService instance = AppUpdateService._();
 
-  static const String _bundleId = 'com.healaura.app';
+  static const String _bundleId = 'com.healora.app';
 
   bool _checkedThisSession = false;
 

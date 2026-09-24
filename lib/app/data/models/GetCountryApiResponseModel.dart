@@ -54,4 +54,21 @@ static CountryModel indiaFrom(Iterable<CountryModel> list) {
   }
   return indiaFallback;
 }
+
+/// Master APIs return `{ countries: [...] }` (or `{ relations: [...] }`),
+/// never a bare list. Using `data as List` throws on Personal Info.
+static List<dynamic> namedList(dynamic data, String key) {
+  if (data is List) return data;
+  if (data is Map) {
+    final nested = data[key];
+    if (nested is List) return nested;
+    if (nested is Map) {
+      final results = nested['results'];
+      if (results is List) return results;
+      final again = nested[key];
+      if (again is List) return again;
+    }
+  }
+  return const [];
+}
 }

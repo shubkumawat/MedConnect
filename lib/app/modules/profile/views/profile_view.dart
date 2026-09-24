@@ -3,14 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
-import 'package:healaura/DataProvider/web_api_constant.dart';
-import 'package:healaura/app/core/Util/LogoutWidget.dart';
-import 'package:healaura/app/core/Util/display_value.dart';
-import 'package:healaura/app/core/Util/web_page_helper.dart';
+import 'package:healora/DataProvider/web_api_constant.dart';
+import 'package:healora/app/core/Util/LogoutWidget.dart';
+import 'package:healora/app/core/Util/display_value.dart';
+import 'package:healora/app/core/Util/web_page_helper.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import '../../../core/widgets/powered_by_aira.dart';
 import '../../../core/widgets/healora_logo.dart';
 import '../../family/controllers/family_member_controller.dart';
 import '../../family/views/parent_permission_prompt.dart';
@@ -59,20 +58,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  double _completeness() {
-    var score = 0;
-    const total = 8;
-    if (controller.fullNameCtrl.text.trim().isNotEmpty) score++;
-    if (controller.mobileNumber.value.trim().isNotEmpty) score++;
-    if (controller.emailCtrl.text.trim().isNotEmpty) score++;
-    if (controller.selectedGender.value.isNotEmpty) score++;
-    if (controller.age.value > 0 || controller.selectedDob.value != null) {
-      score++;
+  /// 12 fields across Personal, Medical, and Emergency.
+  List<String> _missingCompleteness() {
+    final missing = <String>[];
+    if (controller.fullNameCtrl.text.trim().isEmpty) {
+      missing.add('full name');
     }
-    if (controller.bloodGroup.value.isNotEmpty) score++;
-    if (controller.selectedAllergies.isNotEmpty) score++;
-    if (controller.emergencyNameCtrl.text.trim().isNotEmpty) score++;
-    return score / total;
+    final hasPhoto = (controller.profileImage.value != null) ||
+        controller.profilePhotoUrl.value.trim().isNotEmpty;
+    if (!hasPhoto) missing.add('profile photo');
+    if (controller.selectedGender.value.isEmpty) missing.add('gender');
+    if (controller.age.value <= 0 && controller.selectedDob.value == null) {
+      missing.add('date of birth');
+    }
+    if (controller.bloodGroup.value.isEmpty) missing.add('blood group');
+    if (controller.heightCtrl.text.trim().isEmpty) missing.add('height');
+    if (controller.weightCtrl.text.trim().isEmpty) missing.add('weight');
+    if (controller.occupationCtrl.text.trim().isEmpty &&
+        controller.selectedOccupationModel.value == null) {
+      missing.add('occupation');
+    }
+    if (controller.selectedAllergies.isEmpty) missing.add('allergies');
+    if (controller.emergencyNameCtrl.text.trim().isEmpty) {
+      missing.add('emergency name');
+    }
+    if (controller.emergencyMobileCtrl.text.trim().isEmpty) {
+      missing.add('emergency mobile');
+    }
+    if (controller.emergencyRelation.value.trim().isEmpty &&
+        controller.selectedEmergencyRelationModel.value == null) {
+      missing.add('emergency relation');
+    }
+    return missing;
+  }
+
+  double _completeness() {
+    const total = 12;
+    final filled = total - _missingCompleteness().length;
+    return filled / total;
   }
 
   String _formatName(String name) {
@@ -97,19 +120,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   String _completenessTip(double progress) {
-    if (controller.selectedAllergies.isEmpty) {
-      return 'Add your allergies for better doctor views.';
+    final missing = _missingCompleteness();
+    if (missing.isEmpty || progress >= 1) {
+      return 'Personal, medical, and emergency details are complete.';
     }
-    if (controller.emergencyNameCtrl.text.trim().isEmpty) {
-      return 'Add an emergency contact for safer care.';
+    if (missing.length <= 3) {
+      return 'Still needed: ${missing.join(', ')}.';
     }
-    if (controller.bloodGroup.value.isEmpty) {
-      return 'Add your blood group to complete medical info.';
-    }
-    if (progress >= 1) {
-      return 'Your profile looks complete — great job!';
-    }
-    return 'Keep filling details for better care recommendations.';
+    return 'Personal, medical & emergency. Still needed: ${missing.take(3).join(', ')} +${missing.length - 3} more.';
   }
 
   ({int diseases, int meds, int family}) _healthCounts() {
@@ -388,8 +406,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 letterSpacing: 0.3,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            const PoweredByAira(),
                           ],
                         ),
                       ),

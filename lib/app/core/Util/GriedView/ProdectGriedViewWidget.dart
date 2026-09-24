@@ -1,5 +1,5 @@
 // import 'dart:math';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 //
 // import 'package:flutter/material.dart';
 // import 'package:get/get.dart';

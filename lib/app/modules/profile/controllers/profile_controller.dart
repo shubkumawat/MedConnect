@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart' as dio;
-import 'package:healaura/app/data/services/storage_service.dart';
+import 'package:healora/app/data/services/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -12,7 +12,7 @@ import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../data/models/risk_factor_model.dart';
-import 'package:healaura/app/core/Util/Print/print_log.dart';
+import 'package:healora/app/core/Util/Print/print_log.dart';
 import '../../../core/Util/home_address.dart';
 import '../../../core/Util/image_pick_helper.dart';
 import '../../../core/Util/CustomLoading/custom_loading.dart';
@@ -21,7 +21,7 @@ import '../../../data/models/menstrual_cycle_model.dart';
 import '../../../data/models/upcoming_appointment_model.dart';
 import '../../../core/Util/appointment_prompts.dart';
 import '../../home/controllers/home_controller.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 /// Master relation list ka model
 class RelationModel {
@@ -356,11 +356,11 @@ class ProfileController extends GetxController {
           final data = response['data'];
           if (data != null) {
             // Relations
-            final List relations = data['relations'] ?? [];
+            final List relations = CountryModel.namedList(data, 'relations');
             relationList.value = relations.map((e) => RelationModel.fromJson(e)).toList();
 
             // Countries
-            final List countries = data['countries'] ?? [];
+            final List countries = CountryModel.namedList(data, 'countries');
             countryList.value = countries.map((e) => CountryModel.fromJson(e)).toList();
 
             if (selectedNationalityId.value != null) {
@@ -375,11 +375,11 @@ class ProfileController extends GetxController {
             selectedNationalityId.value ??= selectedCountry.value?.id;
 
             // Occupations
-            final List occupations = data['occupations'] ?? [];
+            final List occupations = CountryModel.namedList(data, 'occupations');
             occupationList.value = occupations.map((e) => OccupationModel.fromJson(e)).toList();
 
             // Disability Types
-            final List disabilities = data['disability_types'] ?? [];
+            final List disabilities = CountryModel.namedList(data, 'disability_types');
             disabilityTypeList.value = disabilities.map((e) => DisabilityTypeModel.fromJson(e)).toList();
 
             // Sync selections if needed
@@ -475,7 +475,7 @@ class ProfileController extends GetxController {
 
       if (response != null) {
         if (response['error'] != true && response['error_code'] == 0) {
-          final List list = response['data'] ?? [];
+          final List list = CountryModel.namedList(response['data'], 'countries');
           countryList.value = list.map((e) => CountryModel.fromJson(e)).toList();
 
           if (selectedNationalityId.value != null) {
@@ -1088,7 +1088,15 @@ class ProfileController extends GetxController {
   // ==================================================================
   // ---------------------  API : get-profile  ---------------------
   // ==================================================================
-  Future<void> getPatientProfileAPI(BuildContext context) async {
+  Future<void>? _profileFetch;
+
+  Future<void> getPatientProfileAPI(BuildContext context) {
+    return _profileFetch ??= _fetchPatientProfile(context).whenComplete(() {
+      _profileFetch = null;
+    });
+  }
+
+  Future<void> _fetchPatientProfile(BuildContext context) async {
     try {
       isLoading.value = true;
       userAccessToken = await StorageService().getString(StorageService.token);
@@ -1333,6 +1341,10 @@ class ProfileController extends GetxController {
 
             upcomingAppointments.value =
                 UpcomingAppointment.listFrom(data['upcoming_appointments']);
+            if (Get.isRegistered<HomeController>()) {
+              Get.find<HomeController>().upcomingAppointments
+                  .assignAll(upcomingAppointments);
+            }
             final pid = profilePatientId.value.trim().isNotEmpty
                 ? profilePatientId.value
                 : upcomingAppointments

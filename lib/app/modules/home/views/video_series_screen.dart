@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+import 'package:healora/app/core/Util/CustomTextField/CustomTextField.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../data/models/video_model.dart';
@@ -355,6 +358,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _initPlayer();
   }
 
+  /// Chrome 91 Mobile — newer Chrome WebViews pick WebGPU and fail on
+  /// GPUs with no adapter (PowerVR Rogue, "No available adapters").
+  static const _chromeMobileUa =
+      'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36';
+
   bool _isYoutube(String url) {
     final u = url.toLowerCase();
     return u.contains('youtube.com') || u.contains('youtu.be');
@@ -362,12 +370,27 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   bool _isVimeo(String url) => url.toLowerCase().contains('vimeo.com');
 
+  bool _isFacebook(String url) {
+    final u = url.toLowerCase();
+    return u.contains('facebook.com') ||
+        u.contains('fb.watch') ||
+        u.contains('fb.com/');
+  }
+
+  bool _isDirectMedia(String url) {
+    final path = (Uri.tryParse(url)?.path ?? url).toLowerCase();
+    return path.contains('.mp4') ||
+        path.contains('.m3u8') ||
+        path.contains('.mov') ||
+        path.contains('.webm');
+  }
+
   String? _youtubeId(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return null;
     if (uri.host.contains('youtu.be')) {
       final id = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
-      return id.isEmpty ? null : id;
+      return id.isEmpty ? null : id.split('.').first;
     }
     final v = uri.queryParameters['v'];
     if (v != null && v.isNotEmpty) return v;
@@ -375,7 +398,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     final embedIdx = parts.indexOf('embed');
     if (embedIdx >= 0 && embedIdx + 1 < parts.length) return parts[embedIdx + 1];
     final shortsIdx = parts.indexOf('shorts');
-    if (shortsIdx >= 0 && shortsIdx + 1 < parts.length) return parts[shortsIdx + 1];
+    if (shortsIdx >= 0 && shortsIdx + 1 < parts.length) {
+      return parts[shortsIdx + 1];
+    }
     return null;
   }
 
@@ -388,26 +413,123 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     return null;
   }
 
-  Future<void> _initWebPlayer(String embedUrl) async {
-    final controller = WebViewController()
+  String _iframePage({required String src, required String title}) {
+    final safeSrc = src.replaceAll('"', '%22');
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>$title</title>
+<style>
+html,body,.box{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden}
+iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+</style>
+<script>
+try {
+  Object.defineProperty(navigator, 'gpu', {
+    configurable: true,
+    get: function () { return undefined; }
+  });
+} catch (e) {}
+</script>
+</head>
+<body>
+<div class="box">
+<iframe
+  src="$safeSrc"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+  allowfullscreen
+  playsinline></iframe>
+</div>
+</body>
+</html>
+''';
+  }
+
+  Future<WebViewController> _buildWebController() async {
+    late final PlatformWebViewControllerCreationParams params;
+    if (WebViewPlatform.instance is WebKitWebViewPlatform) {
+      params = WebKitWebViewControllerCreationParams(
+        allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+      );
+    } else {
+      params = const PlatformWebViewControllerCreationParams();
+    }
+
+    final controller = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
+      ..setUserAgent(_chromeMobileUa)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onWebResourceError: (_) {
-            if (mounted) {
-              setState(() {
-                _hasError = true;
-                _errorMessage = 'Could not load video';
-              });
-            }
+          onWebResourceError: (error) {
+            // Ads / CORS / lookaside images fail often — only fail the main frame.
+            if (error.isForMainFrame != true) return;
+            if (!mounted) return;
+            setState(() {
+              _hasError = true;
+              _errorMessage = 'Could not load video';
+            });
           },
         ),
-      )
-      ..loadRequest(Uri.parse(embedUrl));
+      );
+
+    if (controller.platform is AndroidWebViewController) {
+      final android = controller.platform as AndroidWebViewController;
+      await android.setMediaPlaybackRequiresUserGesture(false);
+    }
+    return controller;
+  }
+
+  Future<void> _initWebHtml(String html, String baseUrl) async {
+    final controller = await _buildWebController();
+    await controller.loadHtmlString(html, baseUrl: baseUrl);
     _webController = controller;
     _isWebVideo = true;
     if (mounted) setState(() => _isInitialized = true);
+  }
+
+  Future<void> _initWebUrl(String embedUrl) async {
+    final controller = await _buildWebController();
+    await controller.loadRequest(Uri.parse(embedUrl));
+    _webController = controller;
+    _isWebVideo = true;
+    if (mounted) setState(() => _isInitialized = true);
+  }
+
+  Future<void> _initDirectPlayer(String url) async {
+    _playerController = VideoPlayerController.networkUrl(Uri.parse(url));
+    await _playerController!.initialize();
+    await _playerController!.play();
+    _playerController!.addListener(() {
+      if (!mounted || _playerController == null) return;
+      if (_playerController!.value.isPlaying) {
+        final pos = _playerController!.value.position.inSeconds;
+        if (pos % 5 == 0 && pos > 0) {
+          widget.controller.updateProgress(widget.video.videoId, pos);
+        }
+      }
+    });
+    if (mounted) setState(() => _isInitialized = true);
+  }
+
+  Future<void> _openExternally() async {
+    final raw = widget.video.videoUrl?.trim() ?? '';
+    if (raw.isEmpty) return;
+    final uri = Uri.tryParse(raw);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _failOrOpen(String message) async {
+    if (!mounted) return;
+    setState(() {
+      _hasError = true;
+      _errorMessage = message;
+    });
   }
 
   Future<void> _initPlayer() async {
@@ -423,15 +545,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     try {
       if (_isYoutube(url)) {
         final id = _youtubeId(url);
-        if (id == null) {
-          setState(() {
-            _hasError = true;
-            _errorMessage = 'Invalid YouTube link';
-          });
+        if (id == null || !RegExp(r'^[\w-]{6,}$').hasMatch(id)) {
+          await _failOrOpen('Invalid YouTube link');
           return;
         }
-        await _initWebPlayer(
-          'https://www.youtube.com/embed/$id?autoplay=1&playsinline=1&rel=0',
+        // youtube-nocookie + html5=1 avoids the WebGPU iframe path.
+        final src =
+            'https://www.youtube-nocookie.com/embed/$id?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&html5=1';
+        await _initWebHtml(
+          _iframePage(src: src, title: 'YouTube'),
+          'https://www.youtube-nocookie.com',
+        );
+        return;
+      }
+
+      if (_isFacebook(url)) {
+        final src =
+            'https://www.facebook.com/plugins/video.php?href=${Uri.encodeComponent(url)}&show_text=false&autoplay=true';
+        await _initWebHtml(
+          _iframePage(src: src, title: 'Facebook'),
+          'https://www.facebook.com',
         );
         return;
       }
@@ -439,44 +572,32 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       if (_isVimeo(url)) {
         final id = _vimeoId(url);
         if (id == null) {
-          setState(() {
-            _hasError = true;
-            _errorMessage = 'Invalid Vimeo link';
-          });
+          await _failOrOpen('Invalid Vimeo link');
           return;
         }
-        await _initWebPlayer(
-          'https://player.vimeo.com/video/$id?autoplay=1',
+        await _initWebHtml(
+          _iframePage(
+            src: 'https://player.vimeo.com/video/$id?autoplay=1&playsinline=1',
+            title: 'Vimeo',
+          ),
+          'https://player.vimeo.com',
         );
         return;
       }
 
-      // Direct stream (mp4 / m3u8 / etc.)
-      _playerController = VideoPlayerController.networkUrl(Uri.parse(url));
-      await _playerController!.initialize();
-      await _playerController!.play();
-      _playerController!.addListener(() {
-        if (!mounted || _playerController == null) return;
-        if (_playerController!.value.isPlaying) {
-          final pos = _playerController!.value.position.inSeconds;
-          if (pos % 5 == 0 && pos > 0) {
-            widget.controller.updateProgress(widget.video.videoId, pos);
-          }
-        }
-      });
-      if (mounted) setState(() => _isInitialized = true);
-    } catch (e) {
-      // Last resort: open URL inside WebView so the link still plays.
-      try {
-        await _initWebPlayer(url);
-      } catch (_) {
-        if (mounted) {
-          setState(() {
-            _hasError = true;
-            _errorMessage = 'Video playback error';
-          });
-        }
+      if (_isDirectMedia(url)) {
+        await _initDirectPlayer(url);
+        return;
       }
+
+      // Unknown host — try native player, then WebView.
+      try {
+        await _initDirectPlayer(url);
+      } catch (_) {
+        await _initWebUrl(url);
+      }
+    } catch (_) {
+      await _failOrOpen('Video playback error');
     }
   }
 
@@ -488,17 +609,32 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Widget _buildPlayer() {
     if (_hasError) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 60),
-          const SizedBox(height: 16),
-          Text(
-            _errorMessage ?? 'Video playback error',
-            style: AppTextStyles.body.copyWith(color: Colors.white),
-            textAlign: TextAlign.center,
-          ),
-        ],
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 60),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage ?? 'Video playback error',
+              style: AppTextStyles.body.copyWith(color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            TextButton.icon(
+              onPressed: _openExternally,
+              icon: const Icon(Icons.open_in_new, color: Colors.white),
+              label: const Text(
+                'Open in browser',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
     if (!_isInitialized) {

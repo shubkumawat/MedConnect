@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:healaura/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
+import 'package:healora/app/core/Util/AdditionalWidget/AdditionalWidget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../core/widgets/healora_logo.dart';
-import 'package:healaura/app/core/Util/CustomTextField/CustomTextField.dart';
+import 'package:healora/app/core/Util/CustomTextField/CustomTextField.dart';
 import '../../../data/models/disease_response_model.dart';
 import '../controllers/records_controller.dart';
 import 'package:intl/intl.dart';

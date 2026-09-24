@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
-import '../../../core/widgets/powered_by_aira.dart';
 import '../../../core/widgets/healora_logo.dart';
 import '../../../core/Util/app_toast.dart';
 import '../controllers/qr_controller.dart';
@@ -136,8 +135,6 @@ class QrScreen extends StatelessWidget {
                       body:
                           'Show this QR to your doctor or clinic. It stays valid for ${controller.activeExpiryMinutes} minutes, then tap New QR for a fresh code.',
                     ),
-                    const SizedBox(height: 18),
-                    const PoweredByAira(),
                   ],
                 ),
               ),

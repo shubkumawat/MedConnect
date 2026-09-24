@@ -2,19 +2,19 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:healaura/DataProvider/web_api_constant.dart';
-import 'package:healaura/app/core/Util/CustomButton/CustomButton.dart';
-import 'package:healaura/app/core/Util/TextValidator/text_validation.dart';
-import 'package:healaura/app/core/Util/web_page_helper.dart';
+import 'package:healora/DataProvider/web_api_constant.dart';
+import 'package:healora/app/core/Util/CustomButton/CustomButton.dart';
+import 'package:healora/app/core/Util/TextValidator/text_validation.dart';
+import 'package:healora/app/core/Util/web_page_helper.dart';
 
 import '../../../data/models/GetCountryApiResponseModel.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
 import '../../../core/widgets/live_text_field.dart';
 import '../../../core/widgets/otp_input_row.dart';
-import '../../../core/widgets/powered_by_aira.dart';
 import '../controllers/login_controller.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/social_auth_config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -89,8 +89,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   }),
                   const SizedBox(height: 40),
                   _buildSecureFooter(),
-                  const SizedBox(height: 18),
-                  const PoweredByAira(),
                 ],
               ),
             ),
@@ -145,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildBrand() {
     return Center(
       child: Image.asset(
-        'assets/logo/ic_logo_full.png',
+        'assets/logo/ic_logo_fulls.png',
         height: 118,
         fit: BoxFit.contain,
       ),
@@ -426,6 +424,8 @@ class _PhoneStepState extends State<_PhoneStep> {
             onTap: () => controller.getSendOtpAPI(context),
           ),
         ),
+        const SizedBox(height: 28),
+        _SocialAuthRow(controller: controller),
         const SizedBox(height: 20),
         RichText(
           text: TextSpan(
@@ -454,6 +454,137 @@ class _PhoneStepState extends State<_PhoneStep> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SocialAuthRow extends StatelessWidget {
+  final LoginController controller;
+  const _SocialAuthRow({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final busy = controller.isLoading.value;
+      return Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(child: Divider(color: Color(0xFFE3EBE7))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'or continue with',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textGray,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Expanded(child: Divider(color: Color(0xFFE3EBE7))),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Row(
+          //   children: [
+          //     Expanded(
+          //       child: _SocialButton(
+          //         label: 'Google',
+          //         enabled: !busy,
+          //         leading: const _GoogleMark(),
+          //         onTap: () => controller.signInWithGoogle(context),
+          //       ),
+          //     ),
+          //     if (SocialAuthConfig.isFacebookConfigured) ...[
+          //       const SizedBox(width: 12),
+          //       Expanded(
+          //         child: _SocialButton(
+          //           label: 'Facebook',
+          //           enabled: !busy,
+          //           leading: const Icon(
+          //             Icons.facebook_rounded,
+          //             color: Color(0xFF1877F2),
+          //             size: 22,
+          //           ),
+          //           onTap: () => controller.signInWithFacebook(context),
+          //         ),
+          //       ),
+          //     ],
+          //   ],
+          // ),
+        ],
+      );
+    });
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  final String label;
+  final Widget leading;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  const _SocialButton({
+    required this.label,
+    required this.leading,
+    required this.onTap,
+    required this.enabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE3EBE7)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              leading,
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: AppTextStyles.bodyBold.copyWith(fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleMark extends StatelessWidget {
+  const _GoogleMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFDADCE0)),
+      ),
+      child: const Text(
+        'G',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF4285F4),
+          height: 1,
+        ),
+      ),
     );
   }
 }

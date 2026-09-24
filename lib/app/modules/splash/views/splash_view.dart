@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/powered_by_aira.dart';
 import '../../../data/services/app_update_service.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
@@ -96,7 +95,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).padding.bottom;
     return Scaffold(
       backgroundColor: AppColors.white,
       body: Stack(
@@ -110,7 +108,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Image.asset(
-                      'assets/logo/ic_logo_full.png',
+                      'assets/logo/ic_logo_fulls.png',
                       width: 300,
                       fit: BoxFit.contain,
                     ),
@@ -128,15 +126,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                   ],
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 20 + bottom,
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: const PoweredByAira(),
             ),
           ),
         ],

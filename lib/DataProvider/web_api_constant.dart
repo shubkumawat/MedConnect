@@ -5,6 +5,8 @@ class WebApiConstant {
   // Auth
   static const String API_URL_SEND_OTP                     = BASE_URL + "accounts/send-otp/";
   static const String API_URL_VERIFY_OTP                   = BASE_URL + "accounts/verify-otp/";
+  static const String API_URL_GOOGLE_LOGIN                 = BASE_URL + "accounts/google-login/";
+  static const String API_URL_FACEBOOK_LOGIN               = BASE_URL + "accounts/facebook-login/";
   static const String API_URL_VERIFY_UPDATE_PROFILE        = BASE_URL + "accounts/update-profile/";
 
   // Patient / Family
@@ -32,6 +34,8 @@ class WebApiConstant {
   /// GET current prefs · POST to update
   /// Body/query: device_id + medication_reminders / vaccination_reminders / qr_scan_alerts
   static const String API_URL_CARE_REMINDERS               = BASE_URL + "notifications/care-reminders/";
+  /// POST { patient_id?, page, page_size } · JWT. GET ?patient_id= also works.
+  static const String API_URL_NOTIFICATIONS_HISTORY        = BASE_URL + "notifications/history/";
   /// GET/POST female patients only. Optional patient_id for family members.
   static const String API_URL_MENSTRUAL_CYCLE              = BASE_URL + "notifications/menstrual-cycle/";
   /// POST { started_on } — log actual period start and reschedule.

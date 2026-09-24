@@ -2,8 +2,8 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:healaura/app/data/models/disease_response_model.dart';
-import 'package:healaura/app/data/models/medical_record_model.dart';
+import 'package:healora/app/data/models/disease_response_model.dart';
+import 'package:healora/app/data/models/medical_record_model.dart';
 
 class PdfGenerator {
   static Future<Uint8List> generateDiseasePdfBytes({

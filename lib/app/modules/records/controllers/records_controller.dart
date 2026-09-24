@@ -1,22 +1,22 @@
-import 'package:healaura/app/data/services/storage_service.dart';
+import 'package:healora/app/data/services/storage_service.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:get/get.dart';
-import 'package:healaura/app/data/models/medical_record_model.dart';
-import 'package:healaura/app/data/models/appointment_model.dart';
-import 'package:healaura/app/data/models/disease_response_model.dart';
-import 'package:healaura/app/data/models/disease_document_model.dart';
-import 'package:healaura/app/data/models/family_member_model.dart';
-import 'package:healaura/DataProvider/api_provider.dart';
-import 'package:healaura/DataProvider/app_shared_preferences.dart';
-import 'package:healaura/DataProvider/web_api_constant.dart';
-import 'package:healaura/app/modules/records/controllers/pdf_generator.dart';
+import 'package:healora/app/data/models/medical_record_model.dart';
+import 'package:healora/app/data/models/appointment_model.dart';
+import 'package:healora/app/data/models/disease_response_model.dart';
+import 'package:healora/app/data/models/disease_document_model.dart';
+import 'package:healora/app/data/models/family_member_model.dart';
+import 'package:healora/DataProvider/api_provider.dart';
+import 'package:healora/DataProvider/app_shared_preferences.dart';
+import 'package:healora/DataProvider/web_api_constant.dart';
+import 'package:healora/app/modules/records/controllers/pdf_generator.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../home/controllers/home_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../views/disease_pdf_preview_screen.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 class RecordsController extends GetxController {
   var diseases = <DiseaseResult>[].obs;

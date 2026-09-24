@@ -6,12 +6,12 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:healaura/app/data/models/disease_response_model.dart';
-import 'package:healaura/app/data/models/medical_record_model.dart';
-import 'package:healaura/app/modules/profile/controllers/profile_controller.dart';
-import 'package:healaura/app/core/theme/app_colors.dart';
-import 'package:healaura/app/core/theme/app_text_theme.dart';
-import 'package:healaura/app/core/widgets/healora_logo.dart';
+import 'package:healora/app/data/models/disease_response_model.dart';
+import 'package:healora/app/data/models/medical_record_model.dart';
+import 'package:healora/app/modules/profile/controllers/profile_controller.dart';
+import 'package:healora/app/core/theme/app_colors.dart';
+import 'package:healora/app/core/theme/app_text_theme.dart';
+import 'package:healora/app/core/widgets/healora_logo.dart';
 
 class DiseasePdfPreviewScreen extends StatefulWidget {
   final DiseaseResult disease;

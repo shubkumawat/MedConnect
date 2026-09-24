@@ -74,9 +74,23 @@ class ImagePickHelper {
   static Future<bool> _ensurePermission(ImageSource source) async {
     final permission = _permissionFor(source);
     final kind = source == ImageSource.camera ? 'Camera' : 'Photos';
-    var status = await permission.status;
 
-    // "While using the app" / Allow — already saved, do not prompt again.
+    // Gallery: always re-ask. Android "Only this time" still reports granted
+    // until the process dies, so skipping request() looks like a permanent allow.
+    if (source == ImageSource.gallery) {
+      final proceed = await _confirmGalleryAccess();
+      if (!proceed) return false;
+      var galleryStatus = await permission.request();
+      if (galleryStatus.isGranted || galleryStatus.isLimited) return true;
+      if (galleryStatus.isPermanentlyDenied || galleryStatus.isRestricted) {
+        await _showOpenSettingsDialog(kind);
+        return false;
+      }
+      AppToast.showToast(msg: '$kind permission is required');
+      return false;
+    }
+
+    var status = await permission.status;
     if (status.isGranted || status.isLimited) return true;
 
     if (status.isPermanentlyDenied || status.isRestricted) {
@@ -84,7 +98,6 @@ class ImagePickHelper {
       return false;
     }
 
-    // Denied, or Android "Only this time" expired — ask again.
     status = await permission.request();
     if (status.isGranted || status.isLimited) return true;
 
@@ -95,6 +108,42 @@ class ImagePickHelper {
 
     AppToast.showToast(msg: '$kind permission is required');
     return false;
+  }
+
+  /// In-app prompt every gallery pick (change / delete / new photo).
+  static Future<bool> _confirmGalleryAccess() async {
+    final ctx = Get.context;
+    if (ctx == null) return true;
+
+    final go = await showDialog<bool>(
+      context: ctx,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Photos access',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        content: const Text(
+          'Healora needs access to your photos to set or change your profile picture. You can allow it this time only from the next system prompt.',
+          style: TextStyle(height: 1.35),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.tealDark),
+            child: const Text(
+              'Continue',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+    return go == true;
   }
 
   static Future<void> _showOpenSettingsDialog(String kind) async {

@@ -125,32 +125,7 @@ class _HospitalDetailViewState extends State<HospitalDetailView> {
   }
 
   void _showReviewSheet(HospitalDetail hospital) {
-    if (controller.hasUserReviewed.value || hospital.hasReviewed) {
-      Get.snackbar(
-        'Already reviewed',
-        'You have already submitted a review for this place.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.black87,
-        colorText: Colors.white,
-      );
-      return;
-    }
-    Get.bottomSheet(
-      _WriteReviewSheet(
-        hospital: hospital,
-        onSubmit: (rating, comment) async {
-          await controller.submitReview(
-            id: widget.hospitalId,
-            rating: rating,
-            comment: comment,
-            isHospital: true,
-          );
-        },
-      ),
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      enableDrag: true,
-    );
+    controller.openGooglePlace(hospital);
   }
 
   @override
@@ -535,7 +510,14 @@ class _DetailBody extends StatelessWidget {
                           ),
                         ),
 
-                      // Facilities
+                      // Opening hours
+                      if (hospital.openingHours != null &&
+                          hospital.openingHours!.hasSchedule)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                          child: _OpeningHoursCard(hours: hospital.openingHours!),
+                        ),
+
                       if (hospital.facilities.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
@@ -558,7 +540,7 @@ class _DetailBody extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Departments',
+                              Text('Google reviews',
                                   style: AppTextStyles.heading3),
                               const SizedBox(height: 12),
                               ...hospital.departments.map(
@@ -881,7 +863,7 @@ class _TopRatingCard extends StatelessWidget {
                             Icon(
                               hasReviewed
                                   ? Icons.check_circle_rounded
-                                  : Icons.edit_rounded,
+                                  : Icons.map_rounded,
                               color: hasReviewed
                                   ? AppColors.tealDark
                                   : Colors.white,
@@ -889,7 +871,7 @@ class _TopRatingCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              hasReviewed ? 'Reviewed' : 'Rate',
+                              hasReviewed ? 'Reviewed' : 'Maps',
                               style: TextStyle(
                                 color: hasReviewed
                                     ? AppColors.tealDark
@@ -1575,6 +1557,169 @@ class _ContactActionRow extends StatelessWidget {
   }
 }
 
+class _OpeningHoursCard extends StatelessWidget {
+  final PlaceOpeningHours hours;
+  const _OpeningHoursCard({required this.hours});
+
+  @override
+  Widget build(BuildContext context) {
+    final today = hours.today;
+    final openNow = hours.openNow;
+    final openColor = openNow == true ? const Color(0xFF0B6E4F) : const Color(0xFFB42318);
+    final openBg = openNow == true
+        ? const Color(0xFF0B6E4F).withValues(alpha: 0.1)
+        : const Color(0xFFB42318).withValues(alpha: 0.08);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.schedule_rounded,
+                  size: 18,
+                  color: AppColors.tealDark,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Hours',
+                  style: AppTextStyles.heading3,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (openNow != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: openBg,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    openNow ? 'Open now' : 'Closed',
+                    style: TextStyle(
+                      color: openColor,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (today != null) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F7F5),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          today.day.isEmpty ? 'Today' : 'Today · ${today.day}',
+                          style: AppTextStyles.captionBold.copyWith(
+                            color: AppColors.textMuted,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          today.displayHours,
+                          style: AppTextStyles.bodyBold.copyWith(
+                            fontSize: 15,
+                            height: 1.35,
+                            color: today.isClosed
+                                ? const Color(0xFFB42318)
+                                : AppColors.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (hours.days.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...hours.days.map((d) {
+              final isToday = today != null &&
+                  d.day.toLowerCase() == today.day.toLowerCase();
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 92,
+                      child: Text(
+                        d.day,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.captionBold.copyWith(
+                          fontSize: 13,
+                          color: isToday
+                              ? AppColors.tealDark
+                              : AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        d.displayHours,
+                        textAlign: TextAlign.right,
+                        style: AppTextStyles.body.copyWith(
+                          fontSize: 13,
+                          height: 1.4,
+                          fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                          color: d.isClosed
+                              ? const Color(0xFFB42318)
+                              : AppColors.textDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
@@ -1621,19 +1766,28 @@ class _FacilityPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.teal),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: AppTextStyles.captionBold.copyWith(
-              color: AppColors.tealDark,
-              fontSize: 12,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width - 88,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.teal),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.captionBold.copyWith(
+                  color: AppColors.tealDark,
+                  fontSize: 12,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1972,7 +2126,7 @@ class _ReviewsSection extends StatelessWidget {
                             Icon(
                               hasReviewed
                                   ? Icons.check_circle_rounded
-                                  : Icons.edit_rounded,
+                                  : Icons.map_rounded,
                               color: hasReviewed
                                   ? AppColors.tealDark
                                   : Colors.white,
@@ -1982,7 +2136,7 @@ class _ReviewsSection extends StatelessWidget {
                             Text(
                               hasReviewed
                                   ? 'You already reviewed'
-                                  : 'Write a review',
+                                  : 'Open in Google Maps',
                               style: TextStyle(
                                 color: hasReviewed
                                     ? AppColors.tealDark

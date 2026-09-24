@@ -62,6 +62,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '496964329712',
     projectId: 'healaura-b7634',
     storageBucket: 'healaura-b7634.firebasestorage.app',
-    iosBundleId: 'com.healaura.app',
+    iosBundleId: 'com.healora.app',
   );
 }

@@ -13,7 +13,7 @@ import '../../../../DataProvider/api_provider.dart';
 import '../../../../DataProvider/app_shared_preferences.dart';
 import '../../../../DataProvider/web_api_constant.dart';
 import '../../../data/models/qr_code_model.dart';
-import 'package:healaura/app/core/Util/app_toast.dart';
+import 'package:healora/app/core/Util/app_toast.dart';
 
 class QrController extends GetxController {
   final String patientName;
