@@ -5,7 +5,9 @@ import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_theme.dart';
+import '../../../data/services/notification_navigation.dart';
 import '../../../data/services/storage_service.dart';
+import '../../dashboard/views/dashboard_view.dart';
 
 /// Shown once after splash when location is not yet granted.
 class LocationPermissionScreen extends StatefulWidget {
@@ -35,7 +37,16 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
 
   Future<void> _finish() async {
     if (!mounted) return;
-    Get.offAll(() => widget.next);
+    Get.offAll(
+      () => widget.next,
+      transition: Transition.fadeIn,
+      duration: const Duration(milliseconds: 360),
+    );
+    if (widget.next is DashboardScreen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        NotificationNavigation.flushAfterReady();
+      });
+    }
   }
 
   Future<void> _skip() async {

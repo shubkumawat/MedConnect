@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Color;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -100,8 +101,10 @@ class NotificationService {
     PrintLog.printLog('FCM permission status: ${settings.authorizationStatus}');
   }
 
+  static const String androidIcon = '@drawable/ic_stat_healora';
+
   Future<void> _initLocalNotifications() async {
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings(androidIcon);
     const iosInit = DarwinInitializationSettings(
       // Permission is already requested above via FirebaseMessaging.
       requestAlertPermission: false,
@@ -111,11 +114,17 @@ class NotificationService {
     await _localNotifications.initialize(
       const InitializationSettings(android: androidInit, iOS: iosInit),
       onDidReceiveNotificationResponse: (response) {
-        // payload carries the JSON-encoded `message.data` set in
-        // _onForegroundMessage below.
-        if (response.payload != null && response.payload!.isNotEmpty) {
-          onNotificationTap?.call(jsonDecode(response.payload!));
+        Map<String, dynamic> data = const {};
+        final payload = response.payload;
+        if (payload != null && payload.isNotEmpty) {
+          try {
+            final decoded = jsonDecode(payload);
+            if (decoded is Map) {
+              data = Map<String, dynamic>.from(decoded);
+            }
+          } catch (_) {}
         }
+        onNotificationTap?.call(data);
       },
     );
   }
@@ -165,6 +174,25 @@ class NotificationService {
     // TODO: re-sync the refreshed token with the backend (see above).
   }
 
+  NotificationDetails get _details => NotificationDetails(
+        android: AndroidNotificationDetails(
+          _androidChannel.id,
+          _androidChannel.name,
+          channelDescription: _androidChannel.description,
+          icon: androidIcon,
+          color: const Color(0xFF0B6E4F),
+          largeIcon:
+              const DrawableResourceAndroidBitmap('@drawable/ic_launcher_foreground'),
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      );
+
   /// Push arrived while the app was open — FCM won't surface a system
   /// notification on its own here, so show one via flutter_local_notifications.
   Future<void> _onForegroundMessage(RemoteMessage message) async {
@@ -176,17 +204,7 @@ class NotificationService {
       notification.hashCode,
       notification.title,
       notification.body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _androidChannel.id,
-          _androidChannel.name,
-          channelDescription: _androidChannel.description,
-          icon: '@mipmap/ic_launcher',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: const DarwinNotificationDetails(),
-      ),
+      _details,
       payload: jsonEncode(message.data),
     );
   }
@@ -207,21 +225,8 @@ class NotificationService {
       id,
       title,
       body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _androidChannel.id,
-          _androidChannel.name,
-          channelDescription: _androidChannel.description,
-          icon: '@mipmap/ic_launcher',
-          importance: Importance.max,
-          priority: Priority.max,
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
+      _details,
+      payload: '{}',
     );
   }
 }

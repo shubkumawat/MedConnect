@@ -100,6 +100,18 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     }
   }
 
+  bool _markingVisited = false;
+
+  Future<void> _markVisited() async {
+    if (_markingVisited) return;
+    setState(() => _markingVisited = true);
+    await controller.markAppointmentVisited(
+      appointmentUuid: widget.appointmentUuid,
+      diseaseUuid: widget.diseaseUuid,
+    );
+    if (mounted) setState(() => _markingVisited = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.of(context).padding.top;
@@ -204,7 +216,9 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                                 a.statusLabel,
                                 a.isCancelled
                                     ? AppColors.statusRed
-                                    : AppColors.tealDark,
+                                    : a.isVisited
+                                        ? AppColors.tealDark
+                                        : AppColors.orange,
                               ),
                             ],
                           ),
@@ -219,6 +233,18 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                             _when(a.scheduledAt),
                             style: AppTextStyles.bodyBold.copyWith(fontSize: 14),
                           ),
+                          if (a.isVisited &&
+                              a.visitedAt != null &&
+                              a.visitedAt!.trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              'Visited · ${_when(a.visitedAt)}',
+                              style: AppTextStyles.caption.copyWith(
+                                color: AppColors.tealDark,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                           if (a.notes.isNotEmpty) ...[
                             const SizedBox(height: 8),
                             Text(a.notes,
@@ -228,7 +254,41 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                         ],
                       ),
                     ),
-                    if (a.isScheduled) ...[
+                    if (!a.isCancelled && !a.isVisited) ...[
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        height: 52,
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _markingVisited ? null : _markVisited,
+                          icon: _markingVisited
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check_circle_rounded, size: 22),
+                          label: Text(
+                            _markingVisited ? 'Marking…' : 'Mark as visited',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.tealDark,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: AppColors.tealDark
+                                .withValues(alpha: 0.7),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (!a.isCancelled) ...[
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -265,6 +325,8 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                           ),
                         ],
                       ),
+                    ],
+                    if (a.isScheduled) ...[
                       const SizedBox(height: 10),
                       OutlinedButton(
                         onPressed: _cancel,

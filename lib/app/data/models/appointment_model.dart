@@ -8,6 +8,7 @@ class DiseaseAppointment {
   final String notes;
   final String kind;
   final String status;
+  final String? visitedAt;
 
   DiseaseAppointment({
     required this.uuid,
@@ -19,12 +20,26 @@ class DiseaseAppointment {
     this.notes = '',
     this.kind = 'follow_up',
     this.status = 'scheduled',
+    this.visitedAt,
   });
 
   bool get isCancelled => status.toLowerCase() == 'cancelled';
   bool get isScheduled => status.toLowerCase() == 'scheduled';
+  bool get isVisited =>
+      status.toLowerCase() == 'visited' ||
+      (visitedAt != null && visitedAt!.trim().isNotEmpty);
   bool get isInitial => kind.toLowerCase() == 'initial';
   bool get isFollowUp => kind.toLowerCase() == 'follow_up';
+
+  /// True once the scheduled date/time has passed.
+  bool get hasOccurred {
+    if (scheduledAt == null || scheduledAt!.trim().isEmpty) return false;
+    try {
+      return !DateTime.parse(scheduledAt!).toLocal().isAfter(DateTime.now());
+    } catch (_) {
+      return false;
+    }
+  }
 
   String get kindLabel {
     switch (kind.toLowerCase()) {
@@ -38,8 +53,17 @@ class DiseaseAppointment {
   }
 
   String get statusLabel {
-    if (status.isEmpty) return 'Scheduled';
-    return status[0].toUpperCase() + status.substring(1);
+    switch (status.toLowerCase()) {
+      case 'visited':
+        return 'Visited';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'scheduled':
+        return 'Scheduled';
+      default:
+        if (status.isEmpty) return 'Scheduled';
+        return status[0].toUpperCase() + status.substring(1);
+    }
   }
 
   String get whenLabel {
@@ -70,6 +94,7 @@ class DiseaseAppointment {
       notes: json['notes']?.toString() ?? '',
       kind: json['kind']?.toString() ?? 'follow_up',
       status: json['status']?.toString() ?? 'scheduled',
+      visitedAt: json['visited_at']?.toString(),
     );
   }
 
@@ -110,6 +135,7 @@ class AppointmentDetail extends DiseaseAppointment {
     super.notes,
     super.kind,
     super.status,
+    super.visitedAt,
     this.symptoms = const [],
     this.doctors = const [],
     this.hospitals = const [],
@@ -132,6 +158,7 @@ class AppointmentDetail extends DiseaseAppointment {
       notes: base.notes,
       kind: base.kind,
       status: base.status,
+      visitedAt: base.visitedAt,
       symptoms: _maps(json['symptoms']),
       doctors: _maps(json['doctors']),
       hospitals: _maps(json['hospitals']),

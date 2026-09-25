@@ -1517,8 +1517,14 @@ class _AppointmentTile extends StatelessWidget {
               Icon(
                 cancelled
                     ? Icons.event_busy_rounded
-                    : Icons.event_available_rounded,
-                color: cancelled ? AppColors.statusRed : AppColors.tealDark,
+                    : appointment.isVisited
+                        ? Icons.check_circle_rounded
+                        : Icons.event_available_rounded,
+                color: cancelled
+                    ? AppColors.statusRed
+                    : appointment.isVisited
+                        ? AppColors.tealDark
+                        : AppColors.orange,
               ),
               const SizedBox(width: 10),
               Expanded(

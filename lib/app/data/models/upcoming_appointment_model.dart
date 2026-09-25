@@ -89,6 +89,79 @@ class UpcomingAppointment {
     return date.year == now.year && date.month == now.month && date.day == now.day;
   }
 
+  /// True while the visit’s date/time is still ahead (past slots are hidden).
+  bool get isStillUpcoming {
+    final s = status.toLowerCase();
+    if (s == 'visited' || s == 'cancelled') return false;
+    final when = occursAt;
+    if (when == null) return isTodayOrTomorrow;
+    return !when.isBefore(DateTime.now());
+  }
+
+  /// Local date-time of the visit, or end of that day if no clock time.
+  DateTime? get occursAt {
+    final time = _parseClock(scheduledTime);
+    if (scheduledAt != null && scheduledAt!.trim().isNotEmpty) {
+      try {
+        final parsed = DateTime.parse(scheduledAt!).toLocal();
+        final raw = scheduledAt!;
+        final hasClock = raw.contains('T') ||
+            RegExp(r'\d{1,2}:\d{2}').hasMatch(raw);
+        if (!hasClock && time != null) {
+          return DateTime(
+            parsed.year,
+            parsed.month,
+            parsed.day,
+            time.$1,
+            time.$2,
+          );
+        }
+        return parsed;
+      } catch (_) {}
+    }
+    final date = _resolvedDate;
+    if (date != null) {
+      if (time != null) {
+        return DateTime(date.year, date.month, date.day, time.$1, time.$2);
+      }
+      return DateTime(date.year, date.month, date.day, 23, 59, 59);
+    }
+    final label = day.toLowerCase().trim();
+    final now = DateTime.now();
+    DateTime? dayAnchor;
+    if (label == 'today') {
+      dayAnchor = DateTime(now.year, now.month, now.day);
+    } else if (label == 'tomorrow') {
+      dayAnchor = DateTime(now.year, now.month, now.day)
+          .add(const Duration(days: 1));
+    }
+    if (dayAnchor == null) return null;
+    if (time != null) {
+      return DateTime(
+        dayAnchor.year,
+        dayAnchor.month,
+        dayAnchor.day,
+        time.$1,
+        time.$2,
+      );
+    }
+    return DateTime(dayAnchor.year, dayAnchor.month, dayAnchor.day, 23, 59, 59);
+  }
+
+  static (int, int)? _parseClock(String raw) {
+    final t = raw.trim().toLowerCase();
+    if (t.isEmpty) return null;
+    final match = RegExp(r'(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)?').firstMatch(t);
+    if (match == null) return null;
+    var hour = int.tryParse(match.group(1) ?? '') ?? 0;
+    final minute = int.tryParse(match.group(2) ?? '') ?? 0;
+    final ap = match.group(3);
+    if (ap == 'pm' && hour < 12) hour += 12;
+    if (ap == 'am' && hour == 12) hour = 0;
+    if (hour > 23 || minute > 59) return null;
+    return (hour, minute);
+  }
+
   DateTime? get _resolvedDate {
     if (scheduledAt != null && scheduledAt!.trim().isNotEmpty) {
       try {
@@ -105,6 +178,9 @@ class UpcomingAppointment {
   }
 
   static int compareNearTerm(UpcomingAppointment a, UpcomingAppointment b) {
+    final at = a.occursAt;
+    final bt = b.occursAt;
+    if (at != null && bt != null) return at.compareTo(bt);
     final rank = (a.isToday ? 0 : 1).compareTo(b.isToday ? 0 : 1);
     if (rank != 0) return rank;
     return a.whenLabel.compareTo(b.whenLabel);
@@ -147,7 +223,8 @@ class UpcomingAppointment {
     final items = list
         .whereType<Map>()
         .map((e) => UpcomingAppointment.fromJson(Map<String, dynamic>.from(e)))
-        .where((e) => e.uuid.isNotEmpty && e.isTodayOrTomorrow)
+        .where((e) =>
+            e.uuid.isNotEmpty && e.isTodayOrTomorrow && e.isStillUpcoming)
         .toList();
     items.sort(UpcomingAppointment.compareNearTerm);
     return items;

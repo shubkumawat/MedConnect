@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app/core/theme/app_colors.dart';
+import 'app/core/theme/app_motion.dart';
 import 'app/core/theme/app_text_theme.dart';
+import 'app/data/services/notification_navigation.dart';
 import 'app/data/services/notification_service.dart';
 import 'app/modules/splash/views/splash_view.dart';
 import 'firebase_options.dart';
@@ -14,9 +16,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await NotificationService.instance.init();
-  // Poppins was referenced in Theme/AppTextStyles but never bundled — missing
-  // font families make TextField glyphs invisible until the field is re-tapped.
+  NotificationNavigation.bind();
   GoogleFonts.config.allowRuntimeFetching = true;
+  PaintingBinding.instance.imageCache.maximumSize = 160;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 80 << 20;
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -51,9 +55,19 @@ class HealoraApp extends StatelessWidget {
       locale: const Locale('en'),
       fallbackLocale: const Locale('en'),
       debugShowCheckedModeBanner: false,
+      defaultTransition: Transition.cupertino,
+      transitionDuration: AppMotion.page,
+      scrollBehavior: const HealoraScrollBehavior(),
       theme: base.copyWith(
         textTheme: textTheme,
         primaryTextTheme: textTheme,
+        splashFactory: InkRipple.splashFactory,
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          },
+        ),
         inputDecorationTheme: InputDecorationTheme(
           hintStyle: textTheme.bodyMedium?.copyWith(color: AppColors.textGray),
           labelStyle: textTheme.bodyMedium?.copyWith(color: AppColors.textDark),

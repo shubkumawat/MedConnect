@@ -365,7 +365,8 @@ class AppointmentPrompts {
     required List<UpcomingAppointment> upcoming,
     String? patientId,
   }) async {
-    if (_busy || upcoming.isEmpty) return;
+    final live = upcoming.where((e) => e.isStillUpcoming).toList();
+    if (_busy || live.isEmpty) return;
     final storage = StorageService();
     final loggedIn = await storage.getBool(StorageService.isLogin);
     final setupDone = await storage.getBool(StorageService.profileSetupDone);
@@ -382,7 +383,7 @@ class AppointmentPrompts {
       if (last != today) {
         await storage.setString(StorageService.upcomingApptPopupDate, today);
         if (ctx.mounted) {
-          await showUpcomingAppointmentsDialog(ctx, upcoming);
+          await showUpcomingAppointmentsDialog(ctx, live);
         }
       }
     } finally {

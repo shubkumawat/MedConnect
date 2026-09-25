@@ -5,6 +5,7 @@ import '../../home/controllers/home_controller.dart';
 import '../../records/controllers/records_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
 import 'package:healora/app/core/Util/app_toast.dart';
+import '../../../data/services/notification_navigation.dart';
 
 class DashboardController extends GetxController {
   var currentIndex = 0.obs;
@@ -15,6 +16,7 @@ class DashboardController extends GetxController {
   void onInit() {
     super.onInit();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationNavigation.flushAfterReady();
       _loadProfileOnFirstOpen();
     });
   }

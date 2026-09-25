@@ -114,7 +114,9 @@ class _AddAppointmentScreenState extends State<AddAppointmentScreen> {
     );
     if (!mounted) return;
     setState(() => _saving = false);
-    if (ok) Get.back(result: true);
+    if (ok) {
+      Get.back(result: true);
+    }
   }
 
   @override

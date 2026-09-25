@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_motion.dart';
 import '../../../data/services/app_update_service.dart';
+import '../../../data/services/notification_navigation.dart';
 import '../../../data/services/storage_service.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../location/views/location_permission_view.dart';
@@ -47,7 +48,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   }
 
   Future<void> _navigate() async {
-    await Future.delayed(const Duration(milliseconds: 2200));
+    await Future.delayed(const Duration(milliseconds: 1400));
 
     final storage = StorageService();
     final isLogin = await storage.getBool(StorageService.isLogin);
@@ -75,9 +76,15 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     if (!mounted) return;
 
     if (showLocationGate) {
-      Get.offAll(() => LocationPermissionScreen(next: next));
+      AppMotion.offAll(LocationPermissionScreen(next: next));
     } else {
-      Get.offAll(() => next);
+      AppMotion.offAll(next);
+    }
+
+    if (isLogin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        NotificationNavigation.flushAfterReady();
+      });
     }
 
     // Runs after navigation so the "Update Available" dialog (a Get overlay)

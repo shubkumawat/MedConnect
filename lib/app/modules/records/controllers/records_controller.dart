@@ -1314,7 +1314,6 @@ class RecordsController extends GetxController {
     String notes = '',
   }) async {
     try {
-      isLoading.value = true;
       String? token =
           await AppSharedPreferences().getString(AppSharedPreferences.token);
       final body = <String, dynamic>{
@@ -1343,9 +1342,9 @@ class RecordsController extends GetxController {
         AppToast.showToast(
             msg: (raw is Map ? raw['message']?.toString() : null) ??
                 'Appointment scheduled successfully.');
-        await fetchDiseaseAppointments(diseaseUuid);
-        await fetchDiseaseDetail(diseaseUuid);
-        await fetchDiseases();
+        fetchDiseaseAppointments(diseaseUuid);
+        fetchDiseaseDetail(diseaseUuid);
+        fetchDiseases();
         return true;
       }
       AppToast.showToast(msg: 'Failed to schedule appointment');
@@ -1354,8 +1353,6 @@ class RecordsController extends GetxController {
       debugPrint("Error scheduling appointment: $e");
       AppToast.showToast(msg: 'Failed to schedule appointment');
       return false;
-    } finally {
-      isLoading.value = false;
     }
   }
 
@@ -1449,6 +1446,88 @@ class RecordsController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<bool> markAppointmentVisited({
+    required String appointmentUuid,
+    required String diseaseUuid,
+    bool silent = false,
+  }) async {
+    try {
+      String? token =
+          await AppSharedPreferences().getString(AppSharedPreferences.token);
+      final body = <String, dynamic>{
+        'appointment_uuid': appointmentUuid.trim(),
+      };
+      attachPatientId(body);
+
+      final response = await ApiProvider().requestPostForApi(
+        Get.context,
+        WebApiConstant.API_URL_RECORDS_APPOINTMENT_VISIT,
+        body,
+        token ?? '',
+      );
+      final raw = response?.data;
+      if (raw is Map && raw['error'] == true) {
+        if (!silent) {
+          AppToast.showToast(
+              msg: _apiMessage(raw, fallback: 'Could not mark visit.'));
+        }
+        return false;
+      }
+      if (response != null &&
+          (response.statusCode == 200 || response.statusCode == 201)) {
+        if (raw is Map && raw['data'] is Map) {
+          final data = Map<String, dynamic>.from(raw['data'] as Map);
+          final current = selectedAppointment.value;
+          if (current != null &&
+              (current.uuid == appointmentUuid ||
+                  data['uuid']?.toString() == current.uuid)) {
+            selectedAppointment.value = AppointmentDetail.fromJson({
+              ..._appointmentDetailJson(current),
+              ...data,
+            });
+          }
+        }
+        if (!silent) {
+          AppToast.showToast(
+            msg: (raw is Map ? raw['message']?.toString() : null) ??
+                'Appointment marked as visited.',
+          );
+        }
+        await fetchAppointmentDetail(appointmentUuid);
+        fetchDiseaseAppointments(diseaseUuid);
+        fetchDiseaseDetail(diseaseUuid);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error marking appointment visited: $e');
+      return false;
+    }
+  }
+
+  Map<String, dynamic> _appointmentDetailJson(AppointmentDetail a) {
+    return {
+      'uuid': a.uuid,
+      'display_id': a.displayId,
+      'is_archived': a.isArchived,
+      'created_at': a.createdAt,
+      'updated_at': a.updatedAt,
+      'scheduled_at': a.scheduledAt,
+      'notes': a.notes,
+      'kind': a.kind,
+      'status': a.status,
+      'visited_at': a.visitedAt,
+      'symptoms': a.symptoms,
+      'doctors': a.doctors,
+      'hospitals': a.hospitals,
+      'medications': a.medications,
+      'documents': a.documents,
+      'receipts': a.receipts,
+      'attachments': a.attachments,
+      'prescriptions': a.prescriptions,
+    };
   }
 
   Future<Map<String, dynamic>?> uploadConsultationRecording({

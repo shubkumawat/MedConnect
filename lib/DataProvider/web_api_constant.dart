@@ -51,6 +51,8 @@ class WebApiConstant {
   static const String API_URL_RECORDS_APPOINTMENTS         = BASE_URL + "health-records/diseases/appointments/";
   /// GET ?appointment_uuid=
   static const String API_URL_RECORDS_APPOINTMENT_DETAIL   = BASE_URL + "health-records/diseases/appointments/detail/";
+  /// POST { appointment_uuid } — mark visit complete
+  static const String API_URL_RECORDS_APPOINTMENT_VISIT    = BASE_URL + "health-records/diseases/appointments/visit/";
   /// POST { appointment_uuid }
   static const String API_URL_RECORDS_APPOINTMENT_CANCEL   = BASE_URL + "health-records/diseases/appointments/cancel/";
   static const String API_URL_MASTER_REPORT_TYPES         = BASE_URL + "master/report-types/";

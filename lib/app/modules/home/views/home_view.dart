@@ -178,15 +178,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _UpcomingVisits(controller: controller)
                         .animate()
-                        .fadeIn(delay: 120.ms, duration: 420.ms)
-                        .slideY(begin: 0.06, end: 0),
+                        .fadeIn(duration: 280.ms)
+                        .slideY(begin: 0.04, end: 0),
                     const SizedBox(height: 18),
                     _BmiCalculatorCard(
                       onTap: () => Get.to(() => const BmiCalculatorScreen()),
                     )
                         .animate()
-                        .fadeIn(delay: 150.ms, duration: 420.ms)
-                        .slideY(begin: 0.06, end: 0),
+                        .fadeIn(delay: 40.ms, duration: 280.ms)
+                        .slideY(begin: 0.04, end: 0),
                     const SizedBox(height: 22),
                     _QuickJump(
                       onRecords: () => _jumpTab(1),
@@ -195,17 +195,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       onVideos: () => Get.to(() => const VideoSeriesScreen()),
                     )
                         .animate()
-                        .fadeIn(delay: 180.ms, duration: 420.ms)
-                        .slideY(begin: 0.06, end: 0),
+                        .fadeIn(delay: 70.ms, duration: 280.ms)
+                        .slideY(begin: 0.04, end: 0),
                     const SizedBox(height: 26),
                     _LearnHub(controller: controller)
                         .animate()
-                        .fadeIn(delay: 240.ms, duration: 420.ms),
+                        .fadeIn(delay: 90.ms, duration: 280.ms),
                     const SizedBox(height: 26),
                     _HealthTipsStrip()
                         .animate()
-                        .fadeIn(delay: 280.ms, duration: 420.ms)
-                        .slideY(begin: 0.06, end: 0),
+                        .fadeIn(delay: 110.ms, duration: 280.ms)
+                        .slideY(begin: 0.04, end: 0),
                     const SizedBox(height: 130),
                   ],
                 ),
@@ -872,7 +872,9 @@ class _UpcomingVisits extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final items = controller.upcomingAppointments;
+      final items = controller.upcomingAppointments
+          .where((a) => a.isStillUpcoming)
+          .toList();
       if (items.isEmpty) return const SizedBox.shrink();
 
       return Column(
