@@ -1,0 +1,32 @@
+<svg width="320" height="320" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3D8EE8"/>
+      <stop offset="100%" stop-color="#1E5FA8"/>
+    </linearGradient>
+    <linearGradient id="gTeal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2ECEC0"/>
+      <stop offset="100%" stop-color="#1B9E8E"/>
+    </linearGradient>
+    <linearGradient id="gOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F09040"/>
+      <stop offset="100%" stop-color="#E07B2A"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="150" fill="#E9F2FC"/>
+  <circle cx="160" cy="168" r="118" fill="none" stroke="#3D8EE8" stroke-width="2" stroke-dasharray="2 10" opacity="0.5"/>
+
+  <circle cx="104" cy="196" r="34" fill="url(#gTeal)"/>
+  <circle cx="104" cy="186" r="12" fill="#FFFFFF" opacity="0.95"/>
+  <path d="M84 214 a20 16 0 0 1 40 0 z" fill="#FFFFFF" opacity="0.95"/>
+
+  <circle cx="216" cy="196" r="34" fill="url(#gOrange)"/>
+  <circle cx="216" cy="186" r="12" fill="#FFFFFF" opacity="0.95"/>
+  <path d="M196 214 a20 16 0 0 1 40 0 z" fill="#FFFFFF" opacity="0.95"/>
+
+  <circle cx="160" cy="162" r="46" fill="url(#gBlue)"/>
+  <circle cx="160" cy="148" r="16" fill="#FFFFFF"/>
+  <path d="M132 190 a28 22 0 0 1 56 0 z" fill="#FFFFFF"/>
+
+  <path d="M160 90 c-8 -10 -24 -4 -24 8 c0 12 24 26 24 26 s24 -14 24 -26 c0 -12 -16 -18 -24 -8 z" fill="#E03A3A"/>
+</svg>

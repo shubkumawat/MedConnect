@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "496964329712",
+    "project_id": "healaura-b7634",
+    "storage_bucket": "healaura-b7634.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:496964329712:android:34303a100c758fc5f2a235",
+        "android_client_info": {
+          "package_name": "com.healora.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "496964329712-kjk4p7rkj6capqo4teie8drnmo63gule.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.healora.app",
+            "certificate_hash": "6b63ba88286dcf7147cc36c1748652a6c5065b50"
+          }
+        },
+        {
+          "client_id": "496964329712-7ignm9q48mrccf32rn4dcdl5770pjj2l.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSHthHMWhsFu4Stjk1gB1FrCpmy49bTDQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "496964329712-7ignm9q48mrccf32rn4dcdl5770pjj2l.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "496964329712-ded4jtb3q3c5mge2tbre9fjnsa577amh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.healora.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

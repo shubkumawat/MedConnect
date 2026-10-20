@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Replace 0 / placeholder with Facebook App ID + Client Token -->
+    <string name="facebook_app_id">0</string>
+    <string name="facebook_client_token">placeholder</string>
+    <string name="fb_login_protocol_scheme">fb0</string>
+</resources>

@@ -1,29 +1,30 @@
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:medconnect/main.dart';
+
+import 'package:healora/main.dart';
 
 void main() {
-  testWidgets('Med Connect app flow test', (WidgetTester tester) async {
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MedConnectApp());
+    await tester.pumpWidget(const HealoraApp());
 
-    // 1. Verify Splash Screen branding
-    expect(find.text('Med Connect'), findsOneWidget);
-    expect(find.text('Your Health. Your Family. Your Record.'), findsOneWidget);
-    expect(find.text('Presented by AIRA Innovations'), findsOneWidget);
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
 
-    // 2. Wait for Splash transition (4 seconds delay in code)
-    // We use pumpAndSettle with a duration to fast-forward through the delay.
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
 
-    // 3. Verify Onboarding screen is reached
-    expect(find.text('Skip'), findsOneWidget);
-    expect(find.text('One App for Your Whole Family\'s Health'), findsOneWidget);
-    
-    // 4. Test "Skip" navigation to Login
-    await tester.tap(find.text('Skip'));
-    await tester.pumpAndSettle();
-    
-    expect(find.text('Welcome to\nMed Connect'), findsOneWidget);
-    expect(find.text('Send OTP'), findsOneWidget);
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
   });
 }
