@@ -11,8 +11,6 @@ class Validators {
 
 
 
-
-
   static String? validateOTP(String? value) {
     if (value == null || value.isEmpty) {
       return "OTP is required";
